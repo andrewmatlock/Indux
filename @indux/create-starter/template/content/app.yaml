@@ -1,0 +1,20 @@
+# Fallback SEO tags when not defined in pages below
+defaultMeta:
+  title: My Site
+  author: Me
+  description: Lorem ipsum dolor sit amet.
+  image: /images/default-og-image.jpg
+  ogType: website
+
+# Pages
+pages:
+  - path: /
+    page: home
+    title: Home
+    fallback: true # One page can be the fallback for bad links
+
+# Common components to cache - other components are loaded/unloaded on demand
+commonComponents:
+  - logo
+  - header
+  - footer

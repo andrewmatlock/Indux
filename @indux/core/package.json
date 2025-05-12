@@ -1,0 +1,33 @@
+{
+    "name": "@indux/core",
+    "version": "1.5.9",
+    "description": "Core JavaScript functionality for the Indux framework",
+    "main": "indux.min.js",
+    "bin": "./bin/update.js",
+    "scripts": {
+        "postinstall": "node bin/install.js",
+        "update": "node bin/update.js",
+        "prepublishOnly": "cp ../../development/scripts/indux.min.js ."
+    },
+    "files": [
+        "indux.min.js",
+        "bin"
+    ],
+    "keywords": [
+        "indux",
+        "framework",
+        "javascript"
+    ],
+    "author": "Andrew Matlock",
+    "license": "MIT",
+    "dependencies": {
+        "fs-extra": "^11.2.0",
+        "prompts": "^2.4.2"
+    },
+    "devDependencies": {
+        "glob": "^10.3.10"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}
