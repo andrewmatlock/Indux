@@ -32,5 +32,8 @@
         "modulePathIgnorePatterns": [
             "<rootDir>/dist/"
         ]
+    },
+    "dependencies": {
+        "glob": "^11.0.2"
     }
 }
