@@ -1,0 +1,10 @@
+# System files
+.DS_Store
+
+# Config files
+bs-config.js
+rollup.config.js
+
+# Package management
+package-lock.json
+package.json

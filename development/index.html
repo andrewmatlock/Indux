@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+  <!-- Meta -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Web App UI Colors & Manifest -->
+  <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="styles/indux.theme.css">
+  <link rel="stylesheet" href="styles/styles.css">
+
+  <!-- Scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+  <script src="scripts/tailwind.v4.1.js"></script>
+  <script src="scripts/indux.tailwind.compiler.js"></script>
+  <script src="scripts/indux.js"></script>
+
+  <!-- <script src="scripts/indux.tailwind.compiler.js"></script>
+  <script src="scripts/indux.carousels.js"></script>
+  <script src="scripts/indux.collections.js"></script>
+  <script src="scripts/indux.components.js"></script>
+  <script src="scripts/indux.dropdowns.js"></script>
+  <script src="scripts/indux.icons.js"></script>
+  <script src="scripts/indux.localization.js"></script>
+  <script src="scripts/indux.markdown.js"></script>
+  <script src="scripts/indux.themes.js"></script>
+  <script src="scripts/indux.persist.js"></script>
+  <script src="scripts/indux.resize.js"></script>
+  <script src="scripts/indux.tooltips.js"></script>
+  <script src="scripts/indux.toasts.js"></script>
+  <script src="scripts/indux.url.queries.js"></script> -->
+
+  <script defer src="scripts/alpine.v.3.14.9.js"></script>
+
+</head>
+
+<body x-data class="col gap-2 p-10">
+
+  <x-header />
+
+  <h1>This should be first.</h1>
+  <h2> This should be second.</h2>
+
+  <x-home x-route="/" />
+  <x-about x-route="about" />
+
+  <h2>This should be last.</h2>
+
+</body>
+
+</html>

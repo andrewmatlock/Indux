@@ -1,0 +1,13 @@
+import './indux.components.js';
+import './indux.carousels.js';
+import './indux.collections.js';
+import './indux.dropdowns.js';
+import './indux.icons.js';
+import './indux.localization.js';
+import './indux.persist.js';
+import './indux.resize.js';
+import './indux.themes.js';
+import './indux.toasts.js';
+import './indux.tooltips.js';
+import './indux.url.queries.js';
+import "./temp.plugin.js";
