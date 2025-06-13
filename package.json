@@ -1,14 +1,19 @@
 {
-    "name": "indux-monorepo",
-    "private": true,
+    "name": "indux",
+    "version": "0.1.0",
+    "private": false,
+    "workspaces": [
+        "packages/*"
+    ],
     "scripts": {
         "clean": "rimraf @indux/*/dist/* dist/ development/scripts/indux.min.js",
         "build:core": "cd development && npm run build",
         "build:styles": "node development/scripts/package-styles.js",
         "build:templates": "node development/scripts/package-templates.js",
-        "build": "npm run clean && npm run build:core && npm run build:styles && npm run build:templates",
+        "build": "npm run build --workspaces",
         "publish-packages": "node development/scripts/publish-packages.js",
-        "test": "jest"
+        "test": "npm run test --workspaces",
+        "lint": "npm run lint --workspaces"
     },
     "devDependencies": {
         "@types/jest": "^29.5.14",
@@ -16,9 +21,12 @@
         "jest": "^29.7.0",
         "mock-fs": "^5.4.1",
         "prompts": "^2.4.2",
-        "rimraf": "^5.0.0"
+        "rimraf": "^5.0.0",
+        "@rollup/plugin-commonjs": "^25.0.0",
+        "@rollup/plugin-node-resolve": "^15.0.0",
+        "@rollup/plugin-terser": "^0.4.0",
+        "rollup": "^4.0.0"
     },
-    "version": "1.5.9",
     "main": "index.js",
     "keywords": [],
     "author": "",

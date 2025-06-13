@@ -18,6 +18,11 @@ indux-monorepo/
 ## Available Commands
 
 ### Build Commands
+Rollup all Indux plugins into indux.js (in the /development directory):
+
+    npx rollup -c
+
+    
 Clean all build artifacts:
 
     npm run clean
@@ -37,6 +42,8 @@ Build template packages:
 Build everything:
 
     npm run build
+
+
 
 ### Test Commands
 Run all tests:
