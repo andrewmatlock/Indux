@@ -1,6 +1,4 @@
-/**
- * Indux Collections Plugin
- */
+/*! Indux Collections 1.0.0 - MIT License */
 
 // Initialize plugin when either DOM is ready or Alpine is ready
 async function initializeCollectionsPlugin() {
@@ -32,7 +30,7 @@ async function initializeCollectionsPlugin() {
                 }
             }
         } catch (error) {
-            console.warn('[Indux Collections] Cache read failed:', error);
+            console.warn('[Indux] Cache read failed:', error);
         }
         return null;
     }
@@ -45,7 +43,7 @@ async function initializeCollectionsPlugin() {
                 timestamp: Date.now()
             }));
         } catch (error) {
-            console.warn('[Indux Collections] Cache write failed:', error);
+            console.warn('[Indux] Cache write failed:', error);
         }
     }
 
@@ -95,7 +93,7 @@ async function initializeCollectionsPlugin() {
             window.manifest = await response.json();
             return window.manifest;
         } catch (error) {
-            console.error('[Indux Collections] Failed to load manifest:', error);
+            console.error('[Indux] Failed to load manifest:', error);
             return null;
         }
     }
@@ -137,20 +135,20 @@ async function initializeCollectionsPlugin() {
 
                 const collection = manifest.collections[collectionName];
                 if (!collection) {
-                    console.warn(`[Indux Collections] Collection "${collectionName}" not found in manifest`);
+                    console.warn(`[Indux] Collection "${collectionName}" not found in manifest`);
                     return null;
                 }
 
                 // Handle both string paths and localized objects
                 let source;
                 if (typeof collection === 'string') {
+                    // Direct string path for non-localized collections
                     source = collection;
                 } else if (collection[locale]) {
+                    // Localized collection with locale-specific path
                     source = collection[locale];
-                } else if (collection.path) {
-                    source = collection.path;
                 } else {
-                    console.warn(`[Indux Collections] No source found for collection "${collectionName}" in locale "${locale}"`);
+                    console.warn(`[Indux] No source found for collection "${collectionName}" in locale "${locale}"`);
                     return null;
                 }
 
@@ -165,7 +163,7 @@ async function initializeCollectionsPlugin() {
                     const text = await response.text();
                     data = jsyaml.load(text);
                 } else {
-                    console.warn(`[Indux Collections] Unsupported content type for "${source}": ${contentType}`);
+                    console.warn(`[Indux] Unsupported content type for "${source}": ${contentType}`);
                     return null;
                 }
 
@@ -198,7 +196,7 @@ async function initializeCollectionsPlugin() {
 
                 return enhancedData;
             } catch (error) {
-                console.error(`[Indux Collections] Failed to load collection "${collectionName}":`, error);
+                console.error(`[Indux] Failed to load collection "${collectionName}":`, error);
                 return null;
             } finally {
                 loadingPromises.delete(cacheKey);
@@ -285,16 +283,15 @@ async function initializeCollectionsPlugin() {
         window.addEventListener('localechange', async (event) => {
             const newLocale = event.detail.locale;
 
-            // Clear existing collections
-            Alpine.store('collections', { ...store, all: [] });
+            // Clear existing collections and cache
+            const currentStore = Alpine.store('collections');
+            collectionCache.clear();
+            Alpine.store('collections', {
+                all: [],
+                _initialized: true
+            });
 
-            // Reload all collections with new locale
-            const manifest = await ensureManifest();
-            if (manifest?.collections) {
-                for (const collectionName of Object.keys(manifest.collections)) {
-                    await loadCollection(collectionName, newLocale);
-                }
-            }
+            // Collections will be reloaded on-demand when accessed
         });
 
         return new Proxy({}, {
@@ -392,34 +389,13 @@ async function initializeCollectionsPlugin() {
     isInitializing = true;
 
     try {
-        // Get initial locale from HTML lang attribute
-        const initialLocale = document.documentElement.lang || 'en';
+        // Initialize store without loading all collections
+        Alpine.store('collections', {
+            all: [],
+            _initialized: true
+        });
 
-        // Load collections
-        const manifest = await ensureManifest();
-        if (manifest?.collections) {
-            const store = Alpine.store('collections');
-            const all = [];
-
-            for (const collectionName of Object.keys(manifest.collections)) {
-                const data = await loadCollection(collectionName, initialLocale);
-                if (data) {
-                    store[collectionName] = data;
-                    if (Array.isArray(data)) {
-                        all.push(...data);
-                    } else {
-                        all.push(data);
-                    }
-                }
-            }
-
-            // Update store once with all collections
-            Alpine.store('collections', {
-                ...store,
-                all,
-                _initialized: true
-            });
-        }
+        // Collections will be loaded on-demand when accessed via $x
     } finally {
         isInitializing = false;
         initializationComplete = true;

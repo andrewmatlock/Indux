@@ -1,8 +1,6 @@
-const marked = self.marked;
 
-/**
- * Indux Markdown Plugin
- */
+/*! Indux Markdown 1.0.0 - MIT License */
+const marked = self.marked;
 
 // Initialize plugin when either DOM is ready or Alpine is ready
 function initializeMarkdownPlugin() {

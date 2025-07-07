@@ -1,7 +1,4 @@
-/**
- * Indux URL Queries Plugin
- * Handles URL query parameter management with Alpine.js integration
- */
+/*! Indux URL Queries 1.0.0 - MIT License */
 
 function initializeUrlQueriesPlugin() {
     // Initialize empty queries store
@@ -91,7 +88,7 @@ function initializeUrlQueriesPlugin() {
         // Update URL
         const newQueryString = stringifyQueryObject(currentParams);
         url.search = newQueryString ? `?${newQueryString}` : '';
-        console.debug('[Indux URL Queries] New URL:', url.toString());
+        console.debug('[Indux] New URL:', url.toString());
 
         // Update URL using pushState to ensure changes are visible
         window.history.pushState({}, '', url.toString());
@@ -129,7 +126,7 @@ function initializeUrlQueriesPlugin() {
                     get(target, key) {
                         if (key === 'value') return value;
                         if (key === 'set') return (newValue) => {
-                            console.debug(`[Indux URL Queries] Setting ${prop} to:`, newValue);
+                            console.debug(`[Indux] Setting ${prop} to:`, newValue);
                             clearTimeout(updateTimeouts.get(prop));
                             const timeout = setTimeout(() => {
                                 updateURL({ [prop]: newValue }, 'set');
@@ -137,7 +134,7 @@ function initializeUrlQueriesPlugin() {
                             updateTimeouts.set(prop, timeout);
                         };
                         if (key === 'add') return (newValue) => {
-                            console.debug(`[Indux URL Queries] Adding to ${prop}:`, newValue);
+                            console.debug(`[Indux] Adding to ${prop}:`, newValue);
                             clearTimeout(updateTimeouts.get(prop));
                             const timeout = setTimeout(() => {
                                 updateURL({ [prop]: newValue }, 'add');
@@ -145,7 +142,7 @@ function initializeUrlQueriesPlugin() {
                             updateTimeouts.set(prop, timeout);
                         };
                         if (key === 'remove') return (value) => {
-                            console.debug(`[Indux URL Queries] Removing from ${prop}:`, value);
+                            console.debug(`[Indux] Removing from ${prop}:`, value);
                             clearTimeout(updateTimeouts.get(prop));
                             const timeout = setTimeout(() => {
                                 updateURL({ [prop]: value }, 'remove');
@@ -153,7 +150,7 @@ function initializeUrlQueriesPlugin() {
                             updateTimeouts.set(prop, timeout);
                         };
                         if (key === 'clear') return () => {
-                            console.debug(`[Indux URL Queries] Clearing ${prop}`);
+                            console.debug(`[Indux] Clearing ${prop}`);
                             clearTimeout(updateTimeouts.get(prop));
                             const timeout = setTimeout(() => {
                                 updateURL({ [prop]: null }, 'set');
@@ -177,7 +174,7 @@ function initializeUrlQueriesPlugin() {
     // Listen for popstate events
     window.addEventListener('popstate', () => {
         const params = parseQueryString(window.location.search);
-        console.debug('[Indux URL Queries] Popstate params:', params);
+        console.debug('[Indux] Popstate params:', params);
         Alpine.store('queries', {
             current: params,
             _initialized: true

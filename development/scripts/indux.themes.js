@@ -1,6 +1,4 @@
-/**
- * Indux Theme Plugin
- */
+/*! Indux Themes 1.0.0 - MIT License */
 
 // Initialize plugin when either DOM is ready or Alpine is ready
 function initializeThemePlugin() {

@@ -1,5 +1,3 @@
-<h1>Home</h1>
-
 <template data-head>
     <script>
         console.log('🔄 Home page script loaded');
@@ -76,9 +74,7 @@
         <!-- Current URL State -->
         <div class="col gap-2">
             <h5>Current URL State</h5>
-            <div class="p-2 border rounded">
-                <pre x-text="JSON.stringify($store.queries.current, null, 2)"></pre>
-            </div>
+            <pre x-text="JSON.stringify($store.queries.current, null, 2)"></pre>
         </div>
     </div>
 
@@ -118,7 +114,7 @@
             <h5>Localized Pricing Plans</h5>
             <div class="row gap-4">
                 <template x-for="plan in $x.pricing.plans" :key="plan.name">
-                    <div class="col gap-2 p-4 border rounded">
+                    <div class="col gap-2 p-4 bg-surface-2 rounded">
                         <h6 x-text="plan.name"></h6>
                         <p x-text="plan.price"></p>
                         <ul class="col gap-1">

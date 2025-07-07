@@ -27,35 +27,17 @@
         "image": "/images/default-og-image.jpg",
         "ogType": "website"
     },
-    "pages": [
-        {
-            "path": "html/home.html",
-            "url": "/",
-            "title": "Home",
-            "description": "Testing",
-            "author": "you",
-            "fallback": true
-        },
-        {
-            "path": "html/about.html",
-            "url": "/about",
-            "collections": [
-                "team"
-            ]
-        }
-    ],
     "components": [
         "components/home.html",
-        "components/about.html"
+        "components/about.html",
+        "components/ui.html"
     ],
-    "commonComponents": [
+    "preloadedComponents": [
         "components/navigation/header.html",
         "components/navigation/logo.html"
     ],
     "collections": {
-        "blog": {
-            "path": "/collections/blog.json"
-        },
+        "blog": "/collections/blog.json",
         "pricing": {
             "en": "/collections/pricing.json",
             "fr": "/collections/fr.pricing.json",

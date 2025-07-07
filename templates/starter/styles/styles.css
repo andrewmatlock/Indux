@@ -37,14 +37,14 @@
     --color-surface-1: var(--color-100);
     --color-surface-2: var(--color-200);
     --color-surface-3: var(--color-300);
-    --color-form-surface: oklch(65.5% 0.032 264 / .1);
-    --color-form-surface-hover: oklch(65.5% 0.032 264 / .15);
-    --color-form-inverse: var(--color-text-main);
+    --color-field-surface: oklch(65.5% 0.032 264 / .1);
+    --color-field-surface-hover: oklch(65.5% 0.032 264 / .15);
+    --color-field-inverse: var(--color-text-stark);
     --color-popover-surface: var(--color-page);
     --color-line: oklch(48.3% 0.006422 17.4 / 0.15);
 
     --color-text-stark: var(--color-950);
-    --color-text-main: var(--color-900);
+    --color-text-stark: var(--color-900);
     --color-text-neutral: var(--color-600);
     --color-text-subtle: var(--color-500);
 
@@ -66,8 +66,8 @@
     --spacing-lg: 1.25rem;
     --spacing-xl: 2.5rem;
     --spacing-2xl: 6.25rem;
-    --spacing-form: 0.625rem;
-    --spacing-form-height: 2.25rem;
+    --spacing-field-padding: 0.625rem;
+    --spacing-field-height: 2.25rem;
     --spacing-popover-offset: 0.5rem;
     --spacing-content-width: 85rem;
     --spacing-viewport-padding: 5vw;
@@ -103,12 +103,12 @@
     --color-surface-1: var(--color-900);
     --color-surface-2: var(--color-800);
     --color-surface-3: var(--color-700);
-    --color-form-surface: oklch(58% 0.065 270 / .15);
-    --color-form-surface-hover: oklch(58% 0.065 270 / .20);
+    --color-field-surface: oklch(58% 0.065 270 / .15);
+    --color-field-surface-hover: oklch(58% 0.065 270 / .20);
     --color-popover-surface: var(--color-surface-3);
     --color-line: oklch(48.3% 0.006422 17.4 / 0.2);
     --color-text-stark: var(--color-50);
-    --color-text-main: var(--color-50);
+    --color-text-stark: var(--color-50);
     --color-text-neutral: var(--color-400);
     --color-text-subtle: var(--color-500);
     --color-accent-text: oklch(90.56% 0.1724 148.7);
@@ -162,7 +162,7 @@ h6 {
     font-size: 0.8125rem;
     line-height: 1.4;
     text-transform: uppercase;
-    color: var(--color-text-main)
+    color: var(--color-text-stark)
 }
 
 small,

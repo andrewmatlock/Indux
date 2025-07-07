@@ -1,6 +1,4 @@
-/**
- * Indux Localization Plugin
- */
+/*! Indux Localization 1.0.0 - MIT License */
 
 function initializeLocalizationPlugin() {
     // Initialize empty localization store
@@ -33,7 +31,7 @@ function initializeLocalizationPlugin() {
 
             return Array.from(locales);
         } catch (error) {
-            console.error('[Indux Localization] Error loading manifest:', error);
+            console.error('[Indux] Error loading manifest:', error);
             return ['en']; // Fallback to just 'en'
         }
     }
@@ -101,7 +99,7 @@ function initializeLocalizationPlugin() {
             }));
 
         } catch (error) {
-            console.error('[Indux Localization] Error setting locale:', error);
+            console.error('[Indux] Error setting locale:', error);
             // Restore previous state
             store.current = localStorage.getItem('lang') || store.available[0];
             document.documentElement.lang = store.current;

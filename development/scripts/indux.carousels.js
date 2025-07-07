@@ -1,6 +1,4 @@
-/**
- * Indux Carousel Plugin
- */
+/*! Indux Carousels 1.0.0 - MIT License */
 
 function initializeCarouselPlugin() {
 
@@ -103,7 +101,7 @@ function initializeCarouselPlugin() {
                 setTimeout(() => {
                     const track = el.querySelector('.carousel-slides');
                     if (!track) {
-                        console.warn('[Indux Carousels] Carousel track element not found. Expected element with class "carousel-slides"');
+                        console.warn('[Indux] Carousel track element not found. Expected element with class "carousel-slides"');
                         return;
                     }
 

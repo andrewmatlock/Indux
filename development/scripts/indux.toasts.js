@@ -1,6 +1,4 @@
-/**
- * Indux Toast Plugin
- */
+/*! Indux Toasts 1.0.0 - MIT License */
 
 const TOAST_DURATION = 3000; // Default duration in ms
 

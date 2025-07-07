@@ -1,6 +1,4 @@
-/**
- * Indux Tooltip Plugin
- */
+/*! Indux Tooltips 1.0.0 - MIT License */
 
 const TOOLTIP_HOVER_DELAY = 500; // 500ms delay for hover tooltips
 
