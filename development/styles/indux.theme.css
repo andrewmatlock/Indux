@@ -20,18 +20,18 @@
     --color-surface-1: var(--color-100);
     --color-surface-2: var(--color-200);
     --color-surface-3: var(--color-300);
-    --color-text-stark: var(--color-900);
-    --color-text-neutral: var(--color-600);
-    --color-text-subtle: var(--color-500);
+    --color-content-stark: var(--color-900);
+    --color-content-neutral: var(--color-600);
+    --color-content-subtle: var(--color-500);
     --color-field-surface: var(--color-300);
     --color-field-surface-hover: var(--color-400);
-    --color-field-inverse: var(--color-text-stark);
+    --color-field-inverse: var(--color-content-stark);
     --color-popover-surface: var(--color-page);
-    --color-line: color-mix(in oklch, var(--color-text-stark) 11%, transparent);
+    --color-line: color-mix(in oklch, var(--color-content-stark) 11%, transparent);
     --color-primary: var(--color-900);
     --color-primary-hover: var(--color-700);
     --color-primary-inverse: var(--color-page);
-    --color-primary-text: var(--color-text-stark);
+    --color-primary-text: var(--color-content-stark);
     --color-accent: #f6c07b;
     --color-accent-hover: #f19b46;
     --color-accent-inverse: #763518;
@@ -65,9 +65,9 @@
     --color-field-surface: var(--color-700);
     --color-field-surface-hover: var(--color-600);
     --color-popover-surface: var(--color-700);
-    --color-text-stark: var(--color-50);
-    --color-text-neutral: var(--color-400);
-    --color-text-subtle: var(--color-500);
+    --color-content-stark: var(--color-50);
+    --color-content-neutral: var(--color-400);
+    --color-content-subtle: var(--color-500);
     --color-primary: var(--color-50);
     --color-primary-hover: var(--color-100);
     --color-accent-text: #f6c07b;
@@ -80,18 +80,19 @@
     :host {
         line-height: 1.5;
         font-family: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-        color: var(--color-text-stark, inherit);
+        color: var(--color-content-stark, inherit);
         background-color: var(--color-page, inherit)
     }
 
     /* Text selection */
     ::selection {
-        background-color: color-mix(in oklch, var(--color-surface-1) 92%, var(--color-text-stark))
+        background-color: color-mix(in oklch, var(--color-surface-1) 92%, var(--color-content-stark))
     }
 
     /* Focus state */
-    :where(:focus-visible) {
-        outline: 2px solid color-mix(in oklch, var(--color-field-surface) 90%, var(--color-field-inverse));
-        outline-offset: 0
+    :where(:focus-visible),
+    :where(label:has(input, button, [role="button"], [type="button"], select, textarea):focus-within) {
+        outline: none;
+        box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-content-stark) 35%, transparent);
     }
 }

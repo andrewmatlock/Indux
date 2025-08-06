@@ -478,6 +478,171 @@ var Indux = (function (exports) {
         initialize: initializeComponents
     };
 
+    /*! Indux Anchors 1.0.0 - MIT License */
+
+    // Initialize plugin when Alpine is ready
+    function initializeAnchorsPlugin() {
+        // Register anchors directive
+        Alpine.directive('anchors', (el, { expression, modifiers }, { effect, evaluateLater }) => {
+            const getTarget = evaluateLater(expression || 'null');
+
+            effect(() => {
+                getTarget(async (target) => {
+                    const extractHeadings = () => {
+                        let headings = [];
+
+                        if (target) {
+                            // If target is a string, treat as selector
+                            if (typeof target === 'string') {
+                                const targetEl = document.querySelector(target);
+                                if (targetEl) {
+                                    const headingElements = targetEl.querySelectorAll('h1, h2, h3');
+                                    headings = Array.from(headingElements).map((heading, index) => {
+                                        // Generate ID if missing
+                                        let id = heading.id;
+                                        if (!id || id.trim() === '') {
+                                            // Create ID from text content
+                                            id = heading.textContent
+                                                .toLowerCase()
+                                                .replace(/[^a-z0-9\s-]/g, '')
+                                                .replace(/\s+/g, '-')
+                                                .trim();
+
+                                            // Ensure uniqueness by adding index if needed
+                                            if (!id) {
+                                                id = `heading-${index}`;
+                                            }
+
+                                            // Set the ID on the heading element
+                                            heading.id = id;
+                                        }
+
+                                        return {
+                                            id: id,
+                                            text: heading.textContent,
+                                            level: parseInt(heading.tagName.charAt(1)),
+                                            index: index // Add index for unique key
+                                        };
+                                    });
+                                }
+                            }
+                            // If target is a DOM element, extract headings from it
+                            else if (target && target.querySelectorAll) {
+                                const headingElements = target.querySelectorAll('h1, h2, h3');
+                                headings = Array.from(headingElements).map((heading, index) => {
+                                    // Generate ID if missing
+                                    let id = heading.id;
+                                    if (!id || id.trim() === '') {
+                                        // Create ID from text content
+                                        id = heading.textContent
+                                            .toLowerCase()
+                                            .replace(/[^a-z0-9\s-]/g, '')
+                                            .replace(/\s+/g, '-')
+                                            .trim();
+
+                                        // Ensure uniqueness by adding index if needed
+                                        if (!id) {
+                                            id = `heading-${index}`;
+                                        }
+
+                                        // Set the ID on the heading element
+                                        heading.id = id;
+                                    }
+
+                                    return {
+                                        id: id,
+                                        text: heading.textContent,
+                                        level: parseInt(heading.tagName.charAt(1)),
+                                        index: index // Add index for unique key
+                                    };
+                                });
+                            }
+                        }
+
+                        return headings;
+                    };
+
+                    const updateHeadings = (headings) => {
+                        // Find the closest Alpine component
+                        const parentElement = el.closest('[x-data]') || document.body;
+
+                        // Initialize anchorHeadings if it doesn't exist
+                        if (parentElement._x_dataStack && parentElement._x_dataStack[0]) {
+                            if (!parentElement._x_dataStack[0].anchorHeadings) {
+                                parentElement._x_dataStack[0].anchorHeadings = [];
+                            }
+                            parentElement._x_dataStack[0].anchorHeadings = headings;
+                        } else {
+                            // Create data stack if it doesn't exist
+                            if (!parentElement._x_dataStack) {
+                                parentElement._x_dataStack = [{}];
+                            }
+                            parentElement._x_dataStack[0].anchorHeadings = headings;
+
+                            // Initialize Alpine if needed
+                            if (window.Alpine) {
+                                Alpine.nextTick(() => {
+                                    Alpine.initTree(parentElement);
+                                });
+                            }
+                        }
+                    };
+
+                    // Try immediately
+                    let headings = extractHeadings();
+
+                    // If no headings found, set up a MutationObserver
+                    if (headings.length === 0) {
+                        if (typeof target === 'string') {
+                            const targetEl = document.querySelector(target);
+                            if (targetEl) {
+                                const observer = new MutationObserver((mutations) => {
+                                    const newHeadings = extractHeadings();
+                                    if (newHeadings.length > 0) {
+                                        updateHeadings(newHeadings);
+                                        observer.disconnect();
+                                    }
+                                });
+
+                                observer.observe(targetEl, {
+                                    childList: true,
+                                    subtree: true
+                                });
+
+                                // Also try a few times with setTimeout as fallback
+                                let attempts = 0;
+                                const tryAgain = () => {
+                                    attempts++;
+                                    const newHeadings = extractHeadings();
+                                    if (newHeadings.length > 0) {
+                                        updateHeadings(newHeadings);
+                                        observer.disconnect();
+                                    } else if (attempts < 10) {
+                                        setTimeout(tryAgain, 200);
+                                    } else {
+                                        observer.disconnect();
+                                    }
+                                };
+                                setTimeout(tryAgain, 200);
+                            }
+                        }
+                    }
+
+                    updateHeadings(headings);
+                });
+            });
+        });
+    }
+
+    // Handle both DOMContentLoaded and alpine:init
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.Alpine) initializeAnchorsPlugin();
+        });
+    }
+
+    document.addEventListener('alpine:init', initializeAnchorsPlugin);
+
     /*! Indux Carousels 1.0.0 - MIT License */
 
     function initializeCarouselPlugin() {
@@ -627,381 +792,1382 @@ var Indux = (function (exports) {
 
     document.addEventListener('alpine:init', initializeCarouselPlugin);
 
-    /*! Indux Collections 1.0.0 - MIT License */
+    /*! Indux Code 1.0.0 - MIT License */
 
     // Initialize plugin when either DOM is ready or Alpine is ready
-    async function initializeCollectionsPlugin() {
-        // Initialize empty collections store
-        const initialStore = {
-            all: [], // Global content array for cross-collection access
-            _initialized: false
+    function initializeCodePlugin() {
+        // Check if CSS Custom Highlight API is supported
+        if (!CSS.highlights) {
+            console.warn('[Indux] CSS Custom Highlight API is not supported in this browser. Code highlighting will be disabled.');
+            return;
+        }
+
+        // Configuration object for the code plugin
+        const config = {
+            // CDN base URL for Prism.js
+            prismCDN: 'https://cdn.jsdelivr.net/npm/prismjs@1.30.0',
+            // Flourite CDN for auto-detection
+            flouriteCDN: 'https://cdn.jsdelivr.net/npm/flourite@1.3.0/dist/index.iife.js',
+            // Custom language tokens (can be extended)
+            languageTokens: {},
+            // Theme configuration
+            theme: 'prettylights',
+            // Auto-detection settings
+            autoDetect: true,
+            // Fallback language if detection fails
+            fallbackLanguage: 'text'
         };
-        Alpine.store('collections', initialStore);
 
-        // Cache for loaded collections with persistence
-        const collectionCache = new Map();
-        const loadingPromises = new Map();
-        const CACHE_PREFIX = 'indux_collection_';
-        const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+        // Language mapping from Flourite to Prism.js
+        const flouriteToPrism = {
+            'C': 'c',
+            'C++': 'cpp', 
+            'C#': 'csharp',
+            'Clojure': 'clojure',
+            'CSS': 'css',
+            'Dockerfile': 'docker',
+            'Elixir': 'elixir',
+            'Go': 'go',
+            'HTML': 'markup',
+            'Java': 'java',
+            'Javascript': 'clike',
+            'Julia': 'julia',
+            'Kotlin': 'kotlin',
+            'Lua': 'lua',
+            'Markdown': 'markdown',
+            'Pascal': 'pascal',
+            'PHP': 'php',
+            'Python': 'python',
+            'Ruby': 'ruby',
+            'Rust': 'rust',
+            'SQL': 'sql',
+            'Typescript': 'typescript',
+            'YAML': 'yaml'
+        };
 
-        // Track initialization state
-        let isInitializing = false;
-        let initializationComplete = false;
+        // Language aliases mapping for Prism.js
+        const languageAliases = {
+            html: 'markup',
+            javascript: 'clike',
+            actionscript: 'javascript',
+            arduino: 'cpp',
+            aspnet: ['markup', 'csharp'],
+            bison: 'c',
+            c: 'clike',
+            csharp: 'clike',
+            cpp: 'c',
+            coffeescript: 'javascript',
+            crystal: 'ruby',
+            'css-extras': 'css',
+            d: 'clike',
+            dart: 'clike',
+            django: 'markup',
+            erb: ['ruby', 'markup-templating'],
+            fsharp: 'clike',
+            flow: 'javascript',
+            glsl: 'clike',
+            go: 'clike',
+            groovy: 'clike',
+            haml: 'ruby',
+            handlebars: 'markup-templating',
+            haxe: 'clike',
+            java: 'clike',
+            jolie: 'clike',
+            kotlin: 'clike',
+            less: 'css',
+            markdown: 'markup',
+            'markup-templating': 'markup',
+            n4js: 'javascript',
+            nginx: 'clike',
+            objectivec: 'c',
+            opencl: 'cpp',
+            parser: 'markup',
+            php: ['clike', 'markup-templating'],
+            'php-extras': 'php',
+            plsql: 'sql',
+            processing: 'clike',
+            protobuf: 'clike',
+            pug: 'javascript',
+            qore: 'clike',
+            jsx: ['markup', 'javascript'],
+            tsx: ['jsx', 'typescript'],
+            reason: 'clike',
+            ruby: 'clike',
+            sass: 'css',
+            scss: 'css',
+            scala: 'java',
+            smarty: 'markup-templating',
+            soy: 'markup-templating',
+            swift: 'clike',
+            tap: 'yaml',
+            textile: 'markup',
+            tt2: ['clike', 'markup-templating'],
+            twig: 'markup',
+            typescript: 'javascript',
+            vbnet: 'basic',
+            velocity: 'markup',
+            wiki: 'markup',
+            xeora: 'markup',
+            xquery: 'markup'
+        };
 
-        // Load from persistent cache
-        function loadFromCache(key) {
-            try {
-                const cached = localStorage.getItem(CACHE_PREFIX + key);
-                if (cached) {
-                    const { data, timestamp } = JSON.parse(cached);
-                    if (Date.now() - timestamp < CACHE_DURATION) {
-                        return data;
-                    }
-                }
-            } catch (error) {
-                console.warn('[Indux] Cache read failed:', error);
+        // Set of loaded languages to avoid duplicates
+        const loadedLanguages = new Set();
+
+        // Standard token types for CSS highlights
+        const standardTokens = [
+            'atrule', 'attr-name', 'attr-value', 'bold', 'boolean', 'builtin',
+            'cdata', 'char', 'class-name', 'comment', 'constant', 'deleted',
+            'doctype', 'entity', 'function', 'important', 'inserted', 'italic',
+            'keyword', 'namespace', 'number', 'operator', 'prolog', 'property',
+            'punctuation', 'regex', 'rule', 'selector', 'string', 'symbol',
+            'tag', 'url'
+        ];
+
+        // Initialize CSS highlights
+        function initializeHighlights() {
+            const allTokens = [
+                ...standardTokens,
+                ...Object.entries(config.languageTokens).flatMap(([lang, tokens]) => {
+                    return tokens.map(token => `${lang}-${token}`);
+                })
+            ];
+
+            for (const token of allTokens) {
+                CSS.highlights.set(token, new Highlight());
             }
-            return null;
         }
 
-        // Save to persistent cache
-        function saveToCache(key, data) {
-            try {
-                localStorage.setItem(CACHE_PREFIX + key, JSON.stringify({
-                    data,
-                    timestamp: Date.now()
-                }));
-            } catch (error) {
-                console.warn('[Indux] Cache write failed:', error);
-            }
-        }
-
-        // Load manifest if not already loaded
-        async function ensureManifest() {
-            if (window.manifest) return window.manifest;
-
-            try {
-                const response = await fetch('/manifest.json');
-                window.manifest = await response.json();
-                return window.manifest;
-            } catch (error) {
-                console.error('[Indux] Failed to load manifest:', error);
-                return null;
-            }
-        }
-
-        // Load collection data
-        async function loadCollection(collectionName, locale = 'en') {
-            const cacheKey = `${collectionName}:${locale}`;
-
-            // Check memory cache first
-            if (collectionCache.has(cacheKey)) {
-                const cachedData = collectionCache.get(cacheKey);
-                if (!isInitializing) {
-                    updateStore(collectionName, cachedData);
-                }
-                return cachedData;
-            }
-
-            // Check persistent cache
-            const cachedData = loadFromCache(cacheKey);
-            if (cachedData) {
-                collectionCache.set(cacheKey, cachedData);
-                if (!isInitializing) {
-                    updateStore(collectionName, cachedData);
-                }
-                return cachedData;
-            }
-
-            // If already loading, return existing promise
-            if (loadingPromises.has(cacheKey)) {
-                return loadingPromises.get(cacheKey);
-            }
-
-            const loadPromise = (async () => {
-                try {
-                    const manifest = await ensureManifest();
-                    if (!manifest?.collections) {
-                        return null;
-                    }
-
-                    const collection = manifest.collections[collectionName];
-                    if (!collection) {
-                        console.warn(`[Indux] Collection "${collectionName}" not found in manifest`);
-                        return null;
-                    }
-
-                    // Handle both string paths and localized objects
-                    let source;
-                    if (typeof collection === 'string') {
-                        // Direct string path for non-localized collections
-                        source = collection;
-                    } else if (collection[locale]) {
-                        // Localized collection with locale-specific path
-                        source = collection[locale];
-                    } else {
-                        console.warn(`[Indux] No source found for collection "${collectionName}" in locale "${locale}"`);
-                        return null;
-                    }
-
-                    const response = await fetch(source);
-                    const contentType = response.headers.get('content-type');
-                    let data;
-
-                    // Handle different content types
-                    if (contentType?.includes('application/json')) {
-                        data = await response.json();
-                    } else if (contentType?.includes('text/yaml') || source.endsWith('.yaml') || source.endsWith('.yml')) {
-                        const text = await response.text();
-                        data = jsyaml.load(text);
-                    } else {
-                        console.warn(`[Indux] Unsupported content type for "${source}": ${contentType}`);
-                        return null;
-                    }
-
-                    // Enhance data with metadata
-                    let enhancedData;
-                    if (Array.isArray(data)) {
-                        enhancedData = data.map(item => ({
-                            ...item,
-                            contentType: collectionName,
-                            _loadedFrom: source,
-                            _locale: locale
-                        }));
-                    } else if (typeof data === 'object') {
-                        enhancedData = {
-                            ...data,
-                            contentType: collectionName,
-                            _loadedFrom: source,
-                            _locale: locale
-                        };
-                    }
-
-                    // Update caches
-                    collectionCache.set(cacheKey, enhancedData);
-                    saveToCache(cacheKey, enhancedData);
-
-                    // Update store only if not initializing
-                    if (!isInitializing) {
-                        updateStore(collectionName, enhancedData);
-                    }
-
-                    return enhancedData;
-                } catch (error) {
-                    console.error(`[Indux] Failed to load collection "${collectionName}":`, error);
-                    return null;
-                } finally {
-                    loadingPromises.delete(cacheKey);
-                }
-            })();
-
-            loadingPromises.set(cacheKey, loadPromise);
-            return loadPromise;
-        }
-
-        // Update store with new data
-        function updateStore(collectionName, data) {
-            if (isInitializing) return;
-
-            const store = Alpine.store('collections');
-            const all = store.all.filter(item => item.contentType !== collectionName);
-
-            if (Array.isArray(data)) {
-                all.push(...data);
-            } else {
-                all.push(data);
-            }
-
-            Alpine.store('collections', {
-                ...store,
-                [collectionName]: data,
-                all,
-                _initialized: true
+        // Load Flourite for auto-detection
+        async function loadFlourite() {
+            if (window.flourite) return window.flourite;
+            
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = config.flouriteCDN;
+                script.onload = () => {
+                    resolve(window.flourite);
+                };
+                script.onerror = reject;
+                document.head.appendChild(script);
             });
         }
 
-        // Create a safe proxy for loading state
-        function createLoadingProxy() {
-            return new Proxy({}, {
-                get(target, key) {
-                    // Handle special keys
-                    if (key === Symbol.iterator || key === 'then' || key === 'catch' || key === 'finally') {
-                        return undefined;
-                    }
+        // Auto-detect language using Flourite
+        async function detectLanguage(code) {
+            try {
+                const flourite = await loadFlourite();
+                const result = flourite(code, { shiki: true });
+                
+                // Map Flourite result to Prism.js language
+                const prismLanguage = flouriteToPrism[result.language] || config.fallbackLanguage;
+                
+                console.log(`[Indux] Auto-detected language: ${result.language} → ${prismLanguage}`);
+                return prismLanguage;
+            } catch (error) {
+                console.warn('[Indux] Language detection failed:', error);
+                return config.fallbackLanguage;
+            }
+        }
 
-                    // Handle toPrimitive for text content
-                    if (key === Symbol.toPrimitive) {
-                        return function () { return ''; };
-                    }
-
-                    // Handle numeric keys for array access
-                    if (typeof key === 'string' && !isNaN(Number(key))) {
-                        return createLoadingProxy();
-                    }
-
-                    // Return empty object for nested properties
-                    return createLoadingProxy();
-                }
+        // Load Prism.js core
+        function loadPrismCore() {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = `${config.prismCDN}/components/prism-core.min.js`;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
             });
         }
 
-        // Create a proxy for array items
-        function createArrayItemProxy(item) {
-            return new Proxy(item, {
-                get(target, key) {
-                    // Handle special keys
-                    if (key === Symbol.iterator || key === 'then' || key === 'catch' || key === 'finally') {
-                        return undefined;
-                    }
+        // Load language components
+        async function loadLanguages(languages) {
+            const languagesToLoad = (Array.isArray(languages) ? languages : [languages])
+                .reduce((acc, lang) => {
+                    // Resolve language aliases first
+                    const resolvedLang = languageAliases[lang] || lang;
+                    const deps = Array.isArray(resolvedLang) ? resolvedLang : [resolvedLang];
+                    return acc.push(...deps), acc;
+                }, []);
 
-                    // Handle toPrimitive for text content
-                    if (key === Symbol.toPrimitive) {
-                        return function () {
-                            return target[key] || '';
-                        };
-                    }
+            for (const lang of languagesToLoad) {
+                if (loadedLanguages.has(lang)) continue;
 
-                    return target[key];
-                }
-            });
-        }
-
-        // Add $x magic method first
-        Alpine.magic('x', () => {
-            const pendingLoads = new Map();
-            const store = Alpine.store('collections');
-
-            // Listen for locale changes
-            window.addEventListener('localechange', async (event) => {
-                event.detail.locale;
-
-                // Clear existing collections and cache
-                Alpine.store('collections');
-                collectionCache.clear();
-                Alpine.store('collections', {
-                    all: [],
-                    _initialized: true
+                // Load from CDN - this allows any language to be loaded dynamically
+                await new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = `${config.prismCDN}/components/prism-${lang}.min.js`;
+                    script.onload = () => {
+                        document.head.removeChild(script);
+                        loadedLanguages.add(lang);
+                        resolve(lang);
+                    };
+                    script.onerror = (error) => {
+                        document.head.removeChild(script);
+                        reject(error);
+                    };
+                    document.head.appendChild(script);
                 });
+            }
 
-                // Collections will be reloaded on-demand when accessed
-            });
+            return loadedLanguages;
+        }
 
-            return new Proxy({}, {
-                get(target, prop) {
-                    // Handle special keys
-                    if (prop === Symbol.iterator || prop === 'then' || prop === 'catch' || prop === 'finally') {
-                        return undefined;
+        // Tokenize code using Prism.js
+        function tokenizeCode(code, language) {
+            const grammar = window.Prism.languages[language];
+            if (!grammar) {
+                console.warn(`[Indux] No grammar found for language: ${language}`);
+                return [];
+            }
+            return window.Prism.tokenize(code, grammar).flatMap(flattenTokens);
+        }
+
+        // Flatten nested tokens
+        function flattenTokens(token) {
+            if (typeof token?.content === 'string') {
+                return token;
+            } else if (Array.isArray(token.content)) {
+                return token.content.flatMap(t =>
+                    typeof t === 'string'
+                        ? { type: token.type, content: t, length: t.length }
+                        : t
+                ).flatMap(flattenTokens);
+            } else {
+                return token;
+            }
+        }
+
+        // X-Code custom element
+        class XCodeElement extends HTMLElement {
+            constructor() {
+                super();
+                this.highlights = new Set();
+            }
+
+            static get observedAttributes() {
+                return ['language', 'theme', 'numbers', 'title'];
+            }
+
+            get language() {
+                return this.getAttribute('language') || 'auto';
+            }
+
+            get theme() {
+                return this.getAttribute('theme') || 'default';
+            }
+
+            get numbers() {
+                return this.hasAttribute('numbers');
+            }
+
+            get title() {
+                return this.getAttribute('name') || this.getAttribute('title');
+            }
+
+            get contentElement() {
+                return this.querySelector('code') || this;
+            }
+
+            connectedCallback() {
+                this.setupElement();
+                this.setAttribute('tabindex', '0');
+                this.loadLanguageAndHighlight();
+            }
+
+            attributeChangedCallback(name, oldValue, newValue) {
+                if (oldValue !== newValue) {
+                    if (name === 'language') {
+                        this.loadLanguageAndHighlight();
+                    } else if (name === 'theme') {
+                        this.updateTheme();
+                    } else if (name === 'numbers') {
+                        this.updateLineNumbers();
+                    } else if (name === 'title') {
+                        this.updateTitle();
+                    }
+                }
+            }
+
+            setupElement() {
+                // Create semantically correct structure: pre > code
+                const pre = document.createElement('pre');
+                const code = document.createElement('code');
+                
+                // Get the text content and remove HTML indentation
+                let content = this.textContent.trim();
+                
+                // Split into lines and remove common leading whitespace
+                const lines = content.split('\n');
+                
+                if (lines.length > 1) {
+                    // Find the minimum indentation (excluding empty lines and lines with no indentation)
+                    let minIndent = Infinity;
+                    for (const line of lines) {
+                        if (line.trim() !== '') {
+                            const indent = line.length - line.trimStart().length;
+                            if (indent > 0) { // Only consider lines that actually have indentation
+                                minIndent = Math.min(minIndent, indent);
+                            }
+                        }
                     }
 
-                    // Get current value from store
-                    const value = store[prop];
-                    const currentLocale = Alpine.store('locale').current;
-
-                    // If not in store, try to load it
-                    if (!value && !pendingLoads.has(prop)) {
-                        // Start loading
-                        const loadPromise = loadCollection(prop, currentLocale);
-                        pendingLoads.set(prop, loadPromise);
-                        return createLoadingProxy();
+                    // Remove the common indentation from all lines
+                    if (minIndent < Infinity) {
+                        content = lines.map(line => {
+                            if (line.trim() === '') return '';
+                            const indent = line.length - line.trimStart().length;
+                            // Only remove indentation if the line has enough spaces
+                            return indent >= minIndent ? line.slice(minIndent) : line;
+                        }).join('\n');
                     }
+                }
+                
+                code.textContent = content;
+                pre.appendChild(code);
+                this.textContent = '';
+                this.appendChild(pre);
 
-                    // If we have a value, return a reactive proxy
-                    if (value) {
-                        return new Proxy(value, {
-                            get(target, key) {
-                                // Handle special keys
-                                if (key === Symbol.iterator || key === 'then' || key === 'catch' || key === 'finally') {
-                                    return undefined;
-                                }
+                // Create title if present (after pre element is created)
+                if (this.title) {
+                    const header = document.createElement('div');
+                    header.className = 'header';
+                    
+                    const title = document.createElement('div');
+                    title.className = 'code-title';
+                    title.textContent = this.title;
+                    header.appendChild(title);
+                    
+                    this.insertBefore(header, pre);
+                }
 
-                                // Handle toPrimitive for text content
-                                if (key === Symbol.toPrimitive) {
-                                    return function () { return ''; };
-                                }
+                // Add line numbers if enabled
+                if (this.numbers) {
+                    this.setupLineNumbers();
+                }
+            }
 
-                                // Handle array-like behavior
-                                if (Array.isArray(target)) {
-                                    if (key === 'length') {
-                                        return target.length;
-                                    }
-                                    // Handle numeric keys for array access
-                                    if (typeof key === 'string' && !isNaN(Number(key))) {
-                                        const index = Number(key);
-                                        if (index >= 0 && index < target.length) {
-                                            return createArrayItemProxy(target[index]);
-                                        }
-                                        return createLoadingProxy();
-                                    }
-                                }
+            async setupLineNumbers() {
+                try {
+                    // Ensure the pre element exists and has content
+                    const pre = this.querySelector('pre');
 
-                                // Handle nested objects
-                                const nestedValue = target[key];
-                                if (nestedValue) {
-                                    if (Array.isArray(nestedValue)) {
-                                        return new Proxy(nestedValue, {
-                                            get(target, nestedKey) {
-                                                if (nestedKey === 'length') {
-                                                    return target.length;
-                                                }
-                                                if (typeof nestedKey === 'string' && !isNaN(Number(nestedKey))) {
-                                                    const index = Number(nestedKey);
-                                                    if (index >= 0 && index < target.length) {
-                                                        return createArrayItemProxy(target[index]);
-                                                    }
-                                                    return createLoadingProxy();
-                                                }
-                                                return createLoadingProxy();
-                                            }
-                                        });
-                                    }
-                                    return new Proxy(nestedValue, {
-                                        get(target, nestedKey) {
-                                            // Handle toPrimitive for text content
-                                            if (nestedKey === Symbol.toPrimitive) {
-                                                return function () {
-                                                    return target[nestedKey] || '';
-                                                };
-                                            }
-                                            return target[nestedKey];
-                                        }
-                                    });
-                                }
-                                return createLoadingProxy();
+                    if (pre && !this.querySelector('.lines')) {
+                        // Make sure the pre element is properly set up first
+                        if (!pre.querySelector('code')) {
+                            const code = document.createElement('code');
+                            code.textContent = pre.textContent;
+                            pre.textContent = '';
+                            pre.appendChild(code);
+                        }
+
+                        // Create line numbers manually for better control
+
+                        // Count the lines using the actual DOM content
+                        const codeText = pre.textContent;
+                        const lines = codeText.split('\n');
+
+                        // Create the lines list
+                        const linesList = document.createElement('ul');
+                        linesList.className = 'lines';
+
+                        // Add line number items for all lines (including empty ones)
+                        for (let i = 0; i < lines.length; i++) {
+                            const li = document.createElement('li');
+                            // Show line numbers for all lines to match the actual DOM structure
+                            li.textContent = (i + 1).toString();
+                            linesList.appendChild(li);
+                        }
+
+                        // Insert line numbers before the pre element
+                        this.insertBefore(linesList, pre);
+
+                    }
+                } catch (error) {
+                    console.warn('[Indux] Failed to setup line numbers:', error);
+                }
+            }
+
+            updateLineNumbers() {
+                if (this.numbers) {
+                    this.setupLineNumbers();
+                } else {
+                    // Remove line numbers if disabled
+                    const lines = this.querySelector('.lines');
+                    if (lines) {
+                        lines.remove();
+                    }
+                }
+            }
+
+            async loadLanguageAndHighlight() {
+                try {
+                    let language = this.language;
+                    
+                    // Auto-detect language if not specified or set to 'auto'
+                    if (language === 'auto' || !language) {
+                        const code = this.contentElement.textContent;
+                        language = await detectLanguage(code);
+                        this.setAttribute('language', language);
+                    }
+                    
+                    await loadLanguages(language);
+                    this.paintTokenHighlights();
+                } catch (error) {
+                    console.warn(`[Indux] Failed to load language: ${this.language}`, error);
+                    // Fallback to plain text if language loading fails
+                    this.setAttribute('language', 'text');
+                }
+            }
+
+            paintTokenHighlights() {
+                // Resolve the actual language name for tokenization
+                const resolvedLanguage = languageAliases[this.language] || this.language;
+                const tokens = tokenizeCode(this.contentElement.textContent, resolvedLanguage);
+                const customTokens = config.languageTokens[this.language] || [];
+                let position = 0;
+
+                for (const token of tokens) {
+                    if (token.type) {
+                        const tokenType = customTokens.includes(token.type)
+                            ? `${this.language}-${token.type}`
+                            : token.type;
+
+                        const range = new Range();
+                        range.setStart(this.contentElement.firstChild, position);
+                        range.setEnd(this.contentElement.firstChild, position + token.length);
+
+                        const highlight = CSS.highlights.get(tokenType);
+
+                        if (highlight) {
+                            highlight.add(range);
+                            this.highlights.add({ tokenType, range });
+                        }
+                    }
+                    position += token.length;
+                }
+            }
+
+            clearTokenHighlights() {
+                for (const highlight of this.highlights) {
+                    const cssHighlight = CSS.highlights.get(highlight.tokenType);
+                    if (cssHighlight) {
+                        cssHighlight.delete(highlight.range);
+                    }
+                }
+                this.highlights.clear();
+            }
+
+            update() {
+                this.clearTokenHighlights();
+                this.paintTokenHighlights();
+            }
+
+            updateTheme() {
+                // Theme switching logic could be implemented here
+                // For now, we'll rely on CSS custom properties
+            }
+
+            updateTitle() {
+                let titleElement = this.querySelector('.code-title');
+                if (this.title) {
+                    if (!titleElement) {
+                        titleElement = document.createElement('div');
+                        titleElement.className = 'code-title';
+                        this.insertBefore(titleElement, this.firstChild);
+                    }
+                    titleElement.textContent = this.title;
+                } else if (titleElement) {
+                    titleElement.remove();
+                }
+            }
+        }
+
+        // Initialize the plugin
+        async function initialize() {
+            try {
+                initializeHighlights();
+                await loadPrismCore();
+
+                // Register the custom element
+                if (!customElements.get('x-code')) {
+                    customElements.define('x-code', XCodeElement);
+                }
+
+            } catch (error) {
+                console.error('[Indux] Failed to initialize code plugin:', error);
+            }
+        }
+
+        // Alpine.js directive for code highlighting (only if Alpine is available)
+        if (typeof Alpine !== 'undefined') {
+            Alpine.directive('code', (el, { expression, modifiers }, { effect, evaluateLater }) => {
+                // Create x-code element
+                const codeElement = document.createElement('x-code');
+
+                // Get language from various possible sources
+                let language = 'auto';
+                
+                // Check for language attribute first
+                const languageAttr = el.getAttribute('language');
+                if (languageAttr) {
+                    language = languageAttr;
+                } else if (expression && typeof expression === 'string' && !expression.includes('.')) {
+                    // Fallback to expression if it's a simple string
+                    language = expression;
+                } else if (modifiers.length > 0) {
+                    // Fallback to first modifier
+                    language = modifiers[0];
+                }
+
+                codeElement.setAttribute('language', language);
+
+                // Set theme if specified
+                if (modifiers.includes('dark') || el.hasAttribute('dark')) {
+                    codeElement.setAttribute('theme', 'dark');
+                }
+
+                // Enable line numbers if specified
+                if (modifiers.includes('numbers') || modifiers.includes('line-numbers') || el.hasAttribute('numbers')) {
+                    codeElement.setAttribute('numbers', '');
+                }
+
+                // Set title from various possible sources
+                const title = el.getAttribute('name') || el.getAttribute('title') || el.getAttribute('data-title');
+                if (title) {
+                    codeElement.setAttribute('title', title);
+                }
+
+                // Move content to x-code element
+                const content = el.textContent.trim();
+                codeElement.textContent = content;
+                el.textContent = '';
+                el.appendChild(codeElement);
+
+                // Handle dynamic content updates only if expression is a variable
+                if (expression && (expression.includes('.') || !['javascript', 'css', 'html', 'python', 'ruby', 'php', 'java', 'c', 'cpp', 'csharp', 'go', 'sql', 'json', 'yaml', 'markdown', 'typescript', 'jsx', 'tsx', 'scss', 'sass', 'less', 'xml', 'markup'].includes(expression))) {
+                    const getContent = evaluateLater(expression);
+                    effect(() => {
+                        getContent((content) => {
+                            if (content && typeof content === 'string') {
+                                codeElement.textContent = content;
+                                codeElement.update();
                             }
                         });
-                    }
-
-                    return createLoadingProxy();
+                    });
                 }
             });
-        });
+        }
 
-        // Initialize collections after magic method is registered
-        if (isInitializing || initializationComplete) return;
-        isInitializing = true;
+        // Handle both DOMContentLoaded and alpine:init
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initialize);
+        } else {
+            initialize();
+        }
 
-        try {
-            // Initialize store without loading all collections
-            Alpine.store('collections', {
-                all: [],
-                _initialized: true
+        // Listen for Alpine initialization (only if Alpine is available)
+        if (typeof Alpine !== 'undefined') {
+            document.addEventListener('alpine:init', initialize);
+        } else {
+            // If Alpine isn't available yet, listen for it to become available
+            document.addEventListener('alpine:init', () => {
+                // Re-register the directive when Alpine becomes available
+                if (typeof Alpine !== 'undefined') {
+                    Alpine.directive('code', (el, { expression, modifiers }, { effect, evaluateLater }) => {
+                        // Create x-code element
+                        const codeElement = document.createElement('x-code');
+
+                        // Get language from various possible sources
+                        let language = 'auto';
+                        
+                        // Check for language attribute first
+                        const languageAttr = el.getAttribute('language');
+                        if (languageAttr) {
+                            language = languageAttr;
+                        } else if (expression && typeof expression === 'string' && !expression.includes('.')) {
+                            // Fallback to expression if it's a simple string
+                            language = expression;
+                        } else if (modifiers.length > 0) {
+                            // Fallback to first modifier
+                            language = modifiers[0];
+                        }
+
+                        codeElement.setAttribute('language', language);
+
+                        // Set theme if specified
+                        if (modifiers.includes('dark') || el.hasAttribute('dark')) {
+                            codeElement.setAttribute('theme', 'dark');
+                        }
+
+                        // Enable line numbers if specified
+                        if (modifiers.includes('numbers') || modifiers.includes('line-numbers') || el.hasAttribute('numbers')) {
+                            codeElement.setAttribute('numbers', '');
+                        }
+
+                        // Set title from various possible sources
+                        const title = el.getAttribute('name') || el.getAttribute('title') || el.getAttribute('data-title');
+                        if (title) {
+                            codeElement.setAttribute('title', title);
+                        }
+
+                        // Move content to x-code element
+                        const content = el.textContent.trim();
+                        codeElement.textContent = content;
+                        el.textContent = '';
+                        el.appendChild(codeElement);
+
+                        // Handle dynamic content updates only if expression is a variable
+                        if (expression && (expression.includes('.') || !['javascript', 'css', 'html', 'python', 'ruby', 'php', 'java', 'c', 'cpp', 'csharp', 'go', 'sql', 'json', 'yaml', 'markdown', 'typescript', 'jsx', 'tsx', 'scss', 'sass', 'less', 'xml', 'markup'].includes(expression))) {
+                            const getContent = evaluateLater(expression);
+                            effect(() => {
+                                getContent((content) => {
+                                    if (content && typeof content === 'string') {
+                                        codeElement.textContent = content;
+                                        codeElement.update();
+                                    }
+                                });
+                            });
+                        }
+                    });
+                }
             });
-
-            // Collections will be loaded on-demand when accessed via $x
-        } finally {
-            isInitializing = false;
-            initializationComplete = true;
         }
     }
 
-    // Handle both DOMContentLoaded and alpine:init
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            if (window.Alpine) initializeCollectionsPlugin();
-        });
+    // Initialize the plugin
+    initializeCodePlugin();
+
+    var indux_collections$1 = {exports: {}};
+
+    /*! Indux Collections 1.0.0 - MIT License */
+    var indux_collections = indux_collections$1.exports;
+
+    var hasRequiredIndux_collections;
+
+    function requireIndux_collections () {
+    	if (hasRequiredIndux_collections) return indux_collections$1.exports;
+    	hasRequiredIndux_collections = 1;
+    	(function (module, exports) {
+    		/*! js-yaml 4.1.0 https://github.com/nodeca/js-yaml @license MIT */
+    		!function (e, t) { t(exports) ; }(indux_collections, (function (e) { function t(e) { return null == e } var n = { isNothing: t, isObject: function (e) { return "object" == typeof e && null !== e }, toArray: function (e) { return Array.isArray(e) ? e : t(e) ? [] : [e] }, repeat: function (e, t) { var n, i = ""; for (n = 0; n < t; n += 1)i += e; return i }, isNegativeZero: function (e) { return 0 === e && Number.NEGATIVE_INFINITY === 1 / e }, extend: function (e, t) { var n, i, r, o; if (t) for (n = 0, i = (o = Object.keys(t)).length; n < i; n += 1)e[r = o[n]] = t[r]; return e } }; function i(e, t) { var n = "", i = e.reason || "(unknown reason)"; return e.mark ? (e.mark.name && (n += 'in "' + e.mark.name + '" '), n += "(" + (e.mark.line + 1) + ":" + (e.mark.column + 1) + ")", !t && e.mark.snippet && (n += "\n\n" + e.mark.snippet), i + " " + n) : i } function r(e, t) { Error.call(this), this.name = "YAMLException", this.reason = e, this.mark = t, this.message = i(this, !1), Error.captureStackTrace ? Error.captureStackTrace(this, this.constructor) : this.stack = (new Error).stack || ""; } r.prototype = Object.create(Error.prototype), r.prototype.constructor = r, r.prototype.toString = function (e) { return this.name + ": " + i(this, e) }; var o = r; function a(e, t, n, i, r) { var o = "", a = "", l = Math.floor(r / 2) - 1; return i - t > l && (t = i - l + (o = " ... ").length), n - i > l && (n = i + l - (a = " ...").length), { str: o + e.slice(t, n).replace(/\t/g, "→") + a, pos: i - t + o.length } } function l(e, t) { return n.repeat(" ", t - e.length) + e } var c = function (e, t) { if (t = Object.create(t || null), !e.buffer) return null; t.maxLength || (t.maxLength = 79), "number" != typeof t.indent && (t.indent = 1), "number" != typeof t.linesBefore && (t.linesBefore = 3), "number" != typeof t.linesAfter && (t.linesAfter = 2); for (var i, r = /\r?\n|\r|\0/g, o = [0], c = [], s = -1; i = r.exec(e.buffer);)c.push(i.index), o.push(i.index + i[0].length), e.position <= i.index && s < 0 && (s = o.length - 2); s < 0 && (s = o.length - 1); var u, p, f = "", d = Math.min(e.line + t.linesAfter, c.length).toString().length, h = t.maxLength - (t.indent + d + 3); for (u = 1; u <= t.linesBefore && !(s - u < 0); u++)p = a(e.buffer, o[s - u], c[s - u], e.position - (o[s] - o[s - u]), h), f = n.repeat(" ", t.indent) + l((e.line - u + 1).toString(), d) + " | " + p.str + "\n" + f; for (p = a(e.buffer, o[s], c[s], e.position, h), f += n.repeat(" ", t.indent) + l((e.line + 1).toString(), d) + " | " + p.str + "\n", f += n.repeat("-", t.indent + d + 3 + p.pos) + "^\n", u = 1; u <= t.linesAfter && !(s + u >= c.length); u++)p = a(e.buffer, o[s + u], c[s + u], e.position - (o[s] - o[s + u]), h), f += n.repeat(" ", t.indent) + l((e.line + u + 1).toString(), d) + " | " + p.str + "\n"; return f.replace(/\n$/, "") }, s = ["kind", "multi", "resolve", "construct", "instanceOf", "predicate", "represent", "representName", "defaultStyle", "styleAliases"], u = ["scalar", "sequence", "mapping"]; var p = function (e, t) { if (t = t || {}, Object.keys(t).forEach((function (t) { if (-1 === s.indexOf(t)) throw new o('Unknown option "' + t + '" is met in definition of "' + e + '" YAML type.') })), this.options = t, this.tag = e, this.kind = t.kind || null, this.resolve = t.resolve || function () { return !0 }, this.construct = t.construct || function (e) { return e }, this.instanceOf = t.instanceOf || null, this.predicate = t.predicate || null, this.represent = t.represent || null, this.representName = t.representName || null, this.defaultStyle = t.defaultStyle || null, this.multi = t.multi || !1, this.styleAliases = function (e) { var t = {}; return null !== e && Object.keys(e).forEach((function (n) { e[n].forEach((function (e) { t[String(e)] = n; })); })), t }(t.styleAliases || null), -1 === u.indexOf(this.kind)) throw new o('Unknown kind "' + this.kind + '" is specified for "' + e + '" YAML type.') }; function f(e, t) { var n = []; return e[t].forEach((function (e) { var t = n.length; n.forEach((function (n, i) { n.tag === e.tag && n.kind === e.kind && n.multi === e.multi && (t = i); })), n[t] = e; })), n } function d(e) { return this.extend(e) } d.prototype.extend = function (e) { var t = [], n = []; if (e instanceof p) n.push(e); else if (Array.isArray(e)) n = n.concat(e); else { if (!e || !Array.isArray(e.implicit) && !Array.isArray(e.explicit)) throw new o("Schema.extend argument should be a Type, [ Type ], or a schema definition ({ implicit: [...], explicit: [...] })"); e.implicit && (t = t.concat(e.implicit)), e.explicit && (n = n.concat(e.explicit)); } t.forEach((function (e) { if (!(e instanceof p)) throw new o("Specified list of YAML types (or a single Type object) contains a non-Type object."); if (e.loadKind && "scalar" !== e.loadKind) throw new o("There is a non-scalar type in the implicit list of a schema. Implicit resolving of such types is not supported."); if (e.multi) throw new o("There is a multi type in the implicit list of a schema. Multi tags can only be listed as explicit.") })), n.forEach((function (e) { if (!(e instanceof p)) throw new o("Specified list of YAML types (or a single Type object) contains a non-Type object.") })); var i = Object.create(d.prototype); return i.implicit = (this.implicit || []).concat(t), i.explicit = (this.explicit || []).concat(n), i.compiledImplicit = f(i, "implicit"), i.compiledExplicit = f(i, "explicit"), i.compiledTypeMap = function () { var e, t, n = { scalar: {}, sequence: {}, mapping: {}, fallback: {}, multi: { scalar: [], sequence: [], mapping: [], fallback: [] } }; function i(e) { e.multi ? (n.multi[e.kind].push(e), n.multi.fallback.push(e)) : n[e.kind][e.tag] = n.fallback[e.tag] = e; } for (e = 0, t = arguments.length; e < t; e += 1)arguments[e].forEach(i); return n }(i.compiledImplicit, i.compiledExplicit), i }; var h = d, g = new p("tag:yaml.org,2002:str", { kind: "scalar", construct: function (e) { return null !== e ? e : "" } }), m = new p("tag:yaml.org,2002:seq", { kind: "sequence", construct: function (e) { return null !== e ? e : [] } }), y = new p("tag:yaml.org,2002:map", { kind: "mapping", construct: function (e) { return null !== e ? e : {} } }), b = new h({ explicit: [g, m, y] }); var A = new p("tag:yaml.org,2002:null", { kind: "scalar", resolve: function (e) { if (null === e) return !0; var t = e.length; return 1 === t && "~" === e || 4 === t && ("null" === e || "Null" === e || "NULL" === e) }, construct: function () { return null }, predicate: function (e) { return null === e }, represent: { canonical: function () { return "~" }, lowercase: function () { return "null" }, uppercase: function () { return "NULL" }, camelcase: function () { return "Null" }, empty: function () { return "" } }, defaultStyle: "lowercase" }); var v = new p("tag:yaml.org,2002:bool", { kind: "scalar", resolve: function (e) { if (null === e) return !1; var t = e.length; return 4 === t && ("true" === e || "True" === e || "TRUE" === e) || 5 === t && ("false" === e || "False" === e || "FALSE" === e) }, construct: function (e) { return "true" === e || "True" === e || "TRUE" === e }, predicate: function (e) { return "[object Boolean]" === Object.prototype.toString.call(e) }, represent: { lowercase: function (e) { return e ? "true" : "false" }, uppercase: function (e) { return e ? "TRUE" : "FALSE" }, camelcase: function (e) { return e ? "True" : "False" } }, defaultStyle: "lowercase" }); function w(e) { return 48 <= e && e <= 55 } function k(e) { return 48 <= e && e <= 57 } var C = new p("tag:yaml.org,2002:int", { kind: "scalar", resolve: function (e) { if (null === e) return !1; var t, n, i = e.length, r = 0, o = !1; if (!i) return !1; if ("-" !== (t = e[r]) && "+" !== t || (t = e[++r]), "0" === t) { if (r + 1 === i) return !0; if ("b" === (t = e[++r])) { for (r++; r < i; r++)if ("_" !== (t = e[r])) { if ("0" !== t && "1" !== t) return !1; o = !0; } return o && "_" !== t } if ("x" === t) { for (r++; r < i; r++)if ("_" !== (t = e[r])) { if (!(48 <= (n = e.charCodeAt(r)) && n <= 57 || 65 <= n && n <= 70 || 97 <= n && n <= 102)) return !1; o = !0; } return o && "_" !== t } if ("o" === t) { for (r++; r < i; r++)if ("_" !== (t = e[r])) { if (!w(e.charCodeAt(r))) return !1; o = !0; } return o && "_" !== t } } if ("_" === t) return !1; for (; r < i; r++)if ("_" !== (t = e[r])) { if (!k(e.charCodeAt(r))) return !1; o = !0; } return !(!o || "_" === t) }, construct: function (e) { var t, n = e, i = 1; if (-1 !== n.indexOf("_") && (n = n.replace(/_/g, "")), "-" !== (t = n[0]) && "+" !== t || ("-" === t && (i = -1), t = (n = n.slice(1))[0]), "0" === n) return 0; if ("0" === t) { if ("b" === n[1]) return i * parseInt(n.slice(2), 2); if ("x" === n[1]) return i * parseInt(n.slice(2), 16); if ("o" === n[1]) return i * parseInt(n.slice(2), 8) } return i * parseInt(n, 10) }, predicate: function (e) { return "[object Number]" === Object.prototype.toString.call(e) && e % 1 == 0 && !n.isNegativeZero(e) }, represent: { binary: function (e) { return e >= 0 ? "0b" + e.toString(2) : "-0b" + e.toString(2).slice(1) }, octal: function (e) { return e >= 0 ? "0o" + e.toString(8) : "-0o" + e.toString(8).slice(1) }, decimal: function (e) { return e.toString(10) }, hexadecimal: function (e) { return e >= 0 ? "0x" + e.toString(16).toUpperCase() : "-0x" + e.toString(16).toUpperCase().slice(1) } }, defaultStyle: "decimal", styleAliases: { binary: [2, "bin"], octal: [8, "oct"], decimal: [10, "dec"], hexadecimal: [16, "hex"] } }), x = new RegExp("^(?:[-+]?(?:[0-9][0-9_]*)(?:\\.[0-9_]*)?(?:[eE][-+]?[0-9]+)?|\\.[0-9_]+(?:[eE][-+]?[0-9]+)?|[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN))$"); var I = /^[-+]?[0-9]+e/; var S = new p("tag:yaml.org,2002:float", { kind: "scalar", resolve: function (e) { return null !== e && !(!x.test(e) || "_" === e[e.length - 1]) }, construct: function (e) { var t, n; return n = "-" === (t = e.replace(/_/g, "").toLowerCase())[0] ? -1 : 1, "+-".indexOf(t[0]) >= 0 && (t = t.slice(1)), ".inf" === t ? 1 === n ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY : ".nan" === t ? NaN : n * parseFloat(t, 10) }, predicate: function (e) { return "[object Number]" === Object.prototype.toString.call(e) && (e % 1 != 0 || n.isNegativeZero(e)) }, represent: function (e, t) { var i; if (isNaN(e)) switch (t) { case "lowercase": return ".nan"; case "uppercase": return ".NAN"; case "camelcase": return ".NaN" } else if (Number.POSITIVE_INFINITY === e) switch (t) { case "lowercase": return ".inf"; case "uppercase": return ".INF"; case "camelcase": return ".Inf" } else if (Number.NEGATIVE_INFINITY === e) switch (t) { case "lowercase": return "-.inf"; case "uppercase": return "-.INF"; case "camelcase": return "-.Inf" } else if (n.isNegativeZero(e)) return "-0.0"; return i = e.toString(10), I.test(i) ? i.replace("e", ".e") : i }, defaultStyle: "lowercase" }), O = b.extend({ implicit: [A, v, C, S] }), j = O, T = new RegExp("^([0-9][0-9][0-9][0-9])-([0-9][0-9])-([0-9][0-9])$"), N = new RegExp("^([0-9][0-9][0-9][0-9])-([0-9][0-9]?)-([0-9][0-9]?)(?:[Tt]|[ \\t]+)([0-9][0-9]?):([0-9][0-9]):([0-9][0-9])(?:\\.([0-9]*))?(?:[ \\t]*(Z|([-+])([0-9][0-9]?)(?::([0-9][0-9]))?))?$"); var F = new p("tag:yaml.org,2002:timestamp", { kind: "scalar", resolve: function (e) { return null !== e && (null !== T.exec(e) || null !== N.exec(e)) }, construct: function (e) { var t, n, i, r, o, a, l, c, s = 0, u = null; if (null === (t = T.exec(e)) && (t = N.exec(e)), null === t) throw new Error("Date resolve error"); if (n = +t[1], i = +t[2] - 1, r = +t[3], !t[4]) return new Date(Date.UTC(n, i, r)); if (o = +t[4], a = +t[5], l = +t[6], t[7]) { for (s = t[7].slice(0, 3); s.length < 3;)s += "0"; s = +s; } return t[9] && (u = 6e4 * (60 * +t[10] + +(t[11] || 0)), "-" === t[9] && (u = -u)), c = new Date(Date.UTC(n, i, r, o, a, l, s)), u && c.setTime(c.getTime() - u), c }, instanceOf: Date, represent: function (e) { return e.toISOString() } }); var E = new p("tag:yaml.org,2002:merge", { kind: "scalar", resolve: function (e) { return "<<" === e || null === e } }), M = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\n\r"; var L = new p("tag:yaml.org,2002:binary", { kind: "scalar", resolve: function (e) { if (null === e) return !1; var t, n, i = 0, r = e.length, o = M; for (n = 0; n < r; n++)if (!((t = o.indexOf(e.charAt(n))) > 64)) { if (t < 0) return !1; i += 6; } return i % 8 == 0 }, construct: function (e) { var t, n, i = e.replace(/[\r\n=]/g, ""), r = i.length, o = M, a = 0, l = []; for (t = 0; t < r; t++)t % 4 == 0 && t && (l.push(a >> 16 & 255), l.push(a >> 8 & 255), l.push(255 & a)), a = a << 6 | o.indexOf(i.charAt(t)); return 0 === (n = r % 4 * 6) ? (l.push(a >> 16 & 255), l.push(a >> 8 & 255), l.push(255 & a)) : 18 === n ? (l.push(a >> 10 & 255), l.push(a >> 2 & 255)) : 12 === n && l.push(a >> 4 & 255), new Uint8Array(l) }, predicate: function (e) { return "[object Uint8Array]" === Object.prototype.toString.call(e) }, represent: function (e) { var t, n, i = "", r = 0, o = e.length, a = M; for (t = 0; t < o; t++)t % 3 == 0 && t && (i += a[r >> 18 & 63], i += a[r >> 12 & 63], i += a[r >> 6 & 63], i += a[63 & r]), r = (r << 8) + e[t]; return 0 === (n = o % 3) ? (i += a[r >> 18 & 63], i += a[r >> 12 & 63], i += a[r >> 6 & 63], i += a[63 & r]) : 2 === n ? (i += a[r >> 10 & 63], i += a[r >> 4 & 63], i += a[r << 2 & 63], i += a[64]) : 1 === n && (i += a[r >> 2 & 63], i += a[r << 4 & 63], i += a[64], i += a[64]), i } }), _ = Object.prototype.hasOwnProperty, D = Object.prototype.toString; var U = new p("tag:yaml.org,2002:omap", { kind: "sequence", resolve: function (e) { if (null === e) return !0; var t, n, i, r, o, a = [], l = e; for (t = 0, n = l.length; t < n; t += 1) { if (i = l[t], o = !1, "[object Object]" !== D.call(i)) return !1; for (r in i) if (_.call(i, r)) { if (o) return !1; o = !0; } if (!o) return !1; if (-1 !== a.indexOf(r)) return !1; a.push(r); } return !0 }, construct: function (e) { return null !== e ? e : [] } }), q = Object.prototype.toString; var Y = new p("tag:yaml.org,2002:pairs", { kind: "sequence", resolve: function (e) { if (null === e) return !0; var t, n, i, r, o, a = e; for (o = new Array(a.length), t = 0, n = a.length; t < n; t += 1) { if (i = a[t], "[object Object]" !== q.call(i)) return !1; if (1 !== (r = Object.keys(i)).length) return !1; o[t] = [r[0], i[r[0]]]; } return !0 }, construct: function (e) { if (null === e) return []; var t, n, i, r, o, a = e; for (o = new Array(a.length), t = 0, n = a.length; t < n; t += 1)i = a[t], r = Object.keys(i), o[t] = [r[0], i[r[0]]]; return o } }), R = Object.prototype.hasOwnProperty; var B = new p("tag:yaml.org,2002:set", { kind: "mapping", resolve: function (e) { if (null === e) return !0; var t, n = e; for (t in n) if (R.call(n, t) && null !== n[t]) return !1; return !0 }, construct: function (e) { return null !== e ? e : {} } }), K = j.extend({ implicit: [F, E], explicit: [L, U, Y, B] }), P = Object.prototype.hasOwnProperty, W = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:[^\uD800-\uDBFF]|^)[\uDC00-\uDFFF]/, H = /[\x85\u2028\u2029]/, $ = /[,\[\]\{\}]/, G = /^(?:!|!!|![a-z\-]+!)$/i, V = /^(?:!|[^,\[\]\{\}])(?:%[0-9a-f]{2}|[0-9a-z\-#;\/\?:@&=\+\$,_\.!~\*'\(\)\[\]])*$/i; function Z(e) { return Object.prototype.toString.call(e) } function J(e) { return 10 === e || 13 === e } function Q(e) { return 9 === e || 32 === e } function z(e) { return 9 === e || 32 === e || 10 === e || 13 === e } function X(e) { return 44 === e || 91 === e || 93 === e || 123 === e || 125 === e } function ee(e) { var t; return 48 <= e && e <= 57 ? e - 48 : 97 <= (t = 32 | e) && t <= 102 ? t - 97 + 10 : -1 } function te(e) { return 48 === e ? "\0" : 97 === e ? "" : 98 === e ? "\b" : 116 === e || 9 === e ? "\t" : 110 === e ? "\n" : 118 === e ? "\v" : 102 === e ? "\f" : 114 === e ? "\r" : 101 === e ? "" : 32 === e ? " " : 34 === e ? '"' : 47 === e ? "/" : 92 === e ? "\\" : 78 === e ? "" : 95 === e ? " " : 76 === e ? "\u2028" : 80 === e ? "\u2029" : "" } function ne(e) { return e <= 65535 ? String.fromCharCode(e) : String.fromCharCode(55296 + (e - 65536 >> 10), 56320 + (e - 65536 & 1023)) } for (var ie = new Array(256), re = new Array(256), oe = 0; oe < 256; oe++)ie[oe] = te(oe) ? 1 : 0, re[oe] = te(oe); function ae(e, t) { this.input = e, this.filename = t.filename || null, this.schema = t.schema || K, this.onWarning = t.onWarning || null, this.legacy = t.legacy || !1, this.json = t.json || !1, this.listener = t.listener || null, this.implicitTypes = this.schema.compiledImplicit, this.typeMap = this.schema.compiledTypeMap, this.length = e.length, this.position = 0, this.line = 0, this.lineStart = 0, this.lineIndent = 0, this.firstTabInLine = -1, this.documents = []; } function le(e, t) { var n = { name: e.filename, buffer: e.input.slice(0, -1), position: e.position, line: e.line, column: e.position - e.lineStart }; return n.snippet = c(n), new o(t, n) } function ce(e, t) { throw le(e, t) } function se(e, t) { e.onWarning && e.onWarning.call(null, le(e, t)); } var ue = { YAML: function (e, t, n) { var i, r, o; null !== e.version && ce(e, "duplication of %YAML directive"), 1 !== n.length && ce(e, "YAML directive accepts exactly one argument"), null === (i = /^([0-9]+)\.([0-9]+)$/.exec(n[0])) && ce(e, "ill-formed argument of the YAML directive"), r = parseInt(i[1], 10), o = parseInt(i[2], 10), 1 !== r && ce(e, "unacceptable YAML version of the document"), e.version = n[0], e.checkLineBreaks = o < 2, 1 !== o && 2 !== o && se(e, "unsupported YAML version of the document"); }, TAG: function (e, t, n) { var i, r; 2 !== n.length && ce(e, "TAG directive accepts exactly two arguments"), i = n[0], r = n[1], G.test(i) || ce(e, "ill-formed tag handle (first argument) of the TAG directive"), P.call(e.tagMap, i) && ce(e, 'there is a previously declared suffix for "' + i + '" tag handle'), V.test(r) || ce(e, "ill-formed tag prefix (second argument) of the TAG directive"); try { r = decodeURIComponent(r); } catch (t) { ce(e, "tag prefix is malformed: " + r); } e.tagMap[i] = r; } }; function pe(e, t, n, i) { var r, o, a, l; if (t < n) { if (l = e.input.slice(t, n), i) for (r = 0, o = l.length; r < o; r += 1)9 === (a = l.charCodeAt(r)) || 32 <= a && a <= 1114111 || ce(e, "expected valid JSON character"); else W.test(l) && ce(e, "the stream contains non-printable characters"); e.result += l; } } function fe(e, t, i, r) { var o, a, l, c; for (n.isObject(i) || ce(e, "cannot merge mappings; the provided source object is unacceptable"), l = 0, c = (o = Object.keys(i)).length; l < c; l += 1)a = o[l], P.call(t, a) || (t[a] = i[a], r[a] = !0); } function de(e, t, n, i, r, o, a, l, c) { var s, u; if (Array.isArray(r)) for (s = 0, u = (r = Array.prototype.slice.call(r)).length; s < u; s += 1)Array.isArray(r[s]) && ce(e, "nested arrays are not supported inside keys"), "object" == typeof r && "[object Object]" === Z(r[s]) && (r[s] = "[object Object]"); if ("object" == typeof r && "[object Object]" === Z(r) && (r = "[object Object]"), r = String(r), null === t && (t = {}), "tag:yaml.org,2002:merge" === i) if (Array.isArray(o)) for (s = 0, u = o.length; s < u; s += 1)fe(e, t, o[s], n); else fe(e, t, o, n); else e.json || P.call(n, r) || !P.call(t, r) || (e.line = a || e.line, e.lineStart = l || e.lineStart, e.position = c || e.position, ce(e, "duplicated mapping key")), "__proto__" === r ? Object.defineProperty(t, r, { configurable: !0, enumerable: !0, writable: !0, value: o }) : t[r] = o, delete n[r]; return t } function he(e) { var t; 10 === (t = e.input.charCodeAt(e.position)) ? e.position++ : 13 === t ? (e.position++, 10 === e.input.charCodeAt(e.position) && e.position++) : ce(e, "a line break is expected"), e.line += 1, e.lineStart = e.position, e.firstTabInLine = -1; } function ge(e, t, n) { for (var i = 0, r = e.input.charCodeAt(e.position); 0 !== r;) { for (; Q(r);)9 === r && -1 === e.firstTabInLine && (e.firstTabInLine = e.position), r = e.input.charCodeAt(++e.position); if (t && 35 === r) do { r = e.input.charCodeAt(++e.position); } while (10 !== r && 13 !== r && 0 !== r); if (!J(r)) break; for (he(e), r = e.input.charCodeAt(e.position), i++, e.lineIndent = 0; 32 === r;)e.lineIndent++, r = e.input.charCodeAt(++e.position); } return -1 !== n && 0 !== i && e.lineIndent < n && se(e, "deficient indentation"), i } function me(e) { var t, n = e.position; return !(45 !== (t = e.input.charCodeAt(n)) && 46 !== t || t !== e.input.charCodeAt(n + 1) || t !== e.input.charCodeAt(n + 2) || (n += 3, 0 !== (t = e.input.charCodeAt(n)) && !z(t))) } function ye(e, t) { 1 === t ? e.result += " " : t > 1 && (e.result += n.repeat("\n", t - 1)); } function be(e, t) { var n, i, r = e.tag, o = e.anchor, a = [], l = !1; if (-1 !== e.firstTabInLine) return !1; for (null !== e.anchor && (e.anchorMap[e.anchor] = a), i = e.input.charCodeAt(e.position); 0 !== i && (-1 !== e.firstTabInLine && (e.position = e.firstTabInLine, ce(e, "tab characters must not be used in indentation")), 45 === i) && z(e.input.charCodeAt(e.position + 1));)if (l = !0, e.position++, ge(e, !0, -1) && e.lineIndent <= t) a.push(null), i = e.input.charCodeAt(e.position); else if (n = e.line, we(e, t, 3, !1, !0), a.push(e.result), ge(e, !0, -1), i = e.input.charCodeAt(e.position), (e.line === n || e.lineIndent > t) && 0 !== i) ce(e, "bad indentation of a sequence entry"); else if (e.lineIndent < t) break; return !!l && (e.tag = r, e.anchor = o, e.kind = "sequence", e.result = a, !0) } function Ae(e) { var t, n, i, r, o = !1, a = !1; if (33 !== (r = e.input.charCodeAt(e.position))) return !1; if (null !== e.tag && ce(e, "duplication of a tag property"), 60 === (r = e.input.charCodeAt(++e.position)) ? (o = !0, r = e.input.charCodeAt(++e.position)) : 33 === r ? (a = !0, n = "!!", r = e.input.charCodeAt(++e.position)) : n = "!", t = e.position, o) { do { r = e.input.charCodeAt(++e.position); } while (0 !== r && 62 !== r); e.position < e.length ? (i = e.input.slice(t, e.position), r = e.input.charCodeAt(++e.position)) : ce(e, "unexpected end of the stream within a verbatim tag"); } else { for (; 0 !== r && !z(r);)33 === r && (a ? ce(e, "tag suffix cannot contain exclamation marks") : (n = e.input.slice(t - 1, e.position + 1), G.test(n) || ce(e, "named tag handle cannot contain such characters"), a = !0, t = e.position + 1)), r = e.input.charCodeAt(++e.position); i = e.input.slice(t, e.position), $.test(i) && ce(e, "tag suffix cannot contain flow indicator characters"); } i && !V.test(i) && ce(e, "tag name cannot contain such characters: " + i); try { i = decodeURIComponent(i); } catch (t) { ce(e, "tag name is malformed: " + i); } return o ? e.tag = i : P.call(e.tagMap, n) ? e.tag = e.tagMap[n] + i : "!" === n ? e.tag = "!" + i : "!!" === n ? e.tag = "tag:yaml.org,2002:" + i : ce(e, 'undeclared tag handle "' + n + '"'), !0 } function ve(e) { var t, n; if (38 !== (n = e.input.charCodeAt(e.position))) return !1; for (null !== e.anchor && ce(e, "duplication of an anchor property"), n = e.input.charCodeAt(++e.position), t = e.position; 0 !== n && !z(n) && !X(n);)n = e.input.charCodeAt(++e.position); return e.position === t && ce(e, "name of an anchor node must contain at least one character"), e.anchor = e.input.slice(t, e.position), !0 } function we(e, t, i, r, o) { var a, l, c, s, u, p, f, d, h, g = 1, m = !1, y = !1; if (null !== e.listener && e.listener("open", e), e.tag = null, e.anchor = null, e.kind = null, e.result = null, a = l = c = 4 === i || 3 === i, r && ge(e, !0, -1) && (m = !0, e.lineIndent > t ? g = 1 : e.lineIndent === t ? g = 0 : e.lineIndent < t && (g = -1)), 1 === g) for (; Ae(e) || ve(e);)ge(e, !0, -1) ? (m = !0, c = a, e.lineIndent > t ? g = 1 : e.lineIndent === t ? g = 0 : e.lineIndent < t && (g = -1)) : c = !1; if (c && (c = m || o), 1 !== g && 4 !== i || (d = 1 === i || 2 === i ? t : t + 1, h = e.position - e.lineStart, 1 === g ? c && (be(e, h) || function (e, t, n) { var i, r, o, a, l, c, s, u = e.tag, p = e.anchor, f = {}, d = Object.create(null), h = null, g = null, m = null, y = !1, b = !1; if (-1 !== e.firstTabInLine) return !1; for (null !== e.anchor && (e.anchorMap[e.anchor] = f), s = e.input.charCodeAt(e.position); 0 !== s;) { if (y || -1 === e.firstTabInLine || (e.position = e.firstTabInLine, ce(e, "tab characters must not be used in indentation")), i = e.input.charCodeAt(e.position + 1), o = e.line, 63 !== s && 58 !== s || !z(i)) { if (a = e.line, l = e.lineStart, c = e.position, !we(e, n, 2, !1, !0)) break; if (e.line === o) { for (s = e.input.charCodeAt(e.position); Q(s);)s = e.input.charCodeAt(++e.position); if (58 === s) z(s = e.input.charCodeAt(++e.position)) || ce(e, "a whitespace character is expected after the key-value separator within a block mapping"), y && (de(e, f, d, h, g, null, a, l, c), h = g = m = null), b = !0, y = !1, r = !1, h = e.tag, g = e.result; else { if (!b) return e.tag = u, e.anchor = p, !0; ce(e, "can not read an implicit mapping pair; a colon is missed"); } } else { if (!b) return e.tag = u, e.anchor = p, !0; ce(e, "can not read a block mapping entry; a multiline key may not be an implicit key"); } } else 63 === s ? (y && (de(e, f, d, h, g, null, a, l, c), h = g = m = null), b = !0, y = !0, r = !0) : y ? (y = !1, r = !0) : ce(e, "incomplete explicit mapping pair; a key node is missed; or followed by a non-tabulated empty line"), e.position += 1, s = i; if ((e.line === o || e.lineIndent > t) && (y && (a = e.line, l = e.lineStart, c = e.position), we(e, t, 4, !0, r) && (y ? g = e.result : m = e.result), y || (de(e, f, d, h, g, m, a, l, c), h = g = m = null), ge(e, !0, -1), s = e.input.charCodeAt(e.position)), (e.line === o || e.lineIndent > t) && 0 !== s) ce(e, "bad indentation of a mapping entry"); else if (e.lineIndent < t) break } return y && de(e, f, d, h, g, null, a, l, c), b && (e.tag = u, e.anchor = p, e.kind = "mapping", e.result = f), b }(e, h, d)) || function (e, t) { var n, i, r, o, a, l, c, s, u, p, f, d, h = !0, g = e.tag, m = e.anchor, y = Object.create(null); if (91 === (d = e.input.charCodeAt(e.position))) a = 93, s = !1, o = []; else { if (123 !== d) return !1; a = 125, s = !0, o = {}; } for (null !== e.anchor && (e.anchorMap[e.anchor] = o), d = e.input.charCodeAt(++e.position); 0 !== d;) { if (ge(e, !0, t), (d = e.input.charCodeAt(e.position)) === a) return e.position++, e.tag = g, e.anchor = m, e.kind = s ? "mapping" : "sequence", e.result = o, !0; h ? 44 === d && ce(e, "expected the node content, but found ','") : ce(e, "missed comma between flow collection entries"), f = null, l = c = !1, 63 === d && z(e.input.charCodeAt(e.position + 1)) && (l = c = !0, e.position++, ge(e, !0, t)), n = e.line, i = e.lineStart, r = e.position, we(e, t, 1, !1, !0), p = e.tag, u = e.result, ge(e, !0, t), d = e.input.charCodeAt(e.position), !c && e.line !== n || 58 !== d || (l = !0, d = e.input.charCodeAt(++e.position), ge(e, !0, t), we(e, t, 1, !1, !0), f = e.result), s ? de(e, o, y, p, u, f, n, i, r) : l ? o.push(de(e, null, y, p, u, f, n, i, r)) : o.push(u), ge(e, !0, t), 44 === (d = e.input.charCodeAt(e.position)) ? (h = !0, d = e.input.charCodeAt(++e.position)) : h = !1; } ce(e, "unexpected end of the stream within a flow collection"); }(e, d) ? y = !0 : (l && function (e, t) { var i, r, o, a, l, c = 1, s = !1, u = !1, p = t, f = 0, d = !1; if (124 === (a = e.input.charCodeAt(e.position))) r = !1; else { if (62 !== a) return !1; r = !0; } for (e.kind = "scalar", e.result = ""; 0 !== a;)if (43 === (a = e.input.charCodeAt(++e.position)) || 45 === a) 1 === c ? c = 43 === a ? 3 : 2 : ce(e, "repeat of a chomping mode identifier"); else { if (!((o = 48 <= (l = a) && l <= 57 ? l - 48 : -1) >= 0)) break; 0 === o ? ce(e, "bad explicit indentation width of a block scalar; it cannot be less than one") : u ? ce(e, "repeat of an indentation width identifier") : (p = t + o - 1, u = !0); } if (Q(a)) { do { a = e.input.charCodeAt(++e.position); } while (Q(a)); if (35 === a) do { a = e.input.charCodeAt(++e.position); } while (!J(a) && 0 !== a) } for (; 0 !== a;) { for (he(e), e.lineIndent = 0, a = e.input.charCodeAt(e.position); (!u || e.lineIndent < p) && 32 === a;)e.lineIndent++, a = e.input.charCodeAt(++e.position); if (!u && e.lineIndent > p && (p = e.lineIndent), J(a)) f++; else { if (e.lineIndent < p) { 3 === c ? e.result += n.repeat("\n", s ? 1 + f : f) : 1 === c && s && (e.result += "\n"); break } for (r ? Q(a) ? (d = !0, e.result += n.repeat("\n", s ? 1 + f : f)) : d ? (d = !1, e.result += n.repeat("\n", f + 1)) : 0 === f ? s && (e.result += " ") : e.result += n.repeat("\n", f) : e.result += n.repeat("\n", s ? 1 + f : f), s = !0, u = !0, f = 0, i = e.position; !J(a) && 0 !== a;)a = e.input.charCodeAt(++e.position); pe(e, i, e.position, !1); } } return !0 }(e, d) || function (e, t) { var n, i, r; if (39 !== (n = e.input.charCodeAt(e.position))) return !1; for (e.kind = "scalar", e.result = "", e.position++, i = r = e.position; 0 !== (n = e.input.charCodeAt(e.position));)if (39 === n) { if (pe(e, i, e.position, !0), 39 !== (n = e.input.charCodeAt(++e.position))) return !0; i = e.position, e.position++, r = e.position; } else J(n) ? (pe(e, i, r, !0), ye(e, ge(e, !1, t)), i = r = e.position) : e.position === e.lineStart && me(e) ? ce(e, "unexpected end of the document within a single quoted scalar") : (e.position++, r = e.position); ce(e, "unexpected end of the stream within a single quoted scalar"); }(e, d) || function (e, t) { var n, i, r, o, a, l, c; if (34 !== (l = e.input.charCodeAt(e.position))) return !1; for (e.kind = "scalar", e.result = "", e.position++, n = i = e.position; 0 !== (l = e.input.charCodeAt(e.position));) { if (34 === l) return pe(e, n, e.position, !0), e.position++, !0; if (92 === l) { if (pe(e, n, e.position, !0), J(l = e.input.charCodeAt(++e.position))) ge(e, !1, t); else if (l < 256 && ie[l]) e.result += re[l], e.position++; else if ((a = 120 === (c = l) ? 2 : 117 === c ? 4 : 85 === c ? 8 : 0) > 0) { for (r = a, o = 0; r > 0; r--)(a = ee(l = e.input.charCodeAt(++e.position))) >= 0 ? o = (o << 4) + a : ce(e, "expected hexadecimal character"); e.result += ne(o), e.position++; } else ce(e, "unknown escape sequence"); n = i = e.position; } else J(l) ? (pe(e, n, i, !0), ye(e, ge(e, !1, t)), n = i = e.position) : e.position === e.lineStart && me(e) ? ce(e, "unexpected end of the document within a double quoted scalar") : (e.position++, i = e.position); } ce(e, "unexpected end of the stream within a double quoted scalar"); }(e, d) ? y = !0 : !function (e) { var t, n, i; if (42 !== (i = e.input.charCodeAt(e.position))) return !1; for (i = e.input.charCodeAt(++e.position), t = e.position; 0 !== i && !z(i) && !X(i);)i = e.input.charCodeAt(++e.position); return e.position === t && ce(e, "name of an alias node must contain at least one character"), n = e.input.slice(t, e.position), P.call(e.anchorMap, n) || ce(e, 'unidentified alias "' + n + '"'), e.result = e.anchorMap[n], ge(e, !0, -1), !0 }(e) ? function (e, t, n) { var i, r, o, a, l, c, s, u, p = e.kind, f = e.result; if (z(u = e.input.charCodeAt(e.position)) || X(u) || 35 === u || 38 === u || 42 === u || 33 === u || 124 === u || 62 === u || 39 === u || 34 === u || 37 === u || 64 === u || 96 === u) return !1; if ((63 === u || 45 === u) && (z(i = e.input.charCodeAt(e.position + 1)) || n && X(i))) return !1; for (e.kind = "scalar", e.result = "", r = o = e.position, a = !1; 0 !== u;) { if (58 === u) { if (z(i = e.input.charCodeAt(e.position + 1)) || n && X(i)) break } else if (35 === u) { if (z(e.input.charCodeAt(e.position - 1))) break } else { if (e.position === e.lineStart && me(e) || n && X(u)) break; if (J(u)) { if (l = e.line, c = e.lineStart, s = e.lineIndent, ge(e, !1, -1), e.lineIndent >= t) { a = !0, u = e.input.charCodeAt(e.position); continue } e.position = o, e.line = l, e.lineStart = c, e.lineIndent = s; break } } a && (pe(e, r, o, !1), ye(e, e.line - l), r = o = e.position, a = !1), Q(u) || (o = e.position + 1), u = e.input.charCodeAt(++e.position); } return pe(e, r, o, !1), !!e.result || (e.kind = p, e.result = f, !1) }(e, d, 1 === i) && (y = !0, null === e.tag && (e.tag = "?")) : (y = !0, null === e.tag && null === e.anchor || ce(e, "alias node should not have any properties")), null !== e.anchor && (e.anchorMap[e.anchor] = e.result)) : 0 === g && (y = c && be(e, h))), null === e.tag) null !== e.anchor && (e.anchorMap[e.anchor] = e.result); else if ("?" === e.tag) { for (null !== e.result && "scalar" !== e.kind && ce(e, 'unacceptable node kind for !<?> tag; it should be "scalar", not "' + e.kind + '"'), s = 0, u = e.implicitTypes.length; s < u; s += 1)if ((f = e.implicitTypes[s]).resolve(e.result)) { e.result = f.construct(e.result), e.tag = f.tag, null !== e.anchor && (e.anchorMap[e.anchor] = e.result); break } } else if ("!" !== e.tag) { if (P.call(e.typeMap[e.kind || "fallback"], e.tag)) f = e.typeMap[e.kind || "fallback"][e.tag]; else for (f = null, s = 0, u = (p = e.typeMap.multi[e.kind || "fallback"]).length; s < u; s += 1)if (e.tag.slice(0, p[s].tag.length) === p[s].tag) { f = p[s]; break } f || ce(e, "unknown tag !<" + e.tag + ">"), null !== e.result && f.kind !== e.kind && ce(e, "unacceptable node kind for !<" + e.tag + '> tag; it should be "' + f.kind + '", not "' + e.kind + '"'), f.resolve(e.result, e.tag) ? (e.result = f.construct(e.result, e.tag), null !== e.anchor && (e.anchorMap[e.anchor] = e.result)) : ce(e, "cannot resolve a node with !<" + e.tag + "> explicit tag"); } return null !== e.listener && e.listener("close", e), null !== e.tag || null !== e.anchor || y } function ke(e) { var t, n, i, r, o = e.position, a = !1; for (e.version = null, e.checkLineBreaks = e.legacy, e.tagMap = Object.create(null), e.anchorMap = Object.create(null); 0 !== (r = e.input.charCodeAt(e.position)) && (ge(e, !0, -1), r = e.input.charCodeAt(e.position), !(e.lineIndent > 0 || 37 !== r));) { for (a = !0, r = e.input.charCodeAt(++e.position), t = e.position; 0 !== r && !z(r);)r = e.input.charCodeAt(++e.position); for (i = [], (n = e.input.slice(t, e.position)).length < 1 && ce(e, "directive name must not be less than one character in length"); 0 !== r;) { for (; Q(r);)r = e.input.charCodeAt(++e.position); if (35 === r) { do { r = e.input.charCodeAt(++e.position); } while (0 !== r && !J(r)); break } if (J(r)) break; for (t = e.position; 0 !== r && !z(r);)r = e.input.charCodeAt(++e.position); i.push(e.input.slice(t, e.position)); } 0 !== r && he(e), P.call(ue, n) ? ue[n](e, n, i) : se(e, 'unknown document directive "' + n + '"'); } ge(e, !0, -1), 0 === e.lineIndent && 45 === e.input.charCodeAt(e.position) && 45 === e.input.charCodeAt(e.position + 1) && 45 === e.input.charCodeAt(e.position + 2) ? (e.position += 3, ge(e, !0, -1)) : a && ce(e, "directives end mark is expected"), we(e, e.lineIndent - 1, 4, !1, !0), ge(e, !0, -1), e.checkLineBreaks && H.test(e.input.slice(o, e.position)) && se(e, "non-ASCII line breaks are interpreted as content"), e.documents.push(e.result), e.position === e.lineStart && me(e) ? 46 === e.input.charCodeAt(e.position) && (e.position += 3, ge(e, !0, -1)) : e.position < e.length - 1 && ce(e, "end of the stream or a document separator is expected"); } function Ce(e, t) { t = t || {}, 0 !== (e = String(e)).length && (10 !== e.charCodeAt(e.length - 1) && 13 !== e.charCodeAt(e.length - 1) && (e += "\n"), 65279 === e.charCodeAt(0) && (e = e.slice(1))); var n = new ae(e, t), i = e.indexOf("\0"); for (-1 !== i && (n.position = i, ce(n, "null byte is not allowed in input")), n.input += "\0"; 32 === n.input.charCodeAt(n.position);)n.lineIndent += 1, n.position += 1; for (; n.position < n.length - 1;)ke(n); return n.documents } var xe = { loadAll: function (e, t, n) { null !== t && "object" == typeof t && void 0 === n && (n = t, t = null); var i = Ce(e, n); if ("function" != typeof t) return i; for (var r = 0, o = i.length; r < o; r += 1)t(i[r]); }, load: function (e, t) { var n = Ce(e, t); if (0 !== n.length) { if (1 === n.length) return n[0]; throw new o("expected a single document in the stream, but found more") } } }, Ie = Object.prototype.toString, Se = Object.prototype.hasOwnProperty, Oe = 65279, je = { 0: "\\0", 7: "\\a", 8: "\\b", 9: "\\t", 10: "\\n", 11: "\\v", 12: "\\f", 13: "\\r", 27: "\\e", 34: '\\"', 92: "\\\\", 133: "\\N", 160: "\\_", 8232: "\\L", 8233: "\\P" }, Te = ["y", "Y", "yes", "Yes", "YES", "on", "On", "ON", "n", "N", "no", "No", "NO", "off", "Off", "OFF"], Ne = /^[-+]?[0-9_]+(?::[0-9_]+)+(?:\.[0-9_]*)?$/; function Fe(e) { var t, i, r; if (t = e.toString(16).toUpperCase(), e <= 255) i = "x", r = 2; else if (e <= 65535) i = "u", r = 4; else { if (!(e <= 4294967295)) throw new o("code point within a string may not be greater than 0xFFFFFFFF"); i = "U", r = 8; } return "\\" + i + n.repeat("0", r - t.length) + t } function Ee(e) { this.schema = e.schema || K, this.indent = Math.max(1, e.indent || 2), this.noArrayIndent = e.noArrayIndent || !1, this.skipInvalid = e.skipInvalid || !1, this.flowLevel = n.isNothing(e.flowLevel) ? -1 : e.flowLevel, this.styleMap = function (e, t) { var n, i, r, o, a, l, c; if (null === t) return {}; for (n = {}, r = 0, o = (i = Object.keys(t)).length; r < o; r += 1)a = i[r], l = String(t[a]), "!!" === a.slice(0, 2) && (a = "tag:yaml.org,2002:" + a.slice(2)), (c = e.compiledTypeMap.fallback[a]) && Se.call(c.styleAliases, l) && (l = c.styleAliases[l]), n[a] = l; return n }(this.schema, e.styles || null), this.sortKeys = e.sortKeys || !1, this.lineWidth = e.lineWidth || 80, this.noRefs = e.noRefs || !1, this.noCompatMode = e.noCompatMode || !1, this.condenseFlow = e.condenseFlow || !1, this.quotingType = '"' === e.quotingType ? 2 : 1, this.forceQuotes = e.forceQuotes || !1, this.replacer = "function" == typeof e.replacer ? e.replacer : null, this.implicitTypes = this.schema.compiledImplicit, this.explicitTypes = this.schema.compiledExplicit, this.tag = null, this.result = "", this.duplicates = [], this.usedDuplicates = null; } function Me(e, t) { for (var i, r = n.repeat(" ", t), o = 0, a = -1, l = "", c = e.length; o < c;)-1 === (a = e.indexOf("\n", o)) ? (i = e.slice(o), o = c) : (i = e.slice(o, a + 1), o = a + 1), i.length && "\n" !== i && (l += r), l += i; return l } function Le(e, t) { return "\n" + n.repeat(" ", e.indent * t) } function _e(e) { return 32 === e || 9 === e } function De(e) { return 32 <= e && e <= 126 || 161 <= e && e <= 55295 && 8232 !== e && 8233 !== e || 57344 <= e && e <= 65533 && e !== Oe || 65536 <= e && e <= 1114111 } function Ue(e) { return De(e) && e !== Oe && 13 !== e && 10 !== e } function qe(e, t, n) { var i = Ue(e), r = i && !_e(e); return (n ? i : i && 44 !== e && 91 !== e && 93 !== e && 123 !== e && 125 !== e) && 35 !== e && !(58 === t && !r) || Ue(t) && !_e(t) && 35 === e || 58 === t && r } function Ye(e, t) { var n, i = e.charCodeAt(t); return i >= 55296 && i <= 56319 && t + 1 < e.length && (n = e.charCodeAt(t + 1)) >= 56320 && n <= 57343 ? 1024 * (i - 55296) + n - 56320 + 65536 : i } function Re(e) { return /^\n* /.test(e) } function Be(e, t, n, i, r, o, a, l) { var c, s, u = 0, p = null, f = !1, d = !1, h = -1 !== i, g = -1, m = De(s = Ye(e, 0)) && s !== Oe && !_e(s) && 45 !== s && 63 !== s && 58 !== s && 44 !== s && 91 !== s && 93 !== s && 123 !== s && 125 !== s && 35 !== s && 38 !== s && 42 !== s && 33 !== s && 124 !== s && 61 !== s && 62 !== s && 39 !== s && 34 !== s && 37 !== s && 64 !== s && 96 !== s && function (e) { return !_e(e) && 58 !== e }(Ye(e, e.length - 1)); if (t || a) for (c = 0; c < e.length; u >= 65536 ? c += 2 : c++) { if (!De(u = Ye(e, c))) return 5; m = m && qe(u, p, l), p = u; } else { for (c = 0; c < e.length; u >= 65536 ? c += 2 : c++) { if (10 === (u = Ye(e, c))) f = !0, h && (d = d || c - g - 1 > i && " " !== e[g + 1], g = c); else if (!De(u)) return 5; m = m && qe(u, p, l), p = u; } d = d || h && c - g - 1 > i && " " !== e[g + 1]; } return f || d ? n > 9 && Re(e) ? 5 : a ? 2 === o ? 5 : 2 : d ? 4 : 3 : !m || a || r(e) ? 2 === o ? 5 : 2 : 1 } function Ke(e, t, n, i, r) { e.dump = function () { if (0 === t.length) return 2 === e.quotingType ? '""' : "''"; if (!e.noCompatMode && (-1 !== Te.indexOf(t) || Ne.test(t))) return 2 === e.quotingType ? '"' + t + '"' : "'" + t + "'"; var a = e.indent * Math.max(1, n), l = -1 === e.lineWidth ? -1 : Math.max(Math.min(e.lineWidth, 40), e.lineWidth - a), c = i || e.flowLevel > -1 && n >= e.flowLevel; switch (Be(t, c, e.indent, l, (function (t) { return function (e, t) { var n, i; for (n = 0, i = e.implicitTypes.length; n < i; n += 1)if (e.implicitTypes[n].resolve(t)) return !0; return !1 }(e, t) }), e.quotingType, e.forceQuotes && !i, r)) { case 1: return t; case 2: return "'" + t.replace(/'/g, "''") + "'"; case 3: return "|" + Pe(t, e.indent) + We(Me(t, a)); case 4: return ">" + Pe(t, e.indent) + We(Me(function (e, t) { var n, i, r = /(\n+)([^\n]*)/g, o = (l = e.indexOf("\n"), l = -1 !== l ? l : e.length, r.lastIndex = l, He(e.slice(0, l), t)), a = "\n" === e[0] || " " === e[0]; var l; for (; i = r.exec(e);) { var c = i[1], s = i[2]; n = " " === s[0], o += c + (a || n || "" === s ? "" : "\n") + He(s, t), a = n; } return o }(t, l), a)); case 5: return '"' + function (e) { for (var t, n = "", i = 0, r = 0; r < e.length; i >= 65536 ? r += 2 : r++)i = Ye(e, r), !(t = je[i]) && De(i) ? (n += e[r], i >= 65536 && (n += e[r + 1])) : n += t || Fe(i); return n }(t) + '"'; default: throw new o("impossible error: invalid scalar style") } }(); } function Pe(e, t) { var n = Re(e) ? String(t) : "", i = "\n" === e[e.length - 1]; return n + (i && ("\n" === e[e.length - 2] || "\n" === e) ? "+" : i ? "" : "-") + "\n" } function We(e) { return "\n" === e[e.length - 1] ? e.slice(0, -1) : e } function He(e, t) { if ("" === e || " " === e[0]) return e; for (var n, i, r = / [^ ]/g, o = 0, a = 0, l = 0, c = ""; n = r.exec(e);)(l = n.index) - o > t && (i = a > o ? a : l, c += "\n" + e.slice(o, i), o = i + 1), a = l; return c += "\n", e.length - o > t && a > o ? c += e.slice(o, a) + "\n" + e.slice(a + 1) : c += e.slice(o), c.slice(1) } function $e(e, t, n, i) { var r, o, a, l = "", c = e.tag; for (r = 0, o = n.length; r < o; r += 1)a = n[r], e.replacer && (a = e.replacer.call(n, String(r), a)), (Ve(e, t + 1, a, !0, !0, !1, !0) || void 0 === a && Ve(e, t + 1, null, !0, !0, !1, !0)) && (i && "" === l || (l += Le(e, t)), e.dump && 10 === e.dump.charCodeAt(0) ? l += "-" : l += "- ", l += e.dump); e.tag = c, e.dump = l || "[]"; } function Ge(e, t, n) { var i, r, a, l, c, s; for (a = 0, l = (r = n ? e.explicitTypes : e.implicitTypes).length; a < l; a += 1)if (((c = r[a]).instanceOf || c.predicate) && (!c.instanceOf || "object" == typeof t && t instanceof c.instanceOf) && (!c.predicate || c.predicate(t))) { if (n ? c.multi && c.representName ? e.tag = c.representName(t) : e.tag = c.tag : e.tag = "?", c.represent) { if (s = e.styleMap[c.tag] || c.defaultStyle, "[object Function]" === Ie.call(c.represent)) i = c.represent(t, s); else { if (!Se.call(c.represent, s)) throw new o("!<" + c.tag + '> tag resolver accepts not "' + s + '" style'); i = c.represent[s](t, s); } e.dump = i; } return !0 } return !1 } function Ve(e, t, n, i, r, a, l) { e.tag = null, e.dump = n, Ge(e, n, !1) || Ge(e, n, !0); var c, s = Ie.call(e.dump), u = i; i && (i = e.flowLevel < 0 || e.flowLevel > t); var p, f, d = "[object Object]" === s || "[object Array]" === s; if (d && (f = -1 !== (p = e.duplicates.indexOf(n))), (null !== e.tag && "?" !== e.tag || f || 2 !== e.indent && t > 0) && (r = !1), f && e.usedDuplicates[p]) e.dump = "*ref_" + p; else { if (d && f && !e.usedDuplicates[p] && (e.usedDuplicates[p] = !0), "[object Object]" === s) i && 0 !== Object.keys(e.dump).length ? (!function (e, t, n, i) { var r, a, l, c, s, u, p = "", f = e.tag, d = Object.keys(n); if (!0 === e.sortKeys) d.sort(); else if ("function" == typeof e.sortKeys) d.sort(e.sortKeys); else if (e.sortKeys) throw new o("sortKeys must be a boolean or a function"); for (r = 0, a = d.length; r < a; r += 1)u = "", i && "" === p || (u += Le(e, t)), c = n[l = d[r]], e.replacer && (c = e.replacer.call(n, l, c)), Ve(e, t + 1, l, !0, !0, !0) && ((s = null !== e.tag && "?" !== e.tag || e.dump && e.dump.length > 1024) && (e.dump && 10 === e.dump.charCodeAt(0) ? u += "?" : u += "? "), u += e.dump, s && (u += Le(e, t)), Ve(e, t + 1, c, !0, s) && (e.dump && 10 === e.dump.charCodeAt(0) ? u += ":" : u += ": ", p += u += e.dump)); e.tag = f, e.dump = p || "{}"; }(e, t, e.dump, r), f && (e.dump = "&ref_" + p + e.dump)) : (!function (e, t, n) { var i, r, o, a, l, c = "", s = e.tag, u = Object.keys(n); for (i = 0, r = u.length; i < r; i += 1)l = "", "" !== c && (l += ", "), e.condenseFlow && (l += '"'), a = n[o = u[i]], e.replacer && (a = e.replacer.call(n, o, a)), Ve(e, t, o, !1, !1) && (e.dump.length > 1024 && (l += "? "), l += e.dump + (e.condenseFlow ? '"' : "") + ":" + (e.condenseFlow ? "" : " "), Ve(e, t, a, !1, !1) && (c += l += e.dump)); e.tag = s, e.dump = "{" + c + "}"; }(e, t, e.dump), f && (e.dump = "&ref_" + p + " " + e.dump)); else if ("[object Array]" === s) i && 0 !== e.dump.length ? (e.noArrayIndent && !l && t > 0 ? $e(e, t - 1, e.dump, r) : $e(e, t, e.dump, r), f && (e.dump = "&ref_" + p + e.dump)) : (!function (e, t, n) { var i, r, o, a = "", l = e.tag; for (i = 0, r = n.length; i < r; i += 1)o = n[i], e.replacer && (o = e.replacer.call(n, String(i), o)), (Ve(e, t, o, !1, !1) || void 0 === o && Ve(e, t, null, !1, !1)) && ("" !== a && (a += "," + (e.condenseFlow ? "" : " ")), a += e.dump); e.tag = l, e.dump = "[" + a + "]"; }(e, t, e.dump), f && (e.dump = "&ref_" + p + " " + e.dump)); else { if ("[object String]" !== s) { if ("[object Undefined]" === s) return !1; if (e.skipInvalid) return !1; throw new o("unacceptable kind of an object to dump " + s) } "?" !== e.tag && Ke(e, e.dump, t, a, u); } null !== e.tag && "?" !== e.tag && (c = encodeURI("!" === e.tag[0] ? e.tag.slice(1) : e.tag).replace(/!/g, "%21"), c = "!" === e.tag[0] ? "!" + c : "tag:yaml.org,2002:" === c.slice(0, 18) ? "!!" + c.slice(18) : "!<" + c + ">", e.dump = c + " " + e.dump); } return !0 } function Ze(e, t) { var n, i, r = [], o = []; for (Je(e, r, o), n = 0, i = o.length; n < i; n += 1)t.duplicates.push(r[o[n]]); t.usedDuplicates = new Array(i); } function Je(e, t, n) { var i, r, o; if (null !== e && "object" == typeof e) if (-1 !== (r = t.indexOf(e))) -1 === n.indexOf(r) && n.push(r); else if (t.push(e), Array.isArray(e)) for (r = 0, o = e.length; r < o; r += 1)Je(e[r], t, n); else for (r = 0, o = (i = Object.keys(e)).length; r < o; r += 1)Je(e[i[r]], t, n); } function Qe(e, t) { return function () { throw new Error("Function yaml." + e + " is removed in js-yaml 4. Use yaml." + t + " instead, which is now safe by default.") } } var ze = p, Xe = h, et = b, tt = O, nt = j, it = K, rt = xe.load, ot = xe.loadAll, at = { dump: function (e, t) { var n = new Ee(t = t || {}); n.noRefs || Ze(e, n); var i = e; return n.replacer && (i = n.replacer.call({ "": i }, "", i)), Ve(n, 0, i, !0, !0) ? n.dump + "\n" : "" } }.dump, lt = o, ct = { binary: L, float: S, map: y, null: A, pairs: Y, set: B, timestamp: F, bool: v, int: C, merge: E, omap: U, seq: m, str: g }, st = Qe("safeLoad", "load"), ut = Qe("safeLoadAll", "loadAll"), pt = Qe("safeDump", "dump"), ft = { Type: ze, Schema: Xe, FAILSAFE_SCHEMA: et, JSON_SCHEMA: tt, CORE_SCHEMA: nt, DEFAULT_SCHEMA: it, load: rt, loadAll: ot, dump: at, YAMLException: lt, types: ct, safeLoad: st, safeLoadAll: ut, safeDump: pt }; e.CORE_SCHEMA = nt, e.DEFAULT_SCHEMA = it, e.FAILSAFE_SCHEMA = et, e.JSON_SCHEMA = tt, e.Schema = Xe, e.Type = ze, e.YAMLException = lt, e.default = ft, e.dump = at, e.load = rt, e.loadAll = ot, e.safeDump = pt, e.safeLoad = st, e.safeLoadAll = ut, e.types = ct, Object.defineProperty(e, "__esModule", { value: !0 }); }));
+
+    		// Initialize plugin when either DOM is ready or Alpine is ready
+    		async function initializeCollectionsPlugin() {
+    		    // Initialize empty collections store
+    		    const initialStore = {
+    		        all: [], // Global content array for cross-collection access
+    		        _initialized: false
+    		    };
+    		    Alpine.store('collections', initialStore);
+
+    		    // Cache for loaded collections with persistence
+    		    const collectionCache = new Map();
+    		    const loadingPromises = new Map();
+    		    const CACHE_PREFIX = 'indux_collection_';
+    		    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+    		    // Track initialization state
+    		    let isInitializing = false;
+    		    let initializationComplete = false;
+
+    		    // Load from persistent cache
+    		    function loadFromCache(key) {
+    		        try {
+    		            const cached = localStorage.getItem(CACHE_PREFIX + key);
+    		            if (cached) {
+    		                const { data, timestamp } = JSON.parse(cached);
+    		                if (Date.now() - timestamp < CACHE_DURATION) {
+    		                    return data;
+    		                }
+    		            }
+    		        } catch (error) {
+    		            console.warn('[Indux] Cache read failed:', error);
+    		        }
+    		        return null;
+    		    }
+
+    		    // Save to persistent cache
+    		    function saveToCache(key, data) {
+    		        try {
+    		            localStorage.setItem(CACHE_PREFIX + key, JSON.stringify({
+    		                data,
+    		                timestamp: Date.now()
+    		            }));
+    		        } catch (error) {
+    		            console.warn('[Indux] Cache write failed:', error);
+    		        }
+    		    }
+
+    		    // Load manifest if not already loaded
+    		    async function ensureManifest() {
+    		        if (window.manifest) return window.manifest;
+
+    		        try {
+    		            const response = await fetch('/manifest.json');
+    		            window.manifest = await response.json();
+    		            return window.manifest;
+    		        } catch (error) {
+    		            console.error('[Indux] Failed to load manifest:', error);
+    		            return null;
+    		        }
+    		    }
+
+    		    // Load collection data
+    		    async function loadCollection(collectionName, locale = 'en') {
+    		        const cacheKey = `${collectionName}:${locale}`;
+
+    		        // Check memory cache first
+    		        if (collectionCache.has(cacheKey)) {
+    		            const cachedData = collectionCache.get(cacheKey);
+    		            if (!isInitializing) {
+    		                updateStore(collectionName, cachedData);
+    		            }
+    		            return cachedData;
+    		        }
+
+    		        // Check persistent cache
+    		        const cachedData = loadFromCache(cacheKey);
+    		        if (cachedData) {
+    		            collectionCache.set(cacheKey, cachedData);
+    		            if (!isInitializing) {
+    		                updateStore(collectionName, cachedData);
+    		            }
+    		            return cachedData;
+    		        }
+
+    		        // If already loading, return existing promise
+    		        if (loadingPromises.has(cacheKey)) {
+    		            return loadingPromises.get(cacheKey);
+    		        }
+
+    		        const loadPromise = (async () => {
+    		            try {
+    		                const manifest = await ensureManifest();
+    		                if (!manifest?.collections) {
+    		                    return null;
+    		                }
+
+    		                const collection = manifest.collections[collectionName];
+    		                if (!collection) {
+    		                    console.warn(`[Indux] Collection "${collectionName}" not found in manifest`);
+    		                    return null;
+    		                }
+
+    		                // Handle both string paths and localized objects
+    		                let source;
+    		                if (typeof collection === 'string') {
+    		                    // Direct string path for non-localized collections
+    		                    source = collection;
+    		                } else if (collection[locale]) {
+    		                    // Localized collection with locale-specific path
+    		                    source = collection[locale];
+    		                } else {
+    		                    console.warn(`[Indux] No source found for collection "${collectionName}" in locale "${locale}"`);
+    		                    return null;
+    		                }
+
+    		                const response = await fetch(source);
+    		                const contentType = response.headers.get('content-type');
+    		                let data;
+
+    		                // Handle different content types
+    		                if (contentType?.includes('application/json')) {
+    		                    data = await response.json();
+    		                } else if (contentType?.includes('text/yaml') || source.endsWith('.yaml') || source.endsWith('.yml')) {
+    		                    const text = await response.text();
+    		                    data = jsyaml.load(text);
+    		                } else {
+    		                    console.warn(`[Indux] Unsupported content type for "${source}": ${contentType}`);
+    		                    return null;
+    		                }
+
+    		                // Enhance data with metadata
+    		                let enhancedData;
+    		                if (Array.isArray(data)) {
+    		                    enhancedData = data.map(item => ({
+    		                        ...item,
+    		                        contentType: collectionName,
+    		                        _loadedFrom: source,
+    		                        _locale: locale
+    		                    }));
+    		                } else if (typeof data === 'object') {
+    		                    enhancedData = {
+    		                        ...data,
+    		                        contentType: collectionName,
+    		                        _loadedFrom: source,
+    		                        _locale: locale
+    		                    };
+    		                }
+
+    		                // Update caches
+    		                collectionCache.set(cacheKey, enhancedData);
+    		                saveToCache(cacheKey, enhancedData);
+
+    		                // Update store only if not initializing
+    		                if (!isInitializing) {
+    		                    updateStore(collectionName, enhancedData);
+    		                }
+
+    		                return enhancedData;
+    		            } catch (error) {
+    		                console.error(`[Indux] Failed to load collection "${collectionName}":`, error);
+    		                return null;
+    		            } finally {
+    		                loadingPromises.delete(cacheKey);
+    		            }
+    		        })();
+
+    		        loadingPromises.set(cacheKey, loadPromise);
+    		        return loadPromise;
+    		    }
+
+    		    // Update store with new data
+    		    function updateStore(collectionName, data) {
+    		        if (isInitializing) return;
+
+    		        const store = Alpine.store('collections');
+    		        const all = store.all.filter(item => item.contentType !== collectionName);
+
+    		        if (Array.isArray(data)) {
+    		            all.push(...data);
+    		        } else {
+    		            all.push(data);
+    		        }
+
+    		        Alpine.store('collections', {
+    		            ...store,
+    		            [collectionName]: data,
+    		            all,
+    		            _initialized: true
+    		        });
+    		    }
+
+    		    // Create a safe proxy for loading state
+    		    function createLoadingProxy() {
+    		        return new Proxy({}, {
+    		            get(target, key) {
+    		                // Handle special keys
+    		                if (key === Symbol.iterator || key === 'then' || key === 'catch' || key === 'finally') {
+    		                    return undefined;
+    		                }
+
+    		                // Handle toPrimitive for text content
+    		                if (key === Symbol.toPrimitive) {
+    		                    return function () { return ''; };
+    		                }
+
+    		                // Handle numeric keys for array access
+    		                if (typeof key === 'string' && !isNaN(Number(key))) {
+    		                    return createLoadingProxy();
+    		                }
+
+    		                // Return empty object for nested properties
+    		                return createLoadingProxy();
+    		            }
+    		        });
+    		    }
+
+    		    // Create a proxy for array items
+    		    function createArrayItemProxy(item) {
+    		        return new Proxy(item, {
+    		            get(target, key) {
+    		                // Handle special keys
+    		                if (key === Symbol.iterator || key === 'then' || key === 'catch' || key === 'finally') {
+    		                    return undefined;
+    		                }
+
+    		                // Handle toPrimitive for text content
+    		                if (key === Symbol.toPrimitive) {
+    		                    return function () {
+    		                        return target[key] || '';
+    		                    };
+    		                }
+
+    		                // Handle route-aware access
+    		                if (key === 'route' && typeof window !== 'undefined' && window.location) {
+    		                    return function (matchPath) {
+    		                        // Check if router is available
+    		                        if (!window.InduxRoutingNavigation) {
+    		                            console.warn('[Indux] Router not available for route-aware collection access');
+    		                            return createLoadingProxy();
+    		                        }
+
+    		                        return createRouteAwareProxy(target, matchPath);
+    		                    };
+    		                }
+
+    		                // Return the actual value, not a proxy
+    		                const value = target[key];
+    		                if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    		                    return value;
+    		                }
+
+    		                // For objects and arrays, return a proxy
+    		                if (value && typeof value === 'object') {
+    		                    if (Array.isArray(value)) {
+    		                        return new Proxy(value, {
+    		                            get(target, nestedKey) {
+    		                                if (nestedKey === 'length') {
+    		                                    return target.length;
+    		                                }
+    		                                if (typeof nestedKey === 'string' && !isNaN(Number(nestedKey))) {
+    		                                    const index = Number(nestedKey);
+    		                                    if (index >= 0 && index < target.length) {
+    		                                        return createArrayItemProxy(target[index]);
+    		                                    }
+    		                                    return createLoadingProxy();
+    		                                }
+    		                                return createLoadingProxy();
+    		                            }
+    		                        });
+    		                    }
+    		                    return new Proxy(value, {
+    		                        get(target, nestedKey) {
+    		                            // Handle special keys
+    		                            if (nestedKey === Symbol.iterator || nestedKey === 'then' || nestedKey === 'catch' || nestedKey === 'finally') {
+    		                                return undefined;
+    		                            }
+
+    		                            // Handle toPrimitive for text content
+    		                            if (nestedKey === Symbol.toPrimitive) {
+    		                                return function () {
+    		                                    return target[nestedKey] || '';
+    		                                };
+    		                            }
+
+    		                            // Handle route-aware access
+    		                            if (nestedKey === 'route' && typeof window !== 'undefined' && window.location) {
+    		                                return function (matchPath) {
+    		                                    // Check if router is available
+    		                                    if (!window.InduxRoutingNavigation) {
+    		                                        console.warn('[Indux] Router not available for route-aware collection access');
+    		                                        return createLoadingProxy();
+    		                                    }
+
+    		                                    return createRouteAwareProxy(target, matchPath);
+    		                                };
+    		                            }
+
+    		                            return target[nestedKey];
+    		                        }
+    		                    });
+    		                }
+
+    		                return value;
+    		            }
+    		        });
+    		    }
+
+    		    // Find item by route matching
+    		    function findItemByRoute(data, matchPath, currentRoute) {
+    		        if (!data || !currentRoute) return null;
+
+    		        // Normalize current route
+    		        const normalizedRoute = currentRoute.replace(/^\/+|\/+$/g, '') || '/';
+    		        const routeSegments = normalizedRoute.split('/').filter(segment => segment.length > 0);
+
+    		        // Helper function to recursively search for the match property
+    		        function findMatch(obj) {
+    		            if (Array.isArray(obj)) {
+    		                // Handle arrays - search each item
+    		                for (let i = 0; i < obj.length; i++) {
+    		                    const result = findMatch(obj[i]);
+    		                    if (result) return result;
+    		                }
+    		                return null;
+    		            } else if (obj && typeof obj === 'object') {
+    		                // Handle objects - check if this object has the match property
+    		                if (obj[matchPath]) {
+    		                    const matchValue = obj[matchPath];
+    		                    // Check if the match value appears anywhere in the route segments
+    		                    if (routeSegments.includes(matchValue)) {
+    		                        return obj;
+    		                    }
+    		                }
+
+    		                // Recursively search all properties
+    		                for (const key in obj) {
+    		                    if (obj.hasOwnProperty(key) && typeof obj[key] === 'object') {
+    		                        const result = findMatch(obj[key]);
+    		                        if (result) return result;
+    		                    }
+    		                }
+    		            }
+
+    		            return null;
+    		        }
+
+    		        return findMatch(data);
+    		    }
+
+    		    // Create route-aware proxy
+    		    function createRouteAwareProxy(data, matchPath) {
+    		        // Create a reactive Alpine component that automatically updates on route changes
+    		        const reactiveProxy = Alpine.reactive({
+    		            _data: data,
+    		            _matchPath: matchPath,
+    		            _currentRoute: window.location.pathname,
+    		            _matchedItem: null,
+
+    		            // Computed property that updates automatically
+    		            get matchedItem() {
+    		                this._currentRoute = window.location.pathname;
+    		                this._matchedItem = findItemByRoute(this._data, this._matchPath, this._currentRoute);
+    		                return this._matchedItem;
+    		            }
+    		        });
+
+    		        // Set up route change listeners to trigger reactivity
+    		        const routeChangeHandler = () => {
+    		            reactiveProxy._currentRoute = window.location.pathname;
+    		        };
+
+    		        window.addEventListener('indux:route-change', routeChangeHandler);
+    		        window.addEventListener('popstate', routeChangeHandler);
+
+    		        // Return a proxy that delegates to the reactive component
+    		        return new Proxy({}, {
+    		            get(target, key) {
+    		                // Handle special keys
+    		                if (key === Symbol.iterator || key === 'then' || key === 'catch' || key === 'finally') {
+    		                    return undefined;
+    		                }
+
+    		                // Handle toPrimitive for text content
+    		                if (key === Symbol.toPrimitive) {
+    		                    return function () {
+    		                        const matchedItem = reactiveProxy.matchedItem;
+    		                        return matchedItem ? (matchedItem[key] || '') : '';
+    		                    };
+    		                }
+
+    		                // Get the current matched item (reactive)
+    		                const matchedItem = reactiveProxy.matchedItem;
+
+    		                if (!matchedItem) {
+    		                    return createLoadingProxy();
+    		                }
+
+    		                // Return the actual value, not a proxy
+    		                const value = matchedItem[key];
+    		                if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    		                    return value;
+    		                }
+
+    		                // For objects and arrays, return a proxy
+    		                if (value && typeof value === 'object') {
+    		                    if (Array.isArray(value)) {
+    		                        return new Proxy(value, {
+    		                            get(target, nestedKey) {
+    		                                if (nestedKey === 'length') {
+    		                                    return target.length;
+    		                                }
+    		                                if (typeof nestedKey === 'string' && !isNaN(Number(nestedKey))) {
+    		                                    const index = Number(nestedKey);
+    		                                    if (index >= 0 && index < target.length) {
+    		                                        return createArrayItemProxy(target[index]);
+    		                                    }
+    		                                    return createLoadingProxy();
+    		                                }
+    		                                return createLoadingProxy();
+    		                            }
+    		                        });
+    		                    }
+    		                    return new Proxy(value, {
+    		                        get(target, nestedKey) {
+    		                            // Handle special keys
+    		                            if (nestedKey === Symbol.iterator || nestedKey === 'then' || nestedKey === 'catch' || nestedKey === 'finally') {
+    		                                return undefined;
+    		                            }
+
+    		                            // Handle toPrimitive for text content
+    		                            if (nestedKey === Symbol.toPrimitive) {
+    		                                return function () {
+    		                                    return target[nestedKey] || '';
+    		                                };
+    		                            }
+
+    		                            return target[nestedKey];
+    		                        }
+    		                    });
+    		                }
+
+    		                return value;
+    		            }
+    		        });
+    		    }
+
+    		    // Initialize store first to ensure it exists
+    		    if (!Alpine.store('collections')) {
+    		        Alpine.store('collections', {
+    		            all: [],
+    		            _initialized: true
+    		        });
+    		    }
+
+    		    // Add $x magic method
+    		    Alpine.magic('x', () => {
+    		        const pendingLoads = new Map();
+    		        
+    		        // Ensure store exists
+    		        let store = Alpine.store('collections');
+    		        if (!store) {
+    		            Alpine.store('collections', {
+    		                all: [],
+    		                _initialized: true
+    		            });
+    		            store = Alpine.store('collections');
+    		        }
+    		        
+    		        // Create a fallback route function that returns a loading proxy
+    		        const fallbackRouteFunction = function(matchPath) {
+    		            return new Proxy({}, {
+    		                get(target, key) {
+    		                    // Handle special keys
+    		                    if (key === Symbol.iterator || key === 'then' || key === 'catch' || key === 'finally') {
+    		                        return undefined;
+    		                    }
+
+    		                    // Handle toPrimitive for text content
+    		                    if (key === Symbol.toPrimitive) {
+    		                        return function () { return ''; };
+    		                    }
+
+    		                    // Return loading proxy for all properties
+    		                    return createLoadingProxy();
+    		                }
+    		            });
+    		        };
+
+    		        // Listen for locale changes
+    		        window.addEventListener('localechange', async (event) => {
+    		            event.detail.locale;
+
+    		            // Clear existing collections and cache
+    		            Alpine.store('collections');
+    		            collectionCache.clear();
+    		            Alpine.store('collections', {
+    		                all: [],
+    		                _initialized: true
+    		            });
+
+    		            // Collections will be reloaded on-demand when accessed
+    		        });
+
+    		        return new Proxy({}, {
+    		            get(target, prop) {
+    		                // Handle special keys
+    		                if (prop === Symbol.iterator || prop === 'then' || prop === 'catch' || prop === 'finally') {
+    		                    return undefined;
+    		                }
+
+    		                // Get current value from store
+    		                const value = store[prop];
+    		                const currentLocale = Alpine.store('locale')?.current || 'en';
+
+    		                // If not in store, try to load it
+    		                if (!value && !pendingLoads.has(prop)) {
+    		                    // Start loading
+    		                    const loadPromise = loadCollection(prop, currentLocale);
+    		                    pendingLoads.set(prop, loadPromise);
+    		                    return createLoadingProxy();
+    		                }
+
+    		                // If no value is available yet, return a proxy that provides fallback route function
+    		                if (!value) {
+    		                    return new Proxy({}, {
+    		                        get(target, key) {
+    		                            // Handle special keys
+    		                            if (key === Symbol.iterator || key === 'then' || key === 'catch' || key === 'finally') {
+    		                                return undefined;
+    		                            }
+
+    		                            // Handle toPrimitive for text content
+    		                            if (key === Symbol.toPrimitive) {
+    		                                return function () { return ''; };
+    		                            }
+
+    		                            // Handle route-aware access - return fallback function
+    		                            if (key === 'route' && typeof window !== 'undefined' && window.location) {
+    		                                return fallbackRouteFunction;
+    		                            }
+
+    		                            // Return loading proxy for other properties
+    		                            return createLoadingProxy();
+    		                        }
+    		                    });
+    		                }
+
+    		                // If we have a value, return a reactive proxy
+    		                if (value) {
+    		                    return new Proxy(value, {
+    		                        get(target, key) {
+    		                            // Handle special keys
+    		                            if (key === Symbol.iterator || key === 'then' || key === 'catch' || key === 'finally') {
+    		                                return undefined;
+    		                            }
+
+    		                            // Handle toPrimitive for text content
+    		                            if (key === Symbol.toPrimitive) {
+    		                                return function () { return ''; };
+    		                            }
+
+    		                            // Handle route-aware access
+    		                            if (key === 'route' && typeof window !== 'undefined' && window.location) {
+    		                                return function (matchPath) {
+    		                                    // Check if router is available
+    		                                    if (!window.InduxRoutingNavigation) {
+    		                                        console.warn('[Indux] Router not available for route-aware collection access');
+    		                                        return createLoadingProxy();
+    		                                    }
+
+    		                                    return createRouteAwareProxy(target, matchPath);
+    		                                };
+    		                            }
+
+    		                            // Handle array-like behavior
+    		                            if (Array.isArray(target)) {
+    		                                if (key === 'length') {
+    		                                    return target.length;
+    		                                }
+    		                                // Handle numeric keys for array access
+    		                                if (typeof key === 'string' && !isNaN(Number(key))) {
+    		                                    const index = Number(key);
+    		                                    if (index >= 0 && index < target.length) {
+    		                                        return createArrayItemProxy(target[index]);
+    		                                    }
+    		                                    return createLoadingProxy();
+    		                                }
+    		                            }
+
+    		                            // Handle nested objects
+    		                            const nestedValue = target[key];
+    		                            if (nestedValue) {
+    		                                if (Array.isArray(nestedValue)) {
+    		                                    return new Proxy(nestedValue, {
+    		                                        get(target, nestedKey) {
+    		                                            if (nestedKey === 'length') {
+    		                                                return target.length;
+    		                                            }
+    		                                            if (typeof nestedKey === 'string' && !isNaN(Number(nestedKey))) {
+    		                                                const index = Number(nestedKey);
+    		                                                if (index >= 0 && index < target.length) {
+    		                                                    return createArrayItemProxy(target[index]);
+    		                                                }
+    		                                                return createLoadingProxy();
+    		                                            }
+
+    		                                            // Handle route-aware access
+    		                                            if (nestedKey === 'route' && typeof window !== 'undefined' && window.location) {
+    		                                                return function (matchPath) {
+    		                                                    // Check if router is available
+    		                                                    if (!window.InduxRoutingNavigation) {
+    		                                                        console.warn('[Indux] Router not available for route-aware collection access');
+    		                                                        return createLoadingProxy();
+    		                                                    }
+
+    		                                                    return createRouteAwareProxy(target, matchPath);
+    		                                                };
+    		                                            }
+
+    		                                            return createLoadingProxy();
+    		                                        }
+    		                                    });
+    		                                }
+    		                                return new Proxy(nestedValue, {
+    		                                    get(target, nestedKey) {
+    		                                        // Handle special keys
+    		                                        if (nestedKey === Symbol.iterator || nestedKey === 'then' || nestedKey === 'catch' || nestedKey === 'finally') {
+    		                                            return undefined;
+    		                                        }
+
+    		                                        // Handle toPrimitive for text content
+    		                                        if (nestedKey === Symbol.toPrimitive) {
+    		                                            return function () {
+    		                                                return target[nestedKey] || '';
+    		                                            };
+    		                                        }
+
+    		                                        // Handle route-aware access
+    		                                        if (nestedKey === 'route' && typeof window !== 'undefined' && window.location) {
+    		                                            return function (matchPath) {
+    		                                                // Check if router is available
+    		                                                if (!window.InduxRoutingNavigation) {
+    		                                                    console.warn('[Indux] Router not available for route-aware collection access');
+    		                                                    return createLoadingProxy();
+    		                                                }
+
+    		                                                return createRouteAwareProxy(target, matchPath);
+    		                                            };
+    		                                        }
+
+    		                                        return target[nestedKey];
+    		                                    }
+    		                                });
+    		                            }
+    		                            return createLoadingProxy();
+    		                        }
+    		                    });
+    		                }
+
+    		                // If no value is available yet, return a proxy that provides fallback route function
+    		                return new Proxy({}, {
+    		                    get(target, key) {
+    		                        // Handle special keys
+    		                        if (key === Symbol.iterator || key === 'then' || key === 'catch' || key === 'finally') {
+    		                            return undefined;
+    		                        }
+
+    		                        // Handle toPrimitive for text content
+    		                        if (key === Symbol.toPrimitive) {
+    		                            return function () { return ''; };
+    		                        }
+
+    		                        // Handle route-aware access - return fallback function
+    		                        if (key === 'route' && typeof window !== 'undefined' && window.location) {
+    		                            return fallbackRouteFunction;
+    		                        }
+
+    		                        return createLoadingProxy();
+    		                    }
+    		                });
+    		            }
+    		        });
+    		    });
+
+    		    // Initialize collections after magic method is registered
+    		    if (isInitializing || initializationComplete) return;
+    		    isInitializing = true;
+
+    		    try {
+    		        // Initialize store without loading all collections
+    		        Alpine.store('collections', {
+    		            all: [],
+    		            _initialized: true
+    		        });
+
+    		        // Collections will be loaded on-demand when accessed via $x
+    		    } finally {
+    		        isInitializing = false;
+    		        initializationComplete = true;
+    		    }
+    		}
+
+    		// Handle both DOMContentLoaded and alpine:init
+    		if (document.readyState === 'loading') {
+    		    document.addEventListener('DOMContentLoaded', () => {
+    		        if (window.Alpine) initializeCollectionsPlugin();
+    		    });
+    		}
+
+    		document.addEventListener('alpine:init', initializeCollectionsPlugin); 
+    	} (indux_collections$1, indux_collections$1.exports));
+    	return indux_collections$1.exports;
     }
 
-    document.addEventListener('alpine:init', initializeCollectionsPlugin);
+    requireIndux_collections();
 
     /*! Indux Dropdowns 1.0.0 - MIT License */
 
@@ -1319,7 +2485,63 @@ var Indux = (function (exports) {
     		            evaluate(value => {
     		                if (!value) return
 
-    		                // Create icon element if it doesn't exist
+    		                // Special handling for <li> elements
+    		                if (el.tagName.toLowerCase() === 'li') {
+    		                    // Check if this is the first time processing this li
+    		                    if (!el.hasAttribute('data-icon-processed')) {
+    		                        // Store original text content
+    		                        const originalText = el.textContent.trim();
+
+    		                        // Clear the element
+    		                        el.innerHTML = '';
+
+    		                        // Create a temporary element for Iconify to process
+    		                        const tempEl = document.createElement('span');
+    		                        tempEl.className = 'iconify';
+    		                        tempEl.setAttribute('data-icon', value);
+
+    		                        // Add temporary element first
+    		                        el.appendChild(tempEl);
+
+    		                        // Add text content back
+    		                        if (originalText) {
+    		                            const textNode = document.createTextNode(originalText);
+    		                            el.appendChild(textNode);
+    		                        }
+
+    		                        // Mark as processed to prevent re-processing
+    		                        el.setAttribute('data-icon-processed', 'true');
+
+    		                        // Use Iconify to process the temporary element
+    		                        window.Iconify.scan(tempEl);
+
+    		                        // After a short delay, check if Iconify replaced our element
+    		                        setTimeout(() => {
+    		                            // Check if the temp element was replaced by an SVG
+    		                            const svg = el.querySelector('svg');
+    		                            if (svg && svg.parentNode === el) {
+    		                                // Iconify replaced our span with SVG, wrap it in a new span
+    		                                const newSpan = document.createElement('span');
+    		                                newSpan.setAttribute('x-icon', value);
+    		                                el.insertBefore(newSpan, svg);
+    		                                newSpan.appendChild(svg);
+    		                            }
+    		                        }, 50);
+    		                        return
+    		                    } else {
+    		                        // Update existing icon
+    		                        const iconSpan = el.querySelector('.iconify');
+    		                        if (iconSpan) {
+    		                            iconSpan.setAttribute('data-icon', value);
+    		                            if (window.Iconify) {
+    		                                window.Iconify.scan(iconSpan);
+    		                            }
+    		                        }
+    		                        return
+    		                    }
+    		                }
+
+    		                // Standard handling for non-li elements
     		                let iconEl = el.querySelector('.iconify');
     		                if (!iconEl) {
     		                    iconEl = document.createElement('span');
@@ -1331,15 +2553,8 @@ var Indux = (function (exports) {
     		                // Set icon data
     		                iconEl.setAttribute('data-icon', value);
 
-    		                // Ensure Iconify is loaded
-    		                if (!window.Iconify) {
-    		                    const script = document.createElement('script');
-    		                    script.src = 'https://code.iconify.design/3/3.1.1/iconify.min.js';
-    		                    script.onload = () => window.Iconify.scan(iconEl);
-    		                    document.head.appendChild(script);
-    		                } else {
-    		                    window.Iconify.scan(iconEl);
-    		                }
+    		                // Use Iconify (already embedded in script)
+    		                window.Iconify.scan(iconEl);
     		            });
     		        });
     		    });
@@ -2389,6 +3604,290 @@ var Indux = (function (exports) {
         processAllHeadContent
     };
 
+    /*! Indux Tabs 1.0.0 - MIT License */
+
+    function initializeTabsPlugin() {   
+        
+        // Track tab data globally
+        const tabData = new Map();
+        
+        // Helper to get tab property name based on panel set
+        function getTabPropertyName(panelSet) {
+            return panelSet ? `tab_${panelSet}` : 'tab';
+        }
+        
+        // Helper to find panels by ID or class
+        function findPanelsByTarget(target, panelSet) {
+            const panels = [];
+            
+            // Check if target is an ID
+            const panelById = document.getElementById(target);
+            if (panelById && panelById.hasAttribute('x-tabpanel')) {
+                const panelSetAttr = panelById.getAttribute('x-tabpanel');
+                if (panelSetAttr === panelSet || (!panelSetAttr && !panelSet)) {
+                    panels.push(panelById);
+                }
+            }
+            
+            // Check if target is a class - handle numeric class names
+            try {
+                const panelsByClass = document.querySelectorAll(`.${target}[x-tabpanel]`);
+                panelsByClass.forEach(panel => {
+                    const panelSetAttr = panel.getAttribute('x-tabpanel');
+                    if (panelSetAttr === panelSet || (!panelSetAttr && !panelSet)) {
+                        panels.push(panel);
+                    } else {
+                    }
+                });
+            } catch (e) {
+                // If the selector is invalid (e.g., numeric class), try a different approach
+                const allPanels = document.querySelectorAll('[x-tabpanel]');
+                allPanels.forEach(panel => {
+                    if (panel.classList.contains(target)) {
+                        const panelSetAttr = panel.getAttribute('x-tabpanel');
+                        if (panelSetAttr === panelSet || (!panelSetAttr && !panelSet)) {
+                            panels.push(panel);
+                        }
+                    }
+                });
+            }
+            
+            return panels;
+        }
+        
+        // Helper to find the common parent of multiple elements
+        function findCommonParent(elements) {
+            if (elements.length === 0) return document.body;
+            if (elements.length === 1) return elements[0].parentElement || document.body;
+            
+            // Start with the first element's parent
+            let commonParent = elements[0].parentElement;
+            
+            // For each element, find the lowest common ancestor
+            for (let i = 1; i < elements.length; i++) {
+                const element = elements[i];
+                let currentParent = element.parentElement;
+                
+                // Walk up the tree until we find a common ancestor
+                while (currentParent && !commonParent.contains(currentParent)) {
+                    currentParent = currentParent.parentElement;
+                }
+                
+                if (currentParent) {
+                    commonParent = currentParent;
+                }
+            }
+            
+            // If we couldn't find a common parent, use body
+            if (!commonParent) {
+                commonParent = document.body;
+            }
+            
+            return commonParent;
+        }
+        
+        // Process tabs and panels
+        function processTabs() {
+            
+            // Find all tab-related elements
+            const tabButtons = document.querySelectorAll('[x-tab]');
+            const panels = document.querySelectorAll('[x-tabpanel]');
+            
+            if (tabButtons.length === 0 && panels.length === 0) {
+                return;
+            }
+            
+            // Group panels by their panel set
+            const panelSets = new Map();
+            panels.forEach(panel => {
+                const panelSet = panel.getAttribute('x-tabpanel') || '';
+                if (!panelSets.has(panelSet)) {
+                    panelSets.set(panelSet, []);
+                }
+                panelSets.get(panelSet).push(panel);
+            });
+            
+            
+            // Process each panel set separately
+            panelSets.forEach((panelsInSet, panelSet) => {
+                
+                // Find buttons that control panels in this set
+                const buttonsForThisSet = [];
+                tabButtons.forEach(button => {
+                    const tabValue = button.getAttribute('x-tab');
+                    if (!tabValue) return;
+                    
+                    // Check if this button controls any panels in this set
+                    const targetPanels = findPanelsByTarget(tabValue, panelSet);
+                    if (targetPanels.length > 0) {
+                        buttonsForThisSet.push(button);
+                    }
+                });
+                
+                if (buttonsForThisSet.length === 0) {
+                    return;
+                }
+                
+                // Find the common parent for this specific panel set
+                const allElementsForThisSet = [...buttonsForThisSet, ...panelsInSet];
+                const commonParent = findCommonParent(allElementsForThisSet);
+                
+                
+                // Check if we've already processed this parent for this panel set
+                const processedKey = `data-tabs-processed-${panelSet}`;
+                if (commonParent.hasAttribute(processedKey)) {
+                    return;
+                }
+                
+                // Mark as processed for this panel set
+                commonParent.setAttribute(processedKey, 'true');
+                
+                // Ensure the common parent has x-data
+                if (!commonParent.hasAttribute('x-data')) {
+                    commonParent.setAttribute('x-data', '{}');
+                }
+                
+                // Get or create the tab data for this parent
+                if (!tabData.has(commonParent)) {
+                    tabData.set(commonParent, new Map());
+                }
+                const parentTabData = tabData.get(commonParent);
+                
+                // Process panels in this set
+                panelsInSet.forEach(panel => {
+                    const tabProp = getTabPropertyName(panelSet);
+                    
+                    // Add x-show directive
+                    const panelId = panel.id || panel.className.split(' ')[0];
+                    if (panelId) {
+                        panel.setAttribute('x-show', `${tabProp} === '${panelId}'`);
+                    }
+                });
+                
+                // Process buttons for this set
+                buttonsForThisSet.forEach(button => {
+                    const tabValue = button.getAttribute('x-tab');
+                    if (!tabValue) return;
+                    
+                    
+                    const tabProp = getTabPropertyName(panelSet);
+                    
+                    
+                    // Track this tab property
+                    if (!parentTabData.has(tabProp)) {
+                        parentTabData.set(tabProp, tabValue);
+                    }
+                    
+                    // Add click handler
+                    const existingClick = button.getAttribute('x-on:click') || '';
+                    const newClick = `${tabProp} = '${tabValue}'`;
+                    
+                    // Only add if it's not already there to avoid duplication
+                    let finalClick;
+                    if (existingClick && existingClick.includes(newClick)) {
+                        finalClick = existingClick;
+                    } else {
+                        finalClick = existingClick ? `${existingClick}; ${newClick}` : newClick;
+                    }
+                    
+                    button.setAttribute('x-on:click', finalClick);
+                });
+                
+                // Add tab properties to x-data for this panel set
+                if (parentTabData.size > 0) {
+                    const existingXData = commonParent.getAttribute('x-data') || '{}';
+                    let newXData = existingXData;
+                    
+                    // Parse existing x-data
+                    if (existingXData === '{}') {
+                        // Empty x-data, create new one with tab properties
+                        const tabProperties = Array.from(parentTabData.entries())
+                            .map(([key, value]) => `${key}: '${value}'`)
+                            .join(', ');
+                        newXData = `{ ${tabProperties} }`;
+                    } else {
+                        // Existing x-data, append tab properties
+                        const tabProperties = Array.from(parentTabData.entries())
+                            .map(([key, value]) => `${key}: '${value}'`)
+                            .join(', ');
+                        
+                        // Insert before the closing brace
+                        const lastBraceIndex = existingXData.lastIndexOf('}');
+                        if (lastBraceIndex > 0) {
+                            const beforeBrace = existingXData.substring(0, lastBraceIndex);
+                            const afterBrace = existingXData.substring(lastBraceIndex);
+                            const separator = beforeBrace.trim().endsWith(',') ? '' : ', ';
+                            newXData = beforeBrace + separator + tabProperties + afterBrace;
+                        }
+                    }
+                    
+                    // Update the x-data attribute
+                    commonParent.setAttribute('x-data', newXData);
+                    
+                    // Force Alpine to re-initialize if it's already initialized
+                    if (window.Alpine && commonParent._x_dataStack) {
+                        delete commonParent._x_dataStack;
+                        window.Alpine.initTree(commonParent);
+                    }
+                }
+            });
+        }
+        
+        // Register Alpine directives
+        if (window.Alpine) {
+            Alpine.plugin(() => {
+                // Register x-tab directive
+                Alpine.directive('tab', (el, { value }, { effect }) => {
+                    // This will be processed by our main logic
+                    effect(() => {
+                        processTabs();
+                    });
+                });
+                
+                // Register x-tabpanel directive
+                Alpine.directive('tabpanel', (el, { value }, { effect }) => {
+                    // This will be processed by our main logic
+                    effect(() => {
+                        processTabs();
+                    });
+                });
+            });
+        } else {
+            document.addEventListener('alpine:init', () => {
+                Alpine.plugin(() => {
+                    // Register x-tab directive
+                    Alpine.directive('tab', (el, { value }, { effect }) => {
+                        // This will be processed by our main logic
+                        effect(() => {
+                            processTabs();
+                        });
+                    });
+                    
+                    // Register x-tabpanel directive
+                    Alpine.directive('tabpanel', (el, { value }, { effect }) => {
+                        // This will be processed by our main logic
+                        effect(() => {
+                            processTabs();
+                        });
+                    });
+                });
+            });
+        }
+        
+        // Process tabs when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', processTabs);
+        } else {
+            processTabs();
+        }
+        
+        // Also process when Alpine is ready
+        document.addEventListener('alpine:initialized', processTabs);
+    }
+
+    // Initialize the plugin
+    initializeTabsPlugin();
+
     /*! Indux Themes 1.0.0 - MIT License */
 
     // Initialize plugin when either DOM is ready or Alpine is ready
@@ -3064,7 +4563,7 @@ var Indux = (function (exports) {
 
             // Create style element immediately
             this.styleElement = document.createElement('style');
-            this.styleElement.id = 'tailwind-styles';
+            this.styleElement.id = 'utility-styles';
             document.head.appendChild(this.styleElement);
 
             // Initialize properties
@@ -3097,7 +4596,7 @@ var Indux = (function (exports) {
                 root: new RegExp(`${this.options.rootSelector}\\s*{([^}]*)}`, 'g'),
                 theme: new RegExp(`${this.options.themeSelector}\\s*{([^}]*)}`, 'g'),
                 variable: /--([\w-]+):\s*([^;]+);/g,
-                tailwindPrefix: /^(color|font|text|font-weight|tracking|leading|breakpoint|container|spacing|radius|shadow|inset-shadow|drop-shadow|blur|perspective|aspect|ease|animate)-/
+                tailwindPrefix: /^(color|font|text|font-weight|tracking|leading|breakpoint|container|spacing|radius|shadow|inset-shadow|drop-shadow|blur|perspective|aspect|ease|animate|border-width|border-style|outline|outline-width|outline-style|ring|ring-offset|divide|accent|caret|decoration|placeholder|selection|scrollbar)-/
             };
 
             // Pre-define pseudo classes
@@ -3105,13 +4604,23 @@ var Indux = (function (exports) {
 
             // Pre-define utility generators
             this.utilityGenerators = {
-                'color-': (suffix, value) => [
-                    [`text-${suffix}`, `color: ${value}`],
-                    [`bg-${suffix}`, `background-color: ${value}`],
-                    [`border-${suffix}`, `border-color: ${value}`],
-                    [`fill-${suffix}`, `fill: ${value}`],
-                    [`stroke-${suffix}`, `stroke: ${value}`]
-                ],
+                'color-': (suffix, value) => {
+                    const utilities = [];
+
+                    // Helper function to generate utility with optional opacity
+                    const addUtility = (prefix, property, baseValue) => {
+                        // Base utility without opacity
+                        utilities.push([`${prefix}-${suffix}`, `${property}: ${baseValue}`]);
+                    };
+
+                    addUtility('text', 'color', value);
+                    addUtility('bg', 'background-color', value);
+                    addUtility('border', 'border-color', value);
+                    addUtility('fill', 'fill', value);
+                    addUtility('stroke', 'stroke', value);
+
+                    return utilities;
+                },
                 'font-': (suffix, value) => [
                     [`font-${suffix}`, `font-family: ${value}`]
                 ],
@@ -3177,6 +4686,48 @@ var Indux = (function (exports) {
                 ],
                 'animate-': (suffix, value) => [
                     [`animate-${suffix}`, `animation: ${value}`]
+                ],
+                'border-width-': (suffix, value) => [
+                    [`border-${suffix}`, `border-width: ${value}`]
+                ],
+                'border-style-': (suffix, value) => [
+                    [`border-${suffix}`, `border-style: ${value}`]
+                ],
+                'outline-': (suffix, value) => [
+                    [`outline-${suffix}`, `outline-color: ${value}`]
+                ],
+                'outline-width-': (suffix, value) => [
+                    [`outline-${suffix}`, `outline-width: ${value}`]
+                ],
+                'outline-style-': (suffix, value) => [
+                    [`outline-${suffix}`, `outline-style: ${value}`]
+                ],
+                'ring-': (suffix, value) => [
+                    [`ring-${suffix}`, `box-shadow: 0 0 0 ${value} var(--color-ring)`]
+                ],
+                'ring-offset-': (suffix, value) => [
+                    [`ring-offset-${suffix}`, `--tw-ring-offset-width: ${value}`]
+                ],
+                'divide-': (suffix, value) => [
+                    [`divide-${suffix}`, `border-color: ${value}`]
+                ],
+                'accent-': (suffix, value) => [
+                    [`accent-${suffix}`, `accent-color: ${value}`]
+                ],
+                'caret-': (suffix, value) => [
+                    [`caret-${suffix}`, `caret-color: ${value}`]
+                ],
+                'decoration-': (suffix, value) => [
+                    [`decoration-${suffix}`, `text-decoration-color: ${value}`]
+                ],
+                'placeholder-': (suffix, value) => [
+                    [`placeholder-${suffix}`, `&::placeholder { color: ${value} }`]
+                ],
+                'selection-': (suffix, value) => [
+                    [`selection-${suffix}`, `&::selection { background-color: ${value} }`]
+                ],
+                'scrollbar-': (suffix, value) => [
+                    [`scrollbar-${suffix}`, `scrollbar-color: ${value}`]
                 ]
             };
 
@@ -3216,7 +4767,24 @@ var Indux = (function (exports) {
                 'optional': ':optional',
                 'user-valid': ':user-valid',
                 'user-invalid': ':user-invalid',
-                'details-content': ':details-content',
+                'open': '[open] &',
+                'closed': ':not([open]) &',
+                'paused': '[data-state="paused"] &',
+                'playing': '[data-state="playing"] &',
+                'muted': '[data-state="muted"] &',
+                'unmuted': '[data-state="unmuted"] &',
+                'collapsed': '[data-state="collapsed"] &',
+                'expanded': '[data-state="expanded"] &',
+                'unchecked': ':not(:checked)',
+                'selected': '[data-state="selected"] &',
+                'unselected': '[data-state="unselected"] &',
+                'details-content': '::details-content',
+                'nth': ':nth-child',
+                'nth-last': ':nth-last-child',
+                'nth-of-type': ':nth-of-type',
+                'nth-last-of-type': ':nth-last-of-type',
+                'has': ':has',
+                'not': ':not',
 
                 // Pseudo-elements
                 'before': '::before',
@@ -3228,10 +4796,58 @@ var Indux = (function (exports) {
                 'file': '::file-selector-button',
                 'backdrop': '::backdrop',
                 'placeholder': '::placeholder',
+                'target-text': '::target-text',
+                'spelling-error': '::spelling-error',
+                'grammar-error': '::grammar-error',
 
                 // Media queries
                 'dark': '.dark &',
                 'light': '.light &',
+
+                // Group variants
+                'group': '.group &',
+                'group-hover': '.group:hover &',
+                'group-focus': '.group:focus &',
+                'group-focus-within': '.group:focus-within &',
+                'group-active': '.group:active &',
+                'group-disabled': '.group:disabled &',
+                'group-visited': '.group:visited &',
+                'group-checked': '.group:checked &',
+                'group-required': '.group:required &',
+                'group-valid': '.group:valid &',
+                'group-invalid': '.group:invalid &',
+                'group-in-range': '.group:in-range &',
+                'group-out-of-range': '.group:out-of-range &',
+                'group-placeholder-shown': '.group:placeholder-shown &',
+                'group-autofill': '.group:autofill &',
+                'group-read-only': '.group:read-only &',
+                'group-read-write': '.group:read-write &',
+                'group-optional': '.group:optional &',
+                'group-user-valid': '.group:user-valid &',
+                'group-user-invalid': '.group:user-invalid &',
+
+                // Peer variants
+                'peer': '.peer ~ &',
+                'peer-hover': '.peer:hover ~ &',
+                'peer-focus': '.peer:focus ~ &',
+                'peer-focus-within': '.peer:focus-within ~ &',
+                'peer-active': '.peer:active ~ &',
+                'peer-disabled': '.peer:disabled ~ &',
+                'peer-visited': '.peer:visited ~ &',
+                'peer-checked': '.peer:checked ~ &',
+                'peer-required': '.peer:required ~ &',
+                'peer-valid': '.peer:valid ~ &',
+                'peer-invalid': '.peer:invalid ~ &',
+                'peer-in-range': '.peer:in-range ~ &',
+                'peer-out-of-range': '.peer:out-of-range ~ &',
+                'peer-placeholder-shown': '.peer:placeholder-shown ~ &',
+                'peer-autofill': '.peer:autofill ~ &',
+                'peer-read-only': '.peer:read-only ~ &',
+                'peer-read-write': '.peer:read-write ~ &',
+                'peer-optional': '.peer:optional ~ &',
+                'peer-user-valid': '.peer:user-valid ~ &',
+                'peer-user-invalid': '.peer:user-invalid &',
+
                 'motion-safe': '@media (prefers-reduced-motion: no-preference)',
                 'motion-reduce': '@media (prefers-reduced-motion: reduce)',
                 'print': '@media print',
@@ -3240,7 +4856,8 @@ var Indux = (function (exports) {
                 'contrast-more': '@media (prefers-contrast: more)',
                 'contrast-less': '@media (prefers-contrast: less)',
                 'forced-colors': '@media (forced-colors: active)',
-                'inverted-colors': '@media (inverted-colors: inverted)',
+                'rtl': '&:where(:dir(rtl), [dir="rtl"], [dir="rtl"] *)',
+                'ltr': '&:where(:dir(ltr), [dir="ltr"], [dir="ltr"] *)',
                 'pointer-fine': '@media (pointer: fine)',
                 'pointer-coarse': '@media (pointer: coarse)',
                 'pointer-none': '@media (pointer: none)',
@@ -3248,6 +4865,44 @@ var Indux = (function (exports) {
                 'any-pointer-coarse': '@media (any-pointer: coarse)',
                 'any-pointer-none': '@media (any-pointer: none)',
                 'scripting-enabled': '@media (scripting: enabled)',
+                'can-hover': '@media (hover: hover)',
+                'can-not-hover': '@media (hover: none)',
+                'any-hover': '@media (any-hover: hover)',
+                'any-hover-none': '@media (any-hover: none)',
+                'any-pointer': '@media (any-pointer: fine)',
+                'any-pointer-coarse': '@media (any-pointer: coarse)',
+                'any-pointer-none': '@media (any-pointer: none)',
+                'color': '@media (color)',
+                'color-gamut': '@media (color-gamut: srgb)',
+                'color-gamut-p3': '@media (color-gamut: p3)',
+                'color-gamut-rec2020': '@media (color-gamut: rec2020)',
+                'monochrome': '@media (monochrome)',
+                'monochrome-color': '@media (monochrome: 0)',
+                'monochrome-grayscale': '@media (monochrome: 1)',
+                'inverted-colors': '@media (inverted-colors: inverted)',
+                'inverted-colors-none': '@media (inverted-colors: none)',
+                'update': '@media (update: fast)',
+                'update-slow': '@media (update: slow)',
+                'update-none': '@media (update: none)',
+                'overflow-block': '@media (overflow-block: scroll)',
+                'overflow-block-paged': '@media (overflow-block: paged)',
+                'overflow-inline': '@media (overflow-inline: scroll)',
+                'overflow-inline-auto': '@media (overflow-inline: auto)',
+                'prefers-color-scheme': '@media (prefers-color-scheme: dark)',
+                'prefers-color-scheme-light': '@media (prefers-color-scheme: light)',
+                'prefers-contrast': '@media (prefers-contrast: more)',
+                'prefers-contrast-less': '@media (prefers-contrast: less)',
+                'prefers-contrast-no-preference': '@media (prefers-contrast: no-preference)',
+                'prefers-reduced-motion': '@media (prefers-reduced-motion: reduce)',
+                'prefers-reduced-motion-no-preference': '@media (prefers-reduced-motion: no-preference)',
+                'prefers-reduced-transparency': '@media (prefers-reduced-transparency: reduce)',
+                'prefers-reduced-transparency-no-preference': '@media (prefers-reduced-transparency: no-preference)',
+                'resolution': '@media (resolution: 1dppx)',
+                'resolution-low': '@media (resolution: 1dppx)',
+                'resolution-high': '@media (resolution: 2dppx)',
+                'scan': '@media (scan: progressive)',
+                'scan-interlace': '@media (scan: interlace)',
+                'scripting': '@media (scripting: enabled)',
                 'scripting-none': '@media (scripting: none)',
                 'scripting-initial-only': '@media (scripting: initial-only)',
 
@@ -3269,17 +4924,74 @@ var Indux = (function (exports) {
                 'supports': '@supports',
 
                 // Starting style
-                'starting': '@starting-style'
+                'starting': '@starting-style',
+
+                // Data attribute variants (common patterns)
+                'data-open': '[data-state="open"] &',
+                'data-closed': '[data-state="closed"] &',
+                'data-checked': '[data-state="checked"] &',
+                'data-unchecked': '[data-state="unchecked"] &',
+                'data-on': '[data-state="on"] &',
+                'data-off': '[data-state="off"] &',
+                'data-visible': '[data-state="visible"] &',
+                'data-hidden': '[data-state="hidden"] &',
+                'data-disabled': '[data-disabled] &',
+                'data-loading': '[data-loading] &',
+                'data-error': '[data-error] &',
+                'data-success': '[data-success] &',
+                'data-warning': '[data-warning] &',
+                'data-selected': '[data-selected] &',
+                'data-highlighted': '[data-highlighted] &',
+                'data-pressed': '[data-pressed] &',
+                'data-expanded': '[data-expanded] &',
+                'data-collapsed': '[data-collapsed] &',
+                'data-active': '[data-active] &',
+                'data-inactive': '[data-inactive] &',
+                'data-valid': '[data-valid] &',
+                'data-invalid': '[data-invalid] &',
+                'data-required': '[data-required] &',
+                'data-optional': '[data-optional] &',
+                'data-readonly': '[data-readonly] &',
+                'data-write': '[data-write] &',
+
+                // Aria attribute variants (common patterns)
+                'aria-expanded': '[aria-expanded="true"] &',
+                'aria-collapsed': '[aria-expanded="false"] &',
+                'aria-pressed': '[aria-pressed="true"] &',
+                'aria-unpressed': '[aria-pressed="false"] &',
+                'aria-checked': '[aria-checked="true"] &',
+                'aria-unchecked': '[aria-checked="false"] &',
+                'aria-selected': '[aria-selected="true"] &',
+                'aria-unselected': '[aria-selected="false"] &',
+                'aria-invalid': '[aria-invalid="true"] &',
+                'aria-valid': '[aria-invalid="false"] &',
+                'aria-required': '[aria-required="true"] &',
+                'aria-optional': '[aria-required="false"] &',
+                'aria-disabled': '[aria-disabled="true"] &',
+                'aria-enabled': '[aria-disabled="false"] &',
+                'aria-hidden': '[aria-hidden="true"] &',
+                'aria-visible': '[aria-hidden="false"] &',
+                'aria-busy': '[aria-busy="true"] &',
+                'aria-available': '[aria-busy="false"] &',
+                'aria-current': '[aria-current="true"] &',
+                'aria-not-current': '[aria-current="false"] &',
+                'aria-live': '[aria-live="polite"] &, [aria-live="assertive"] &',
+                'aria-atomic': '[aria-atomic="true"] &',
+                'aria-relevant': '[aria-relevant="additions"] &, [aria-relevant="removals"] &, [aria-relevant="text"] &, [aria-relevant="all"] &'
             };
 
             // Define variant groups that can be combined
             this.variantGroups = {
-                'state': ['hover', 'focus', 'active', 'visited', 'target'],
+                'state': ['hover', 'focus', 'active', 'visited', 'target', 'open', 'closed', 'paused', 'playing', 'muted', 'unmuted', 'collapsed', 'expanded', 'unchecked', 'selected', 'unselected'],
                 'child': ['first', 'last', 'only', 'odd', 'even'],
                 'form': ['disabled', 'enabled', 'checked', 'indeterminate', 'required', 'valid', 'invalid'],
                 'pseudo': ['before', 'after', 'first-letter', 'first-line', 'marker', 'selection', 'file', 'backdrop'],
-                'media': ['dark', 'light', 'motion-safe', 'motion-reduce', 'print', 'portrait', 'landscape'],
-                'responsive': ['sm', 'md', 'lg', 'xl', '2xl']
+                'media': ['dark', 'light', 'motion-safe', 'motion-reduce', 'print', 'portrait', 'landscape', 'rtl', 'ltr', 'can-hover', 'can-not-hover', 'any-hover', 'any-hover-none', 'color', 'monochrome', 'inverted-colors', 'inverted-colors-none', 'update', 'update-slow', 'update-none', 'overflow-block', 'overflow-block-paged', 'overflow-inline', 'overflow-inline-auto', 'prefers-color-scheme', 'prefers-color-scheme-light', 'prefers-contrast', 'prefers-contrast-less', 'prefers-contrast-no-preference', 'prefers-reduced-motion', 'prefers-reduced-motion-no-preference', 'prefers-reduced-transparency', 'prefers-reduced-transparency-no-preference', 'resolution', 'resolution-low', 'resolution-high', 'scan', 'scan-interlace', 'scripting', 'scripting-none', 'scripting-initial-only', 'forced-colors', 'contrast-more', 'contrast-less', 'pointer-fine', 'pointer-coarse', 'pointer-none', 'any-pointer-fine', 'any-pointer-coarse', 'any-pointer-none', 'scripting-enabled'],
+                'responsive': ['sm', 'md', 'lg', 'xl', '2xl'],
+                'group': ['group', 'group-hover', 'group-focus', 'group-active', 'group-disabled', 'group-checked', 'group-required', 'group-valid', 'group-invalid'],
+                'peer': ['peer', 'peer-hover', 'peer-focus', 'peer-active', 'peer-disabled', 'peer-checked', 'peer-required', 'peer-valid', 'peer-invalid'],
+                'data': ['data-open', 'data-closed', 'data-checked', 'data-unchecked', 'data-visible', 'data-hidden', 'data-disabled', 'data-loading', 'data-error', 'data-success', 'data-warning', 'data-selected', 'data-highlighted', 'data-pressed', 'data-expanded', 'data-collapsed', 'data-active', 'data-inactive', 'data-valid', 'data-invalid', 'data-required', 'data-optional', 'data-readonly', 'data-write'],
+                'aria': ['aria-expanded', 'aria-collapsed', 'aria-pressed', 'aria-unpressed', 'aria-checked', 'aria-unchecked', 'aria-selected', 'aria-unselected', 'aria-invalid', 'aria-valid', 'aria-required', 'aria-optional', 'aria-disabled', 'aria-enabled', 'aria-hidden', 'aria-visible', 'aria-busy', 'aria-available', 'aria-current', 'aria-not-current', 'aria-live', 'aria-atomic', 'aria-relevant']
             };
 
             // Cache for parsed class names
@@ -3542,7 +5254,8 @@ var Indux = (function (exports) {
 
         // Generate a hash of the theme variables to detect changes
         generateThemeHash(themeCss) {
-            return btoa(themeCss).slice(0, 8); // Simple hash of theme content
+            // Use encodeURIComponent to handle non-Latin1 characters safely
+            return encodeURIComponent(themeCss).slice(0, 8); // Simple hash of theme content
         }
 
         // Clean up old cache entries
@@ -3568,10 +5281,11 @@ var Indux = (function (exports) {
 
         getUsedClasses() {
             try {
-                const elements = document.getElementsByTagName('*');
                 const usedClasses = new Set();
                 const usedVariableSuffixes = new Set();
 
+                // Scan current DOM (including index.html and all loaded components)
+                const elements = document.getElementsByTagName('*');
                 for (const element of elements) {
                     let classes = [];
                     if (typeof element.className === 'string') {
@@ -3593,8 +5307,32 @@ var Indux = (function (exports) {
                         // Extract suffix for variable matching
                         const classParts = baseClass.split('-');
                         if (classParts.length > 1) {
-                            const suffix = classParts.slice(1).join('-');
-                            usedVariableSuffixes.add(suffix);
+                            let suffix = classParts.slice(1).join('-');
+
+                            // Handle opacity modifiers (like /90, /50)
+                            let baseSuffix = suffix;
+                            if (suffix.includes('/')) {
+                                const parts = suffix.split('/');
+                                baseSuffix = parts[0];
+                                const opacity = parts[1];
+
+                                // Add both the base suffix and the full suffix with opacity
+                                usedVariableSuffixes.add(baseSuffix);
+                                usedVariableSuffixes.add(suffix); // Keep the full suffix with opacity
+                            } else {
+                                usedVariableSuffixes.add(suffix);
+                            }
+
+                            // For compound classes like text-content-subtle, also add the full suffix
+                            // This handles cases where the variable is --color-content-subtle
+                            if (classParts.length > 2) {
+                                const fullSuffix = classParts.slice(1).join('-');
+                                if (fullSuffix.includes('/')) {
+                                    usedVariableSuffixes.add(fullSuffix.split('/')[0]);
+                                } else {
+                                    usedVariableSuffixes.add(fullSuffix);
+                                }
+                            }
                         }
                     }
                 }
@@ -3714,25 +5452,16 @@ var Indux = (function (exports) {
 
         extractThemeVariables(cssText) {
             const variables = new Map();
-            const patterns = [
-                // Match :root variables
-                new RegExp(`${this.options.rootSelector}\\s*{([^}]*)}`, 'g'),
-                // Match @theme variables
-                new RegExp(`${this.options.themeSelector}\\s*{([^}]*)}`, 'g')
-            ];
 
-            // Process each pattern in order
-            for (const pattern of patterns) {
-                let match;
-                while ((match = pattern.exec(cssText)) !== null) {
-                    const varRegex = /--([\w-]+):\s*([^;]+);/g;
-                    let varMatch;
-                    while ((varMatch = varRegex.exec(match[1])) !== null) {
-                        const name = varMatch[1];
-                        const value = varMatch[2].trim();
-                        variables.set(name, value);
-                    }
-                }
+            // Extract ALL CSS custom properties from ANY declaration block
+            // This regex finds --variable-name: value; patterns anywhere in the CSS
+            const varRegex = /--([\w-]+):\s*([^;]+);/g;
+
+            let varMatch;
+            while ((varMatch = varRegex.exec(cssText)) !== null) {
+                const name = varMatch[1];
+                const value = varMatch[2].trim();
+                variables.set(name, value);
             }
 
             return variables;
@@ -3817,7 +5546,8 @@ var Indux = (function (exports) {
                         if (variants.length === 1 && this.variants[variants[0]]?.startsWith(':')) {
                             // Generate a rule that matches the actual class name and applies the pseudo-class
                             const pseudoClass = this.variants[variants[0]];
-                            utilities.push(`.${escapeClassName(variantClass)}${pseudoClass} { ${css} }`);
+                            const rule = `.${escapeClassName(variantClass)}${pseudoClass} { ${css} }`;
+                            utilities.push(rule);
                         } else {
                             // For other variants (like dark mode, media queries)
                             let selector = `.${escapeClassName(variantClass)}`;
@@ -3826,12 +5556,17 @@ var Indux = (function (exports) {
                                 if (!variantSelector) continue;
 
                                 if (variantSelector.startsWith('@')) {
-                                    selector = `${variantSelector} { ${selector} }`;
+                                    // For media queries, we need to include the CSS content inside the media query block
+                                    selector = `${variantSelector} { ${selector} { ${css} } }`;
+
+                                    // Skip the final utilities.push since we already included the CSS content
+                                    continue;
                                 } else if (variantSelector.startsWith('.')) {
                                     selector = variantSelector.replace('&', selector);
                                 }
                             }
-                            utilities.push(`${selector} { ${css} }`);
+                            const finalRule = `${selector} { ${css} }`;
+                            utilities.push(finalRule);
                         }
                     }
                 };
@@ -3843,10 +5578,6 @@ var Indux = (function (exports) {
                     }
 
                     const suffix = varName.split('-').slice(1).join('-');
-                    if (!variableSuffixes.includes(suffix)) {
-                        continue;
-                    }
-
                     const value = `var(--${varName})`;
                     const prefix = varName.split('-')[0] + '-';
                     const generator = this.utilityGenerators[prefix];
@@ -3854,7 +5585,34 @@ var Indux = (function (exports) {
                     if (generator) {
                         const utilityPairs = generator(suffix, value);
                         for (const [className, css] of utilityPairs) {
-                            generateUtility(className, css);
+                            // Check if this specific utility class is actually used (including variants)
+                            const isUsed = usedClasses.some(cls => {
+                                const parts = cls.split(':');
+                                const baseClass = parts[parts.length - 1];
+                                return baseClass === className;
+                            });
+                            if (isUsed) {
+                                generateUtility(className, css);
+                            }
+
+                            // Check for opacity variants of this utility
+                            const opacityVariants = usedClasses.filter(cls => {
+                                // Check if this class has an opacity modifier and matches our base class
+                                if (cls.includes('/') && cls.startsWith(className + '/')) {
+                                    const opacity = cls.split('/')[1];
+                                    // Validate that the opacity is a number between 0-100
+                                    return !isNaN(opacity) && opacity >= 0 && opacity <= 100;
+                                }
+                                return false;
+                            });
+
+                            // Generate opacity utilities for each variant found
+                            for (const variant of opacityVariants) {
+                                const opacity = variant.split('/')[1];
+                                const opacityValue = `color-mix(in oklch, ${value} ${opacity}%, transparent)`;
+                                const opacityCss = css.replace(value, opacityValue);
+                                generateUtility(variant, opacityCss);
+                            }
                         }
                     }
                 }
@@ -3946,123 +5704,376 @@ var Indux = (function (exports) {
         }
     });
 
-    /*! Indux Markdown 1.0.0 - MIT License */
-    const marked = self.marked;
+    var temp_plugin = {};
 
-    // Initialize plugin when either DOM is ready or Alpine is ready
-    function initializeMarkdownPlugin() {
-        // Register markdown directive
-        Alpine.directive('markdown', (el, { expression }, { effect, evaluateLater }) => {
-            // Store original markdown content
-            let markdownSource = '';
-            let isUpdating = false;
+    var hasRequiredTemp_plugin;
 
-            const normalizeContent = (content) => {
-                const lines = content.split('\n');
-                const commonIndent = lines
-                    .filter(line => line.trim())
-                    .reduce((min, line) => {
-                        const indent = line.match(/^\s*/)[0].length;
-                        return Math.min(min, indent);
-                    }, Infinity);
+    function requireTemp_plugin () {
+    	if (hasRequiredTemp_plugin) return temp_plugin;
+    	hasRequiredTemp_plugin = 1;
+    	/*! Indux Markdown 1.0.0 - MIT License */
+    	const marked = self.marked;
 
-                return lines
-                    .map(line => line.slice(commonIndent))
-                    .join('\n')
-                    .trim();
-            };
+    	// Configure marked to preserve full language strings
+    	marked.use({
+    	    renderer: {
+    	        code(token) {
+    	            const lang = token.lang || '';
+    	            const text = token.text || '';
+    	            const escaped = token.escaped || false;
+    	            
+    	            // Store the full language string in a data attribute
+    	            const dataLang = lang ? ` data-language="${lang}"` : '';
+    	            const className = lang ? ` class="language-${lang.split(' ')[0]}"` : '';
+    	            
+    	            const code = escaped ? text : text.replace(/[&<>"']/g, (match) => {
+    	                const escapeMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+    	                return escapeMap[match];
+    	            });
+    	            
+    	            return `<pre${dataLang}><code${className}>${code}</code></pre>\n`;
+    	        }
+    	    }
+    	});
 
-            const updateContent = async (element, newContent = null) => {
-                if (isUpdating) return;
-                isUpdating = true;
+    	// Check if the code plugin is available
+    	function isCodePluginAvailable() {
+    	    return typeof window.XCodeElement !== 'undefined' || 
+    	           document.querySelector('script[src*="indux.code.js"]') !== null;
+    	}
 
-                try {
-                    // Update source if new content provided
-                    if (newContent !== null && newContent.trim() !== '') {
-                        markdownSource = normalizeContent(newContent);
-                    }
+    	// Convert markdown code blocks to x-code elements
+    	function convertCodeBlocks(element) {
+    	    if (!isCodePluginAvailable()) {
+    	        return; // Code plugin not available, use default rendering
+    	    }
 
-                    const html = marked.parse(markdownSource);
+    	    const codeBlocks = element.querySelectorAll('pre code');
 
-                    // Only update if content has changed and isn't empty
-                    if (element.innerHTML !== html && html.trim() !== '') {
-                        // Create a temporary container to hold the HTML
-                        const temp = document.createElement('div');
-                        temp.innerHTML = html;
+    	    
+    	    // Define valid languages array
+    	    const validLanguages = ['javascript', 'js', 'typescript', 'ts', 'html', 'css', 'python', 'py', 'java', 'c', 'cpp', 'csharp', 'cs', 'php', 'ruby', 'rb', 'go', 'rust', 'rs', 'swift', 'kotlin', 'kt', 'scala', 'sql', 'json', 'yaml', 'yml', 'xml', 'markdown', 'md', 'bash', 'sh', 'powershell', 'ps', 'dockerfile', 'docker', 'nginx', 'apache', 'git', 'diff', 'text', 'plaintext'];
+    	    
+    	    // Define callout types that should be converted to aside elements
+    	    const calloutTypes = ['preview', 'note', 'warning', 'info', 'tip', 'success', 'error', 'danger'];
+    	    
+    	    codeBlocks.forEach((codeBlock, index) => {
+    	        const pre = codeBlock.parentElement;
+    	        let language = codeBlock.className?.replace('language-', '') || '';
+    	        const code = codeBlock.textContent;
+    	        
+    	        // Check if this is a callout block (starts with a callout type)
+    	        const languageParts = language.split(/\s+/);
+    	        const firstPart = languageParts[0]?.toLowerCase();
+    	        
+    	        if (calloutTypes.includes(firstPart)) {
+    	            // This is a callout block - convert to aside element
+    	            const calloutType = firstPart;
+    	            
+    	            // Create aside element
+    	            const aside = document.createElement('aside');
+    	            aside.className = calloutType;
+    	            
+    	            // Set the content as HTML to render actual elements
+    	            aside.innerHTML = code;
+    	            
+    	            // Replace the pre element with aside
+    	            pre.parentNode.replaceChild(aside, pre);
+    	            return; // Skip the rest of the processing
+    	        }
+    	        
+    	        // Parse Mintlify-style meta options from language
+    	        let title = '';
+    	        let lineNumbers = false;
+    	        
+    	        if (language) {
+    	            // Split by spaces to handle multiple options
+    	            const parts = language.split(/\s+/);
+    	            const parsedLanguage = parts[0];
+    	            
+    	            // Check if first part is a valid language
+    	            if (validLanguages.includes(parsedLanguage.toLowerCase())) {
+    	                language = parsedLanguage;
+    	                
+    	                // Parse remaining parts for options
+    	                for (let i = 1; i < parts.length; i++) {
+    	                    const part = parts[i].toLowerCase();
+    	                    
+    	                    // Check for line numbers
+    	                    if (part === 'numbers' || part === 'lines') {
+    	                        lineNumbers = true;
+    	                    }
+    	                    // Check for title (anything that's not a known option)
+    	                    else if (!['numbers', 'lines', 'expandable', 'wrap', 'focus', 'highlight'].includes(part)) {
+    	                        title = parts[i]; // Use original case for title
+    	                    }
+    	                }
+    	            } else {
+    	                // If first part isn't a language, treat it as a title
+    	                title = parts[0];
+    	                language = 'text'; // Default to text
+    	                
+    	                // Check remaining parts for options
+    	                for (let i = 1; i < parts.length; i++) {
+    	                    const part = parts[i].toLowerCase();
+    	                    if (part === 'numbers' || part === 'lines') {
+    	                        lineNumbers = true;
+    	                    }
+    	                }
+    	            }
+    	        }
+    	        
+    	        // Also check if the pre element has any data attributes that might contain the original language
+    	        const preLanguage = pre.getAttribute('data-language') || pre.getAttribute('lang');
+    	        if (preLanguage && preLanguage !== language) {
+    	            // Parse the pre language as well
+    	            const preParts = preLanguage.split(/\s+/);
+    	            if (preParts.length > 1) {
+    	                // Use the pre language if it has more parts
+    	                const preParsedLanguage = preParts[0];
+    	                if (validLanguages.includes(preParsedLanguage.toLowerCase())) {
+    	                    language = preParsedLanguage;
+    	                    
+    	                    // Parse remaining parts for options
+    	                    for (let i = 1; i < preParts.length; i++) {
+    	                        const part = preParts[i].toLowerCase();
+    	                        
+    	                        // Check for line numbers
+    	                        if (part === 'numbers' || part === 'lines') {
+    	                            lineNumbers = true;
+    	                        }
+    	                        // Check for title (anything that's not a known option)
+    	                        else if (!['numbers', 'lines', 'expandable', 'wrap', 'focus', 'highlight'].includes(part)) {
+    	                            title = preParts[i]; // Use original case for title
+    	                        }
+    	                    }
+    	                }
+    	            }
+    	        }
+    	        
+    	        // Create x-code element
+    	        const xCode = document.createElement('x-code');
+    	        if (language && language !== 'text') {
+    	            xCode.setAttribute('language', language);
+    	        }
+    	        
+    	        // Add title if present
+    	        if (title) {
+    	            xCode.setAttribute('name', title);
+    	        }
+    	        
+    	        // Add line numbers if specified
+    	        if (lineNumbers) {
+    	            xCode.setAttribute('numbers', '');
+    	        }
+    	        
+    	        // Set the code content
+    	        let cleanCode = code;
+    	        if (title) {
+    	            // Remove the title from the beginning of the code if it appears there
+    	            const titlePattern = new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\n?`, 'i');
+    	            cleanCode = code.replace(titlePattern, '').trim();
+    	        }
+    	        xCode.textContent = cleanCode;
+    	        
+    	        // Replace the pre element with x-code
+    	        pre.parentNode.replaceChild(xCode, pre);
+    	    });
+    	}
 
-                        // Replace the content
-                        element.innerHTML = '';
-                        while (temp.firstChild) {
-                            element.appendChild(temp.firstChild);
-                        }
-                    }
-                } finally {
-                    isUpdating = false;
-                }
-            };
+    	// Initialize plugin when either DOM is ready or Alpine is ready
+    	function initializeMarkdownPlugin() {
+    	    // Configure marked to generate heading IDs
+    	    marked.use({
+    	        renderer: {
+    	            heading(token) {
+    	                // Extract text and level from the token
+    	                const text = token.text || '';
+    	                const level = token.depth || 1;
+    	                const escapedText = text.toLowerCase().replace(/[^\w]+/g, '-').replace(/^-+|-+$/g, '');
+    	                return `<h${level} id="${escapedText}">${text}</h${level}>`;
+    	            }
+    	        }
+    	    });
 
-            // Handle inline markdown content (no expression or 'inline')
-            if (!expression || expression === 'inline') {
-                // Initial parse
-                markdownSource = normalizeContent(el.textContent);
-                updateContent(el);
+    	    // Register markdown directive
+    	    Alpine.directive('markdown', (el, { expression, modifiers }, { effect, evaluateLater }) => {
+    	        // Store original markdown content
+    	        let markdownSource = '';
+    	        let isUpdating = false;
 
-                // Set up mutation observer for streaming content
-                const observer = new MutationObserver((mutations) => {
-                    let newContent = null;
+    	        const normalizeContent = (content) => {
+    	            const lines = content.split('\n');
+    	            const commonIndent = lines
+    	                .filter(line => line.trim())
+    	                .reduce((min, line) => {
+    	                    const indent = line.match(/^\s*/)[0].length;
+    	                    return Math.min(min, indent);
+    	                }, Infinity);
 
-                    for (const mutation of mutations) {
-                        if (mutation.type === 'childList') {
-                            const textNodes = Array.from(el.childNodes)
-                                .filter(node => node.nodeType === Node.TEXT_NODE);
-                            if (textNodes.length > 0) {
-                                newContent = textNodes.map(node => node.textContent).join('');
-                                break;
-                            }
-                        } else if (mutation.type === 'characterData') {
-                            newContent = mutation.target.textContent;
-                            break;
-                        }
-                    }
+    	            return lines
+    	                .map(line => line.slice(commonIndent))
+    	                .join('\n')
+    	                .trim();
+    	        };
 
-                    if (newContent && newContent.trim() !== '') {
-                        updateContent(el, newContent);
-                    }
-                });
+    	        const updateContent = async (element, newContent = null) => {
+    	            if (isUpdating) return;
+    	            isUpdating = true;
 
-                observer.observe(el, {
-                    characterData: true,
-                    childList: true,
-                    subtree: true,
-                    characterDataOldValue: true
-                });
+    	            try {
+    	                // Update source if new content provided
+    	                if (newContent !== null && newContent.trim() !== '') {
+    	                    markdownSource = normalizeContent(newContent);
+    	                }
 
-                return;
-            }
+    	                const html = marked.parse(markdownSource);
 
-            // Handle expressions (file paths, inline strings, content references)
-            const getMarkdownContent = evaluateLater(expression);
+    	                // Only update if content has changed and isn't empty
+    	                if (element.innerHTML !== html && html.trim() !== '') {
+    	                    // Create a temporary container to hold the HTML
+    	                    const temp = document.createElement('div');
+    	                    temp.innerHTML = html;
 
-            effect(() => {
-                getMarkdownContent(async (pathOrContent) => {
-                    if (pathOrContent === undefined) {
-                        pathOrContent = expression;
-                    }
-                    const html = marked.parse(pathOrContent);
-                    el.innerHTML = html;
-                });
-            });
-        });
+    	                    // Convert code blocks to x-code if plugin is available
+    	                    convertCodeBlocks(temp);
+
+    	                    // Replace the content
+    	                    element.innerHTML = '';
+    	                    while (temp.firstChild) {
+    	                        element.appendChild(temp.firstChild);
+    	                    }
+    	                }
+    	            } finally {
+    	                isUpdating = false;
+    	            }
+    	        };
+
+    	        // Handle inline markdown content (no expression or 'inline')
+    	        if (!expression || expression === 'inline') {
+    	            // Initial parse
+    	            markdownSource = normalizeContent(el.textContent);
+    	            updateContent(el);
+
+    	            // Set up mutation observer for streaming content
+    	            const observer = new MutationObserver((mutations) => {
+    	                let newContent = null;
+
+    	                for (const mutation of mutations) {
+    	                    if (mutation.type === 'childList') {
+    	                        const textNodes = Array.from(el.childNodes)
+    	                            .filter(node => node.nodeType === Node.TEXT_NODE);
+    	                        if (textNodes.length > 0) {
+    	                            newContent = textNodes.map(node => node.textContent).join('');
+    	                            break;
+    	                        }
+    	                    } else if (mutation.type === 'characterData') {
+    	                        newContent = mutation.target.textContent;
+    	                        break;
+    	                    }
+    	                }
+
+    	                if (newContent && newContent.trim() !== '') {
+    	                    updateContent(el, newContent);
+    	                }
+    	            });
+
+    	            observer.observe(el, {
+    	                characterData: true,
+    	                childList: true,
+    	                subtree: true,
+    	                characterDataOldValue: true
+    	            });
+
+    	            return;
+    	        }
+
+    	        // Handle expressions (file paths, inline strings, content references)
+    	        const getMarkdownContent = evaluateLater(expression);
+
+    	        effect(() => {
+    	            getMarkdownContent(async (pathOrContent) => {
+    	                if (pathOrContent === undefined) {
+    	                    pathOrContent = expression;
+    	                }
+
+    	                // Check if this looks like a file path (contains .md, .markdown, or starts with /)
+    	                const isFilePath = typeof pathOrContent === 'string' &&
+    	                    (pathOrContent.includes('.md') ||
+    	                        pathOrContent.includes('.markdown') ||
+    	                        pathOrContent.startsWith('/') ||
+    	                        pathOrContent.includes('/'));
+
+    	                let markdownContent = pathOrContent;
+
+    	                // If it's a file path, fetch the content
+    	                if (isFilePath) {
+    	                    try {
+    	                        const response = await fetch(pathOrContent);
+    	                        if (response.ok) {
+    	                            markdownContent = await response.text();
+    	                        } else {
+    	                            console.warn(`[Indux] Failed to fetch markdown file: ${pathOrContent}`);
+    	                            markdownContent = `# Error Loading Content\n\nCould not load: ${pathOrContent}`;
+    	                        }
+    	                    } catch (error) {
+    	                        console.error(`[Indux] Error fetching markdown file: ${pathOrContent}`, error);
+    	                        markdownContent = `# Error Loading Content\n\nCould not load: ${pathOrContent}\n\nError: ${error.message}`;
+    	                    }
+    	                }
+
+    	                const html = marked.parse(markdownContent);
+    	                
+    	                // Create temporary container and convert code blocks
+    	                const temp = document.createElement('div');
+    	                temp.innerHTML = html;
+    	                convertCodeBlocks(temp);
+    	                
+    	                el.innerHTML = '';
+    	                while (temp.firstChild) {
+    	                    el.appendChild(temp.firstChild);
+    	                }
+
+    	                // Extract headings for anchor links
+    	                const headings = [];
+    	                const headingElements = el.querySelectorAll('h1, h2, h3');
+    	                headingElements.forEach(heading => {
+    	                    headings.push({
+    	                        id: heading.id,
+    	                        text: heading.textContent,
+    	                        level: parseInt(heading.tagName.charAt(1))
+    	                    });
+    	                });
+
+    	                // Store headings in Alpine data if 'headings' modifier is used
+    	                if (modifiers.includes('headings')) {
+    	                    // Generate a unique ID for this markdown section
+    	                    const sectionId = 'markdown-' + Math.random().toString(36).substr(2, 9);
+    	                    el.setAttribute('data-headings-section', sectionId);
+
+    	                    // Store headings in a global registry
+    	                    if (!window._induxHeadings) {
+    	                        window._induxHeadings = {};
+    	                    }
+    	                    window._induxHeadings[sectionId] = headings;
+    	                }
+    	            });
+    	        });
+    	    });
+    	}
+
+    	// Handle both DOMContentLoaded and alpine:init
+    	if (document.readyState === 'loading') {
+    	    document.addEventListener('DOMContentLoaded', () => {
+    	        if (window.Alpine) initializeMarkdownPlugin();
+    	    });
+    	}
+
+    	document.addEventListener('alpine:init', initializeMarkdownPlugin);
+    	return temp_plugin;
     }
 
-    // Handle both DOMContentLoaded and alpine:init
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            if (window.Alpine) initializeMarkdownPlugin();
-        });
-    }
-
-    document.addEventListener('alpine:init', initializeMarkdownPlugin);
+    requireTemp_plugin();
 
     // Additional dependencies for Alpine+Tailwind build
     // Update these filenames as needed when versions change

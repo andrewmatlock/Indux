@@ -29,14 +29,15 @@
     },
     "components": [
         "components/home.html",
-        "components/about.html",
-        "components/ui.html"
+        "components/variant-test.html"
     ],
     "preloadedComponents": [
+        "components/navigation/doc-footer.html",
         "components/navigation/header.html",
         "components/navigation/logo.html"
     ],
     "collections": {
+        "docs": "/collections/docs.yaml",
         "blog": "/collections/blog.json",
         "pricing": {
             "en": "/collections/pricing.json",

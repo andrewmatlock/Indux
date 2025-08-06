@@ -25,7 +25,63 @@ function initializeIconPlugin() {
             evaluate(value => {
                 if (!value) return
 
-                // Create icon element if it doesn't exist
+                // Special handling for <li> elements
+                if (el.tagName.toLowerCase() === 'li') {
+                    // Check if this is the first time processing this li
+                    if (!el.hasAttribute('data-icon-processed')) {
+                        // Store original text content
+                        const originalText = el.textContent.trim()
+
+                        // Clear the element
+                        el.innerHTML = ''
+
+                        // Create a temporary element for Iconify to process
+                        const tempEl = document.createElement('span')
+                        tempEl.className = 'iconify'
+                        tempEl.setAttribute('data-icon', value)
+
+                        // Add temporary element first
+                        el.appendChild(tempEl)
+
+                        // Add text content back
+                        if (originalText) {
+                            const textNode = document.createTextNode(originalText)
+                            el.appendChild(textNode)
+                        }
+
+                        // Mark as processed to prevent re-processing
+                        el.setAttribute('data-icon-processed', 'true')
+
+                        // Use Iconify to process the temporary element
+                        window.Iconify.scan(tempEl)
+
+                        // After a short delay, check if Iconify replaced our element
+                        setTimeout(() => {
+                            // Check if the temp element was replaced by an SVG
+                            const svg = el.querySelector('svg')
+                            if (svg && svg.parentNode === el) {
+                                // Iconify replaced our span with SVG, wrap it in a new span
+                                const newSpan = document.createElement('span')
+                                newSpan.setAttribute('x-icon', value)
+                                el.insertBefore(newSpan, svg)
+                                newSpan.appendChild(svg)
+                            }
+                        }, 50)
+                        return
+                    } else {
+                        // Update existing icon
+                        const iconSpan = el.querySelector('.iconify')
+                        if (iconSpan) {
+                            iconSpan.setAttribute('data-icon', value)
+                            if (window.Iconify) {
+                                window.Iconify.scan(iconSpan)
+                            }
+                        }
+                        return
+                    }
+                }
+
+                // Standard handling for non-li elements
                 let iconEl = el.querySelector('.iconify')
                 if (!iconEl) {
                     iconEl = document.createElement('span')
@@ -37,15 +93,8 @@ function initializeIconPlugin() {
                 // Set icon data
                 iconEl.setAttribute('data-icon', value)
 
-                // Ensure Iconify is loaded
-                if (!window.Iconify) {
-                    const script = document.createElement('script')
-                    script.src = 'https://code.iconify.design/3/3.1.1/iconify.min.js'
-                    script.onload = () => window.Iconify.scan(iconEl)
-                    document.head.appendChild(script)
-                } else {
-                    window.Iconify.scan(iconEl)
-                }
+                // Use Iconify (already embedded in script)
+                window.Iconify.scan(iconEl)
             })
         })
     })

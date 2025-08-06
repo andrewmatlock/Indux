@@ -1,51 +1,44 @@
 /*! Indux Collections 1.0.0 - MIT License */
 
+// Dynamic js-yaml loader
+let jsyaml = null;
+let yamlLoadingPromise = null;
+
+async function loadYamlLibrary() {
+    if (jsyaml) return jsyaml;
+    if (yamlLoadingPromise) return yamlLoadingPromise;
+    
+    yamlLoadingPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/js-yaml/dist/js-yaml.min.js';
+        script.onload = () => {
+            jsyaml = window.jsyaml;
+            resolve(jsyaml);
+        };
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+    
+    return yamlLoadingPromise;
+}
+
 // Initialize plugin when either DOM is ready or Alpine is ready
 async function initializeCollectionsPlugin() {
     // Initialize empty collections store
     const initialStore = {
         all: [], // Global content array for cross-collection access
-        _initialized: false
+        _initialized: false,
+        _currentUrl: window.location.pathname
     };
     Alpine.store('collections', initialStore);
 
-    // Cache for loaded collections with persistence
+    // Cache for loaded collections
     const collectionCache = new Map();
     const loadingPromises = new Map();
-    const CACHE_PREFIX = 'indux_collection_';
-    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
     // Track initialization state
     let isInitializing = false;
     let initializationComplete = false;
-
-    // Load from persistent cache
-    function loadFromCache(key) {
-        try {
-            const cached = localStorage.getItem(CACHE_PREFIX + key);
-            if (cached) {
-                const { data, timestamp } = JSON.parse(cached);
-                if (Date.now() - timestamp < CACHE_DURATION) {
-                    return data;
-                }
-            }
-        } catch (error) {
-            console.warn('[Indux] Cache read failed:', error);
-        }
-        return null;
-    }
-
-    // Save to persistent cache
-    function saveToCache(key, data) {
-        try {
-            localStorage.setItem(CACHE_PREFIX + key, JSON.stringify({
-                data,
-                timestamp: Date.now()
-            }));
-        } catch (error) {
-            console.warn('[Indux] Cache write failed:', error);
-        }
-    }
 
     // Parse content path with array support
     function parseContentPath(path) {
@@ -86,14 +79,15 @@ async function initializeCollectionsPlugin() {
 
     // Load manifest if not already loaded
     async function ensureManifest() {
-        if (window.manifest) return window.manifest;
+        if (window.InduxComponentsRegistry?.manifest) {
+            return window.InduxComponentsRegistry.manifest;
+        }
 
         try {
             const response = await fetch('/manifest.json');
-            window.manifest = await response.json();
-            return window.manifest;
+            return await response.json();
         } catch (error) {
-            console.error('[Indux] Failed to load manifest:', error);
+            console.error('[Indux Collections] Failed to load manifest:', error);
             return null;
         }
     }
@@ -111,16 +105,6 @@ async function initializeCollectionsPlugin() {
             return cachedData;
         }
 
-        // Check persistent cache
-        const cachedData = loadFromCache(cacheKey);
-        if (cachedData) {
-            collectionCache.set(cacheKey, cachedData);
-            if (!isInitializing) {
-                updateStore(collectionName, cachedData);
-            }
-            return cachedData;
-        }
-
         // If already loading, return existing promise
         if (loadingPromises.has(cacheKey)) {
             return loadingPromises.get(cacheKey);
@@ -130,12 +114,14 @@ async function initializeCollectionsPlugin() {
             try {
                 const manifest = await ensureManifest();
                 if (!manifest?.collections) {
+                    console.warn('[Indux Collections] No collections defined in manifest.json');
                     return null;
                 }
 
                 const collection = manifest.collections[collectionName];
                 if (!collection) {
-                    console.warn(`[Indux] Collection "${collectionName}" not found in manifest`);
+                    // Only warn for collections that are actually being accessed
+                    // This prevents warnings for test references that might exist in HTML
                     return null;
                 }
 
@@ -148,7 +134,7 @@ async function initializeCollectionsPlugin() {
                     // Localized collection with locale-specific path
                     source = collection[locale];
                 } else {
-                    console.warn(`[Indux] No source found for collection "${collectionName}" in locale "${locale}"`);
+                    console.warn(`[Indux Collections] No source found for collection "${collectionName}" in locale "${locale}"`);
                     return null;
                 }
 
@@ -157,14 +143,23 @@ async function initializeCollectionsPlugin() {
                 let data;
 
                 // Handle different content types
-                if (contentType?.includes('application/json')) {
+                if (contentType?.includes('application/json') || source.endsWith('.json')) {
                     data = await response.json();
-                } else if (contentType?.includes('text/yaml') || source.endsWith('.yaml') || source.endsWith('.yml')) {
+                                } else if (contentType?.includes('text/yaml') || source.endsWith('.yaml') || source.endsWith('.yml')) {
                     const text = await response.text();
-                    data = jsyaml.load(text);
+                    
+                    // Load js-yaml library dynamically
+                    const yamlLib = await loadYamlLibrary();
+                    data = yamlLib.load(text);
                 } else {
-                    console.warn(`[Indux] Unsupported content type for "${source}": ${contentType}`);
-                    return null;
+                    // Try JSON first, then YAML
+                    try {
+                        const text = await response.text();
+                        data = JSON.parse(text);
+                    } catch (e) {
+                        const yamlLib = await loadYamlLibrary();
+                        data = yamlLib.load(text);
+                    }
                 }
 
                 // Enhance data with metadata
@@ -185,9 +180,8 @@ async function initializeCollectionsPlugin() {
                     };
                 }
 
-                // Update caches
+                // Update cache
                 collectionCache.set(cacheKey, enhancedData);
-                saveToCache(cacheKey, enhancedData);
 
                 // Update store only if not initializing
                 if (!isInitializing) {
@@ -196,7 +190,7 @@ async function initializeCollectionsPlugin() {
 
                 return enhancedData;
             } catch (error) {
-                console.error(`[Indux] Failed to load collection "${collectionName}":`, error);
+                console.error(`[Indux Collections] Failed to load collection "${collectionName}":`, error);
                 return null;
             } finally {
                 loadingPromises.delete(cacheKey);
@@ -237,6 +231,16 @@ async function initializeCollectionsPlugin() {
                     return undefined;
                 }
 
+                // Handle route() function - always available
+                if (key === 'route') {
+                    return function(pathKey) {
+                        // Return a safe fallback proxy that returns undefined for all properties
+                        return new Proxy({}, {
+                            get() { return undefined; }
+                        });
+                    };
+                }
+
                 // Handle toPrimitive for text content
                 if (key === Symbol.toPrimitive) {
                     return function () { return ''; };
@@ -274,25 +278,109 @@ async function initializeCollectionsPlugin() {
         });
     }
 
-    // Add $x magic method first
+    // Create proxy for route-specific lookups
+    function createRouteProxy(collectionData, pathKey, collectionName) {
+        return new Proxy({}, {
+            get(target, prop) {
+                try {
+                    // Get current URL from store (reactive)
+                    const store = Alpine.store('collections');
+                    const currentPath = store?._currentUrl || window.location.pathname;
+                    const pathSegments = currentPath.split('/').filter(segment => segment);
+                    
+                    // If collection data is not loaded yet, return undefined
+                    if (!collectionData || typeof collectionData !== 'object') {
+                        return undefined;
+                    }
+                    
+                    // Search through collection data recursively
+                    const foundItem = findItemByPath(collectionData, pathKey, pathSegments);
+                    
+                    if (foundItem && prop in foundItem) {
+                        return foundItem[prop];
+                    }
+                    
+                    return undefined;
+                } catch (error) {
+                    // Return undefined if anything goes wrong
+                    return undefined;
+                }
+            }
+        });
+    }
+
+    // Listen for URL changes to trigger reactivity
+    let currentUrl = window.location.pathname;
+    window.addEventListener('popstate', () => {
+        if (window.location.pathname !== currentUrl) {
+            currentUrl = window.location.pathname;
+            // Update store to trigger Alpine reactivity
+            const store = Alpine.store('collections');
+            if (store && store._initialized) {
+                store._currentUrl = window.location.pathname;
+            }
+        }
+    });
+
+    // Also listen for pushstate/replacestate (for SPA navigation)
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+    
+    history.pushState = function(...args) {
+        originalPushState.apply(history, args);
+        if (window.location.pathname !== currentUrl) {
+            currentUrl = window.location.pathname;
+            const store = Alpine.store('collections');
+            if (store && store._initialized) {
+                store._currentUrl = window.location.pathname;
+            }
+        }
+    };
+    
+    history.replaceState = function(...args) {
+        originalReplaceState.apply(history, args);
+        if (window.location.pathname !== currentUrl) {
+            currentUrl = window.location.pathname;
+            const store = Alpine.store('collections');
+            if (store && store._initialized) {
+                store._currentUrl = window.location.pathname;
+            }
+        }
+    };
+
+    // Recursively search for items with matching path
+    function findItemByPath(data, pathKey, pathSegments) {
+        if (Array.isArray(data)) {
+            for (const item of data) {
+                if (typeof item === 'object' && item !== null) {
+                    // Check if this item has the path key
+                    if (pathKey in item) {
+                        const itemPath = item[pathKey];
+                        // Check if any path segment matches this item's path
+                        if (pathSegments.some(segment => segment === itemPath)) {
+                            return item;
+                        }
+                    }
+                    
+                    // Recursively search nested objects
+                    const found = findItemByPath(item, pathKey, pathSegments);
+                    if (found) return found;
+                }
+            }
+        } else if (typeof data === 'object' && data !== null) {
+            for (const key in data) {
+                const found = findItemByPath(data[key], pathKey, pathSegments);
+                if (found) return found;
+            }
+        }
+        
+        return null;
+    }
+
+    // Add $x magic method
     Alpine.magic('x', () => {
         const pendingLoads = new Map();
         const store = Alpine.store('collections');
-
-        // Listen for locale changes
-        window.addEventListener('localechange', async (event) => {
-            const newLocale = event.detail.locale;
-
-            // Clear existing collections and cache
-            const currentStore = Alpine.store('collections');
-            collectionCache.clear();
-            Alpine.store('collections', {
-                all: [],
-                _initialized: true
-            });
-
-            // Collections will be reloaded on-demand when accessed
-        });
 
         return new Proxy({}, {
             get(target, prop) {
@@ -303,7 +391,7 @@ async function initializeCollectionsPlugin() {
 
                 // Get current value from store
                 const value = store[prop];
-                const currentLocale = Alpine.store('locale').current;
+                const currentLocale = 'en'; // Default locale
 
                 // If not in store, try to load it
                 if (!value && !pendingLoads.has(prop)) {
@@ -320,6 +408,20 @@ async function initializeCollectionsPlugin() {
                             // Handle special keys
                             if (key === Symbol.iterator || key === 'then' || key === 'catch' || key === 'finally') {
                                 return undefined;
+                            }
+
+                            // Handle route() function for route-specific lookups
+                            if (key === 'route') {
+                                return function(pathKey) {
+                                    // Only create route proxy if we have valid data
+                                    if (target && typeof target === 'object') {
+                                        return createRouteProxy(target, pathKey, prop);
+                                    }
+                                    // Return a safe fallback proxy
+                                    return new Proxy({}, {
+                                        get() { return undefined; }
+                                    });
+                                };
                             }
 
                             // Handle toPrimitive for text content

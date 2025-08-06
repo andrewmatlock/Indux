@@ -1,0 +1,25 @@
+/* Header */
+body>header {
+    position: sticky;
+    top: 0;
+
+    & nav {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: var(--spacing-content-width);
+        max-width: 100%;
+        margin: 0 auto;
+        padding: calc(var(--spacing) * 4) 0;
+    }
+}
+
+/* Footer */
+body>footer>nav {
+    display: flex;
+    justify-content: center;
+    width: var(--spacing-content-width);
+    max-width: 100%;
+    margin: 0 auto;
+    padding: calc(var(--spacing) * 4) 0;
+}

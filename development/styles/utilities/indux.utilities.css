@@ -1,0 +1,295 @@
+/* Utilities */
+
+@layer utilities {
+
+    :where(.center) {
+        justify-content: center;
+        align-items: center
+    }
+
+    :where(.col) {
+        flex-flow: column nowrap
+    }
+
+    :where(.col-wrap) {
+        flex-flow: column wrap
+    }
+
+    :where(.row) {
+        flex-flow: row nowrap
+    }
+
+    :where(.row-wrap) {
+        flex-flow: row wrap
+    }
+
+    :where(.row, .row-wrap, .col, .col-wrap) {
+        display: flex
+    }
+
+    :where(.content) {
+        width: var(--spacing-content-width, 68.75rem);
+        max-width: 100%;
+        margin-left: auto;
+        margin-right: auto
+    }
+
+    :where(.ghost) {
+        color: var(--color-content-stark);
+        background-color: transparent;
+
+        &:hover {
+            background-color: var(--color-field-surface-hover)
+        }
+
+        &.primary:hover {
+            color: var(--color-primary-inverse)
+        }
+
+        &.accent:hover {
+            color: var(--color-accent-inverse)
+        }
+
+        &.danger:hover {
+            color: var(--color-danger-inverse)
+        }
+    }
+
+    :where(.hug) {
+        min-width: 0;
+        width: fit-content;
+        height: fit-content;
+        padding: 0
+    }
+
+    :where(.outlined) {
+        border-width: 1.5px;
+        border-style: solid;
+        border-color: color-mix(in oklch, var(--color-field-surface) 80%, var(--color-field-inverse))
+    }
+
+    :where(.selected) {
+        background-color: color-mix(in oklch, var(--color-field-surface) 35%, transparent);
+    }
+
+    :where(.transparent) {
+        background-color: transparent !important
+    }
+
+    :where(.lg) {
+        --spacing-field-height: 2.5rem;
+        --spacing-field-padding: 0.78rem;
+        font-size: 125%
+    }
+
+    :where(.sm) {
+        --spacing-field-height: 1.5rem;
+        --spacing-field-padding: 0.49rem;
+        font-size: 75%
+    }
+
+    .no-focus:focus-visible {
+        outline: 0 none
+    }
+
+    :where(.no-scrollbar) {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+
+        &::-webkit-scrollbar {
+            display: none
+        }
+    }
+
+    :where(.overlay-dark, .overlay-light) {
+        position: relative;
+
+        &::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            width: 100%;
+            height: 100%
+        }
+
+        >* {
+            position: relative;
+            z-index: 1
+        }
+    }
+
+    :where(.overlay-dark) {
+        color: white !important;
+
+        &::after {
+            background: var(--overlay-dark, oklch(50% 0 0))
+        }
+    }
+
+    :where(.overlay-light) {
+        color: black !important;
+
+        &::after {
+            background: var(--color-overlay-light, oklch(50% 0 100))
+        }
+    }
+
+    :where(.prose) {
+        width: 65ch;
+        max-width: 100%;
+
+        /* Asides inside a prose element are used as callouts */
+        & aside {
+            margin-top: calc(1rem * 1.4);
+            padding: 1rem;
+            border-radius: var(--radius);
+            color: var(--color-content-stark);
+            background-color: color-mix(in oklch, var(--color-field-surface) 15%, transparent);
+            border: 1px solid color-mix(in oklch, var(--color-field-surface) 50%, transparent);
+
+            &:not(.preview) * {
+                color: inherit
+            }
+
+            &:has([x-icon]) {
+                display: flex;
+                flex-direction: row;
+                gap: 1rem;
+
+                & [x-icon] {
+                    padding-top: 0.25rem;
+                    font-size: 1.25rem
+                }
+            }
+        }
+
+        & a:not(:where(h1, h2, h3, h4, h5, h6, p, small, figcaption, label, li, blockquote, pre code, code, kbd, span, mark, [role=button]) a) {
+            margin-top: calc(1rem * 1.4);
+        }
+
+        & h1+p {
+            margin-top: 0.625rem;
+            font-size: 1.125rem;
+            color: var(--color-content-neutral)
+        }
+
+        & blockquote {
+            margin-top: calc(1rem * 2);
+
+            & * {
+                margin: 0
+            }
+        }
+
+        & figcaption {
+            margin-top: 1rem
+        }
+
+        & figure {
+            margin-top: calc(1rem * 1.4);
+
+            & img {
+                margin: 0
+            }
+        }
+
+        & h2 {
+            margin-top: 1rem;
+            margin-bottom: calc(1rem * 0.6667)
+        }
+
+        & h3 {
+            margin-top: calc(1rem * 2.4)
+        }
+
+        & h4 {
+            margin-top: calc(1rem * 3)
+        }
+
+        & h5 {
+            margin-top: 1rem;
+            margin-bottom: 1rem
+        }
+
+        h6 {
+            margin-top: calc(1rem * 2);
+            margin-bottom: 1rem
+        }
+
+        & hr {
+            margin-top: calc(1rem * 3);
+            margin-bottom: calc(1rem * 3)
+        }
+
+        & img,
+        p {
+            margin-top: calc(1rem * 1.4)
+        }
+
+        & ol,
+        & ul,
+        & small {
+            margin-top: 1rem
+        }
+
+        & x-code-group, & x-code, & pre {
+            margin-top: 2rem;
+            margin-bottom: 2rem
+        }
+
+        & x-code-group x-code {
+            margin-top: 0;
+            margin-bottom: 0
+        }
+
+        & x-code pre {
+            margin-top: 0;
+            margin-bottom: 0
+        }
+
+        & li>* {
+            margin-top: 0;
+            margin-bottom: 0
+        }
+
+        & table {
+            margin-top: calc(1rem * 2);
+            margin-bottom: calc(1rem * 2)
+        }
+    }
+
+    :where(.trailing) {
+        display: inline-block;
+        margin-left: auto;
+        color: var(--color-content-neutral)
+    }
+
+    :where(.primary) {
+        --color-field-surface: var(--color-primary);
+        --color-field-surface-hover: var(--color-primary-hover);
+        --color-field-inverse: var(--color-primary-inverse);
+        --color-content-stark: var(--color-primary-text);
+        --color-content-neutral: color-mix(in oklch, var(--color-primary-text) 85%, transparent);
+        --color-content-subtle: color-mix(in oklch, var(--color-primary-text) 70%, transparent);
+    }
+
+    :where(.accent) {
+        --color-field-surface: var(--color-accent);
+        --color-field-surface-hover: var(--color-accent-hover);
+        --color-field-inverse: var(--color-accent-inverse);
+        --color-content-stark: var(--color-accent-text);
+        --color-content-neutral: color-mix(in oklch, var(--color-accent-text) 85%, transparent);
+        --color-content-subtle: color-mix(in oklch, var(--color-accent-text) 70%, transparent);
+    }
+
+    :where(.danger) {
+        --color-field-surface: var(--color-danger);
+        --color-field-surface-hover: var(--color-danger-hover);
+        --color-field-inverse: var(--color-danger-inverse);
+        --color-content-stark: var(--color-danger-text);
+        --color-content-neutral: color-mix(in oklch, var(--color-danger-text) 85%, transparent);
+        --color-content-subtle: color-mix(in oklch, var(--color-danger-text) 70%, transparent);
+    }
+}

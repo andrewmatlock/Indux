@@ -1,0 +1,61 @@
+/* Tables */
+
+@layer components {
+
+    :where(table) {
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden;
+        border-spacing: 0;
+        border-radius: var(--radius);
+
+        /* Striped modifier */
+        &.striped {
+            & tr:nth-child(even) {
+                background-color: var(--color-surface-1)
+            }
+
+            & tr:nth-child(odd) {
+                background-color: transparent
+            }
+
+            & tr {
+                border-bottom: 0 none
+            }
+        }
+    }
+
+    :where(thead) {
+        background-color: var(--color-surface-1);
+        border-bottom: 1px solid var(--color-line, oklch(48.3% 0.006422 17.4 / 0.15))
+    }
+
+    :where(tr) {
+        border-bottom: 1px solid var(--color-line, oklch(48.3% 0.006422 17.4 / 0.15))
+    }
+
+    :where(td),
+    :where(th) {
+        padding: calc(var(--spacing) * 2.5) calc(var(--spacing) * 4);
+        font-size: 0.875rem;
+        text-align: left;
+        text-align: start;
+        overflow: hidden;
+
+        /* Make elements within cell inline */
+        &>*:not(template) {
+            display: inline-block;
+
+            /* Add space between them */
+            &:not(:last-child) {
+                margin-right: 4px
+            }
+        }
+    }
+
+    :where(tfoot) td,
+    :where(tfoot) th {
+        border-bottom: 0
+    }
+
+}

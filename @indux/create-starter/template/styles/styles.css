@@ -39,18 +39,18 @@
     --color-surface-3: var(--color-300);
     --color-field-surface: oklch(65.5% 0.032 264 / .1);
     --color-field-surface-hover: oklch(65.5% 0.032 264 / .15);
-    --color-field-inverse: var(--color-text-stark);
+    --color-field-inverse: var(--color-content-stark);
     --color-popover-surface: var(--color-page);
     --color-line: oklch(48.3% 0.006422 17.4 / 0.15);
 
-    --color-text-stark: var(--color-950);
-    --color-text-stark: var(--color-900);
-    --color-text-neutral: var(--color-600);
-    --color-text-subtle: var(--color-500);
+    --color-content-stark: var(--color-950);
+    --color-content-stark: var(--color-900);
+    --color-content-neutral: var(--color-600);
+    --color-content-subtle: var(--color-500);
 
-    --color-primary: var(--color-text-stark);
+    --color-primary: var(--color-content-stark);
     --color-primary-inverse: var(--color-page);
-    --color-primary-text: var(--color-text-stark);
+    --color-primary-text: var(--color-content-stark);
     --color-accent: oklch(90.56% 0.1724 148.7);
     --color-accent-inverse: var(--color-950);
     --color-accent-text: oklch(70.7% 0.229867 143.9);
@@ -107,10 +107,10 @@
     --color-field-surface-hover: oklch(58% 0.065 270 / .20);
     --color-popover-surface: var(--color-surface-3);
     --color-line: oklch(48.3% 0.006422 17.4 / 0.2);
-    --color-text-stark: var(--color-50);
-    --color-text-stark: var(--color-50);
-    --color-text-neutral: var(--color-400);
-    --color-text-subtle: var(--color-500);
+    --color-content-stark: var(--color-50);
+    --color-content-stark: var(--color-50);
+    --color-content-neutral: var(--color-400);
+    --color-content-subtle: var(--color-500);
     --color-accent-text: oklch(90.56% 0.1724 148.7);
 }
 
@@ -121,7 +121,7 @@ h2,
 h3,
 h4 {
     font-weight: 700;
-    color: var(--color-text-stark)
+    color: var(--color-content-stark)
 }
 
 h1,
@@ -154,7 +154,7 @@ h5 {
     line-height: 1rem;
     letter-spacing: .0025em;
     text-transform: uppercase;
-    color: var(--color-text-subtle)
+    color: var(--color-content-subtle)
 }
 
 h6 {
@@ -162,12 +162,12 @@ h6 {
     font-size: 0.8125rem;
     line-height: 1.4;
     text-transform: uppercase;
-    color: var(--color-text-stark)
+    color: var(--color-content-stark)
 }
 
 small,
 figcaption {
-    color: var(--color-text-neutral)
+    color: var(--color-content-neutral)
 }
 
 figcaption {
@@ -181,7 +181,7 @@ figcaption {
 
 b,
 strong {
-    color: var(--color-text-stark)
+    color: var(--color-content-stark)
 }
 
 /* Header */

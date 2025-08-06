@@ -1,0 +1,74 @@
+/* Layout */
+
+:root {
+    --spacing-content-width: 68.75rem;
+    --spacing-viewport-padding: 3vw
+}
+
+@layer base {
+
+    body {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh
+    }
+
+    body> :where(footer, header, main) {
+        width: 100%;
+        max-width: 100%;
+        margin-right: auto;
+        margin-left: auto
+    }
+
+    body> :where(header, footer) {
+        padding-left: var(--spacing-viewport-padding, 3vw);
+        padding-right: var(--spacing-viewport-padding, 3vw);
+        z-index: 30
+    }
+
+    body> :where(footer) {
+        margin-top: auto
+    }
+
+    body> :where(main) {
+        display: block
+    }
+
+    :where(body main section) {
+        width: 100%;
+        max-width: 100%;
+        padding: 150px var(--spacing-viewport-padding, 3vw);
+        background-size: cover
+    }
+
+    :where(nav:has(ul)) {
+        display: flex;
+        flex-flow: row nowrap;
+        justify-content: space-between;
+        align-items: center;
+        width: var(--spacing-content-width), 68.75rem;
+        max-width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+
+        & ul {
+            display: flex;
+            flex-flow: row nowrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: calc(var(--spacing) * 2);
+            margin: 0;
+            padding: 0;
+            list-style: none;
+
+            & li {
+                display: flex;
+                align-items: center;
+                gap: 0.25rem;
+                transition: var(--transition)
+            }
+        }
+    }
+
+}

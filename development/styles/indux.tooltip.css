@@ -1,0 +1,51 @@
+/* Tooltips */
+
+@layer utilities {
+
+    :where(.tooltip[popover]) {
+        position: absolute;
+        position-try-fallbacks: flip-inline, flip-block, flip-start;
+        position-area: bottom;
+        inset: auto;
+        display: block;
+        width: fit-content;
+        max-width: 200px;
+        margin: var(--spacing-popover-offset, 0.5rem);
+        padding: calc(var(--spacing) * .5) calc(var(--spacing) * 2);
+        font-size: 0.875rem;
+        color: var(--color-page);
+        background-color: var(--color-content-stark);
+        border: 0 none;
+        border-radius: var(--radius);
+        box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+
+        &:hover {
+            transition-delay: 1s
+        }
+    }
+}
+
+:where([popover]) {
+    display: none;
+    transition: opacity .15s ease-in, scale .15s ease-in, display .15s ease-in;
+    transition-behavior: allow-discrete;
+
+    &:popover-open {
+        display: flex
+    }
+
+    /* Opening state */
+    @starting-style {
+        scale: .9;
+        opacity: 0
+    }
+
+    /* Closing state */
+    &:not(:popover-open) {
+        display: none !important;
+        scale: 1;
+        opacity: 0;
+        transition-duration: .15s;
+        transition-timing-function: ease-out
+    }
+}

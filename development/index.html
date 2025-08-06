@@ -3,7 +3,7 @@
 
 <head>
 
-  <base href="/">
+  
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -17,23 +17,26 @@
   <meta name="google" content="notranslate">
 
   <!-- Web App & Manifest -->
-  <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)" />
-  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
-  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="/manifest.json">
 
   <!-- Styles -->
   <!-- <link rel="stylesheet" href="/styles/indux.css"> -->
 
-  <!-- Scripts -->
-  <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script> -->
+  <!-- Alpine Intersect Plugin -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/intersect@3.x.x/dist/cdn.min.js"></script>
 
+  <!-- Scripts -->
   <script defer src="/scripts/alpine.v3.14.9.js"></script>
   <script src="/scripts/tailwind.v4.1.js"></script>
-  <script src="/scripts/indux.js"></script>
+  <!-- <script src="/scripts/indux.js"></script> -->
   <!-- <script defer src="/scripts/indux.alpine.tailwind.js"></script> -->
 
   <script src="/scripts/alpine.persist.js"></script>
+
   <script src="/scripts/indux.carousels.js"></script>
+  <script src="/scripts/indux.code.js"></script>
   <script src="/scripts/indux.collections.js"></script>
   <script src="/scripts/indux.components.js"></script>
   <script src="/scripts/indux.dropdowns.js"></script>
@@ -42,11 +45,13 @@
   <script src="/scripts/indux.markdown.js"></script>
   <script src="/scripts/indux.resizer.js"></script>
   <script src="/scripts/indux.router.js"></script>
+  <script src="/scripts/indux.tabs.js"></script>
   <script src="/scripts/indux.themes.js"></script>
   <script src="/scripts/indux.tooltips.js"></script>
   <script src="/scripts/indux.toasts.js"></script>
   <script src="/scripts/indux.url.queries.js"></script>
   <script src="/scripts/indux.utilities.js"></script>
+  
 
   <!-- Styles -->
   <link rel="stylesheet" href="/styles/core/indux.theme.css">
@@ -56,6 +61,7 @@
   <link rel="stylesheet" href="/styles/elements/indux.button.css">
   <link rel="stylesheet" href="/styles/elements/indux.carousel.css">
   <link rel="stylesheet" href="/styles/elements/indux.checkbox.css">
+  <link rel="stylesheet" href="/styles/elements/indux.code.css">
   <link rel="stylesheet" href="/styles/elements/indux.divider.css">
   <link rel="stylesheet" href="/styles/elements/indux.dropdown.css">
   <link rel="stylesheet" href="/styles/elements/indux.form.css">
@@ -68,494 +74,87 @@
   <link rel="stylesheet" href="/styles/elements/indux.tooltip.css">
   <link rel="stylesheet" href="/styles/elements/indux.typography.css">
   <link rel="stylesheet" href="/styles/utilities/indux.utilities.css">
+  <link rel="stylesheet" href="/styles/utilities/indux.layout.css">
+
+
 
 </head>
 
-<body>
+<body class="col" x-data="{ 
+  init() { 
+    const savedDirection = localStorage.getItem('indux-direction') || 'auto';
+    document.documentElement.setAttribute('dir', savedDirection);
+  }
+}">    
 
-  <main class="p-5">
+  <x-header></x-header>
 
-    <!-- Default -->
-    <section class="row-wrap gap-2">
-      <p>I'm an <a>inline text</a> link.</p>
-      <abbr>abbr</abbr>
-      <address>address</address>
-      <p>This is some <code>inline code</code> text.</p>
-      <p>This is some <kbd>KBD</kbd><kbd>SHIFT</kbd><kbd>CMD</kbd><kbd>Z</kbd> text.</p>
-      <del>del</del>
-      <h1>h1</h1>
-      <h2>h2</h2>
-      <h3>h3</h3>
-      <h4>h4</h4>
-      <h5>h5</h5>
-      <h6>h6</h6>
-      <ins>ins</ins>
-      <label>label</label>
-      <legend>legend</legend>
-      <p>Paragraph. Lorem <b>ipsum dolar</b> sit amet.</p>
-      <span>span</span>
-      <small>small</small>
-      <cite>cite</cite>
-    </section>
+  <main class="px-viewport-padding">
 
-    <hr>
+    <div class="row justify-between gap-4 w-7xl mx-auto">
 
-    <!-- Accent -->
-    <section class="primary row-wrap gap-2">
-      <p>I'm an <a>inline text</a> link.</p>
-      <abbr>abbr</abbr>
-      <address>address</address>
-      <p>This is some <code>inline code</code> text.</p>
-      <p>This is some <kbd>KBD</kbd><kbd>SHIFT</kbd><kbd>CMD</kbd><kbd>CTRL</kbd> text.</p>
-      <del>del</del>
-      <h1>h1</h1>
-      <h2>h2</h2>
-      <h3>h3</h3>
-      <h4>h4</h4>
-      <h5>h5</h5>
-      <h6>h6</h6>
-      <ins>ins</ins>
-      <label>label</label>
-      <legend>legend</legend>
-      <p>Paragraph. Lorem <b>ipsum dolar</b> sit amet.</p>
-      <span>span</span>
-      <small>small</small>
-      <cite>cite</cite>
-    </section>
+      <!-- Navigation-->
+      <div class="w-64 max-h-[calc(100vh-69px)] mt-[69px] pt-8 pb-64 pr-10 overflow-y-auto no-scrollbar">
+        <template x-for="group in $x.docs" :key="group.group">
+          <div>
+            <h5 class="mb-2.5 pl-2.5 text-content-subtle" x-text="group.group"></h5>
+            <div class="col mb-8">
+              <template x-for="item in group.items" :key="item.name">
+                <a :href="'/' + group.group.toLowerCase().replace(' ', '-') + '/' + item.path" role="button" class="ghost justify-start w-full text-content-neutral" :class="$x.docs.route('path') && $x.docs.route('path').path === item.path ? 'selected accent pointer-events-none' : ''">
+                  <span x-icon="item.icon"></span>
+                  <span x-text="item.name"></span>
+                </a>
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
 
-    <hr>
+      <!-- Articles -->
+      <div class="grow max-h-screen pt-26 px-8 pb-[30vh] overflow-y-auto no-scrollbar scroll-smooth">
 
-    <!-- Accent -->
-    <section class="accent row-wrap gap-2">
-      <p>I'm an <a>inline text</a> link.</p>
-      <abbr>abbr</abbr>
-      <address>address</address>
-      <p>This is some <code>inline code</code> text.</p>
-      <p>This is some <kbd>KBD</kbd><kbd>SHIFT</kbd><kbd>CMD</kbd><kbd>Z</kbd> text.</p>
-      <del>del</del>
-      <h1>h1</h1>
-      <h2>h2</h2>
-      <h3>h3</h3>
-      <h4>h4</h4>
-      <h5>h5</h5>
-      <h6>h6</h6>
-      <ins>ins</ins>
-      <label>label</label>
-      <legend>legend</legend>
-      <p>Paragraph. Lorem <b>ipsum dolar</b> sit amet.</p>
-      <span>span</span>
-      <small>small</small>
-      <cite>cite</cite>
-    </section>
+        <div class="x-3xl max-w-full mx-auto">
 
-    <hr>
+          <!-- Eyebrow Group Name -->
+          <h5 x-show="$x.docs.route('path')" class="mb-2.5 text-accent-text" x-text="$el.textContent || window.location.pathname.split('/')[1]?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'No group'"></h5>
 
-    <!-- Danger -->
-    <section class="danger row-wrap gap-2 p-3">
-      <p>I'm an <a>inline text</a> link.</p>
-      <abbr>abbr</abbr>
-      <address>address</address>
-      <p>This is some <code>inline code</code> text.</p>
-      <p>This is some <kbd>KBD</kbd><kbd>SHIFT</kbd><kbd>CMD</kbd><kbd>Z</kbd> text.</p>
-      <del>del</del>
-      <h1>h1</h1>
-      <h2>h2</h2>
-      <h3>h3</h3>
-      <h4>h4</h4>
-      <h5>h5</h5>
-      <h6>h6</h6>
-      <ins>ins</ins>
-      <label>label</label>
-      <legend>legend</legend>
-      <p>Paragraph. Lorem <b>ipsum dolar</b> sit amet.</p>
-      <span>span</span>
-      <small>small</small>
-      <cite>cite</cite>
-    </section>
+          <!-- Markdown Document for Route -->
+          <div x-show="$x.docs.route('path')" class="prose [&_:where(h1,h2,h3)]:scroll-mt-26" x-markdown="$x.docs.route('path').doc"></div>
 
-    <hr>
+        </div>
 
-    <!-- Badges -->
-    <section class="row-wrap gap-2 p-3">
-      <mark>Default</mark>
-      <mark class="primary">Primary</mark>
-      <mark class="accent">Accent</mark>
-      <mark class="danger">Danger</mark>
-      <mark>99</mark>
-      <mark class="primary">99</mark>
-      <mark class="accent">99</mark>
-      <mark class="danger">99</mark>
-      <mark x-icon="ph:house"></mark>
-      <mark>
-        <span x-icon="ph:house">99</span>
-        <span>house</span>
-      </mark>
-      <mark class="primary" icon="ph:house"></mark>
-      <mark class="accent" icon="ph:house"></mark>
-      <mark class="danger" icon="ph:house"></mark>
-    </section>
+        <!-- Default Content -->
+        <div x-show="!$x.docs.route('path')" class="w-3xl max-w-full mx-auto prose">
+          <h1>Welcome to Indux Documentation</h1>
+          <p>Select a topic from the navigation to view its documentation.</p>
+        </div>
 
-    <hr>
+        <x-doc-footer></x-doc-footer>
 
-    <!-- Pre -->
-    <section class="row-wrap gap-2 p-3">
-      <pre>
-        <code>&lt;head&gt;
-          &lt;link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/indux/dist/indux.css" /&gt;
-          &lt;/head&gt;
-        </code>
-      </pre>
-      <pre class="primary">
-        <code>&lt;head&gt;
-          &lt;link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/indux/dist/indux.css" /&gt;
-          &lt;/head&gt;
-        </code>
-      </pre>
-      <pre class="accent">
-        <code>&lt;head&gt;
-          &lt;link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/indux/dist/indux.css" /&gt;
-          &lt;/head&gt;
-        </code>
-      </pre>
-      <pre class="danger">
-        <code>&lt;head&gt;
-          &lt;link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/indux/dist/indux.css" /&gt;
-          &lt;/head&gt;
-        </code>
-      </pre>
-    </section>
+      </div>
 
-    <hr>
+      <!-- Anchor Links -->
+      <div class="col gap-2.5 w-64 max-h-[calc(100vh-69px)] mt-[69px] pt-8 pb-64 pl-10 overflow-y-auto no-scrollbar">
 
-    <!-- Blockquote -->
-    <section class="row-wrap gap-2 p-3">
-      <blockquote>
-        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, quos.</p>
-        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, quos.</p>
-      </blockquote>
-      <blockquote class="primary">
-        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, quos.</p>
-        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, quos.</p>
-      </blockquote>
-      <blockquote class="accent">
-        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, quos.</p>
-        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, quos.</p>
-      </blockquote>
-      <blockquote class="danger">
-        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, quos.</p>
-        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Quisquam, quos.</p>
-      </blockquote>
-    </section>
+        <h5 class="mb-2">
+          <span x-icon="lucide:align-left" class="[dir=rtl]:rotate-180"></span>
+          <span>On this page</span>
+        </h5>
+        <div x-anchors.highlight="'.prose'" class="col gap-2.5">
+          <template x-for="heading in anchorHeadings || []" :key="`${heading.id}-${heading.index}`">
+            <a :href="heading.url()" 
+               class="text-content-subtle hover:text-content-neutral text-sm no-underline" 
+               :class="heading.level === 1 ? 'pl-0' : heading.level === 2 ? 'pl-2' : 'pl-4'" 
+               x-text="heading.text"
+            ></a>
+          </template>
+        </div>
 
-    <hr>
+      </div>
 
-    <!-- Buttons -->
-    <section class="row-wrap gap-2 p-3">
-      <button>Default</button>
-      <button class="primary">Primary</button>
-      <button class="accent">Accent</button>
-      <button class="danger">Danger</button>
-    </section>
-
-    <hr>
-
-    <!-- Inputs -->
-    <section class="row-wrap gap-2 p-3">
-      <input type="text" placeholder="Default" />
-      <input type="text" class="primary" placeholder="Primary" />
-      <input type="text" class="accent" placeholder="Accent" />
-      <input type="text" class="danger" placeholder="Danger" />
-    </section>
-
-    <hr>
-
-    <!-- Checkboxes -->
-    <section class="row-wrap gap-2 p-3">
-      <fieldset>
-
-        <legend>Legend</legend>
-
-        <label>
-          <input type="checkbox" class="" />
-          Lorem ipsum dolor sit amet
-        </label>
-
-        <label>
-          <input type="checkbox" class="outlined primary" />
-          Lorem ipsum dolor sit amet
-        </label>
-
-        <label>
-          <input type="checkbox" class="outlined accent" />
-          Lorem ipsum dolor sit amet
-        </label>
-
-        <label>
-          <input type="checkbox" class="outlined danger" />
-          Lorem ipsum dolor sit amet
-        </label>
-
-      </fieldset>
-
-    </section>
-
-    <hr>
-
-    <!-- Radios -->
-    <section class="row-wrap gap-2 p-3">
-      <fieldset>
-
-        <label>
-          <input type="radio" class="outlined" name="radio" />
-          Lorem ipsum dolor sit amet
-        </label>
-
-        <label>
-          <input type="radio" class="outlined primary" name="radio" />
-          Lorem ipsum dolor sit amet
-        </label>
-
-        <label>
-          <input type="radio" class="outlined accent" name="radio" />
-          Lorem ipsum dolor sit amet
-        </label>
-
-        <label>
-          <input type="radio" class="outlined danger" name="radio" />
-          Lorem ipsum dolor sit amet
-        </label>
-
-      </fieldset>
-    </section>
-
-    <hr>
-
-    <!-- Selects -->
-    <section class="row-wrap gap-2 p-3">
-      <select>
-
-        <option value="1">Option 1</option>
-        <option value="2">Option 2</option>
-        <option value="3">Option 3</option>
-      </select>
-      <select class="primary">
-        <option value="1">Option 1</option>
-        <option value="2">Option 2</option>
-        <option value="3">Option 3</option>
-      </select>
-      <select class="accent">
-        <option value="1">Option 1</option>
-        <option value="2">Option 2</option>
-        <option value="3">Option 3</option>
-      </select>
-      <select class="danger">
-        <option value="1">Option 1</option>
-        <option value="2">Option 2</option>
-        <option value="3">Option 3</option>
-      </select>
-    </section>
-
-    <hr>
-
-    <!-- Switches -->
-    <section class="row-wrap gap-2 p-3">
-      <label>
-        <input type="checkbox" role="switch" />
-        Lorem ipsum dolor sit amet
-      </label>
-      <label>
-        <input type="checkbox" role="switch" class="primary" />
-        Lorem ipsum dolor sit amet
-      </label>
-      <label>
-        <input type="checkbox" role="switch" class="accent" />
-        Lorem ipsum dolor sit amet
-      </label>
-      <label>
-        <input type="checkbox" role="switch" class="danger" />
-        Lorem ipsum dolor sit amet
-      </label>
-    </section>
-
-    <!-- Textareas -->
-    <section class="row-wrap gap-2 p-3">
-      <textarea placeholder="Default" class="field-sizing-content"></textarea>
-      <textarea class="primary" placeholder="Primary"></textarea>
-      <textarea class="accent" placeholder="Accent"></textarea>
-      <textarea class="danger" placeholder="Danger"></textarea>
-    </section>
-
-    <!-- Form -->
-    <form>
-      <label>
-        Name
-        <input type="text" placeholder="Name" />
-      </label>
-      <label>
-        Email
-        <input type="text" placeholder="Email" />
-      </label>
-      <label>
-        Message
-        <textarea placeholder="Message"></textarea>
-      </label>
-      <fieldset>
-        <legend>Legend</legend>
-        <label>
-          <input type="radio" />
-          Lorem ipsum dolor sit amet
-        </label>
-        <label>
-          <input type="radio" />
-          Lorem ipsum dolor sit amet
-        </label>
-      </fieldset>
-      <label>
-        <input type="checkbox" />
-        Lorem ipsum dolor sit amet
-      </label>
-      <label></label>
-    </form>
+    </div>
 
   </main>
-
-  <a href="/">Home</a>
-  <a href="/about">About</a>
-  <a href="/about/random">Random</a>
-  <a href="/not-found">Not Found</a>
-
-  <h1 x-route="!*">404 Page Not Found</h1>
-  <h1 x-route="*">Home</h1>
-  <h2 x-route="about">About</h2>
-  <h2 x-route="about/*">About Wildcard</h2>
-
-  <h1>I should be above the header</h1>
-
-  <x-header colors="bg-surface-1"></x-header>
-
-  <h1>I should be below the header</h1>
-
-  <template data-head>
-    <script>
-      console.log('I have no route');
-    </script>
-  </template>
-
-  <div class="bg-surface-1 p-5 my-5" x-route="/">
-    <h1>I'm a static box</h1>
-    <h2 x-route="/">Home only</h2>
-    <x-logo x-route="/"></x-logo>
-    <h2 x-route="about">About only</h2>
-
-    <template data-head>
-      <script>
-        console.log('I am working');
-      </script>
-    </template>
-  </div>
-
-  <x-home x-route="/"></x-home>
-  <x-about x-route="about"></x-about>
-  <x-ui x-route="ui"></x-ui>
-
-  <h1>I should be at the end</h1>
-
-  <template data-head>
-    <script>
-      console.log('About page script loaded');
-    </script>
-  </template>
-
-  <div>
-    <main class="p-20 space-y-8">
-      <!-- State Variants -->
-      <section class="p-4 border border-line rounded">
-        <h2 class="text-lg font-bold mb-4">State Variants</h2>
-        <button class="bg-surface-3 hover:bg-surface-4 focus:ring-2 focus:ring-accent active:bg-surface-5 p-2 rounded">
-          Hover/Focus/Active
-        </button>
-        <a href="#" class="block mt-2 text-accent visited:text-danger">Visited Link</a>
-        <div class="mt-2">
-          <input type="text" class="border border-line focus:border-accent focus:outline-none p-2 rounded" placeholder="Focus me">
-        </div>
-      </section>
-
-      <!-- Child Variants -->
-      <section class="p-4 border border-line rounded">
-        <h2 class="text-lg font-bold mb-4">Child Variants</h2>
-        <div class="space-y-2">
-          <p class="first:text-accent">First child</p>
-          <p class="even:bg-surface-3">Even child</p>
-          <p class="odd:bg-surface-4">Odd child</p>
-          <p class="last:text-danger">Last child</p>
-        </div>
-      </section>
-
-      <!-- Form Variants -->
-      <section class="p-4 border border-line rounded">
-        <h2 class="text-lg font-bold mb-4">Form Variants</h2>
-        <div class="space-y-4">
-          <input type="text" required class="border border-line required:border-accent p-2 rounded" placeholder="Required field">
-          <input type="text" disabled class="border border-line disabled:opacity-50 p-2 rounded" placeholder="Disabled field">
-          <input type="checkbox" class="checked:bg-accent">
-          <input type="number" min="1" max="5" class="border border-line in-range:border-success out-of-range:border-danger p-2 rounded" placeholder="1-5">
-        </div>
-      </section>
-
-      <!-- Pseudo-elements -->
-      <section class="p-4 border border-line rounded">
-        <h2 class="text-lg font-bold mb-4">Pseudo-elements</h2>
-        <div class="space-y-4">
-          <p class="before:content-['→'] before:mr-2">Before element</p>
-          <p class="after:content-['←'] after:ml-2">After element</p>
-          <p class="first-letter:text-2xl first-letter:font-bold">First letter</p>
-          <p class="selection:bg-accent selection:text-white">Select this text</p>
-        </div>
-      </section>
-
-      <!-- Media Queries -->
-      <section class="p-4 border border-line rounded">
-        <h2 class="text-lg font-bold mb-4">Media Queries</h2>
-        <div class="space-y-4">
-          <p class="dark:text-white">Dark mode text</p>
-          <p class="motion-safe:animate-pulse">Motion safe animation</p>
-          <p class="portrait:bg-surface-3 landscape:bg-surface-4 p-2">Orientation based</p>
-          <p class="print:bg-white print:text-black p-2">Print styles</p>
-        </div>
-      </section>
-
-      <!-- Responsive -->
-      <section class="p-4 border border-line rounded">
-        <h2 class="text-lg font-bold mb-4">Responsive</h2>
-        <div class="space-y-4">
-          <p class="sm:text-lg md:text-xl lg:text-2xl xl:text-3xl 2xl:text-4xl">Responsive text</p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <div class="bg-surface-3 p-4">1</div>
-            <div class="bg-surface-3 p-4">2</div>
-            <div class="bg-surface-3 p-4">3</div>
-            <div class="bg-surface-3 p-4">4</div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Container Queries -->
-      <section class="p-4 border border-line rounded">
-        <h2 class="text-lg font-bold mb-4">Container Queries</h2>
-        <div class="container">
-          <p class="container:text-lg">Container query text</p>
-        </div>
-      </section>
-
-      <!-- Supports -->
-      <section class="p-4 border border-line rounded">
-        <h2 class="text-lg font-bold mb-4">Supports</h2>
-        <div class="supports-[display:grid]:grid supports-[display:grid]:grid-cols-2 gap-4">
-          <div class="bg-surface-3 p-4">Grid supported</div>
-          <div class="bg-surface-3 p-4">Grid supported</div>
-        </div>
-      </section>
-    </main>
-  </div>
 
 </body>
 
