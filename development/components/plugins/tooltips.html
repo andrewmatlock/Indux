@@ -1,0 +1,11 @@
+<div class="row items-center gap-1" x-data="{ dynamicMessage: 'Dynamic tooltip' }">
+    <button x-tooltip="Basic tooltip">Hover me</button>
+    <button x-tooltip="Press tooltip">Press me</button>
+    <button x-tooltip.top="Top tooltip">Top</button>
+    <button x-tooltip.top.right="Top right tooltip">Top right</button>
+    <button x-tooltip.bottom="Bottom tooltip">Bottom</button>
+    <button x-tooltip.left="Left tooltip">Left</button>
+    <button x-tooltip.right="Right tooltip">Right</button>
+    <button x-tooltip="'Dynamic: ' + dynamicMessage">Dynamic</button>
+    <button x-tooltip="`Template literal: ${dynamicMessage}`">Template literal</button>
+</div>

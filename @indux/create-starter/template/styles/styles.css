@@ -48,15 +48,15 @@
     --color-content-neutral: var(--color-600);
     --color-content-subtle: var(--color-500);
 
-    --color-primary: var(--color-content-stark);
-    --color-primary-inverse: var(--color-page);
-    --color-primary-text: var(--color-content-stark);
+    --color-brand-surface: var(--color-content-stark);
+    --color-brand-inverse: var(--color-page);
+    --color-brand-content: var(--color-content-stark);
     --color-accent: oklch(90.56% 0.1724 148.7);
     --color-accent-inverse: var(--color-950);
-    --color-accent-text: oklch(70.7% 0.229867 143.9);
-    --color-danger: oklch(63.68% 0.2078 25.33);
-    --color-danger-inverse: oklch(100% 0 0);
-    --color-danger-text: var(--color-danger);
+    --color-accent-content: oklch(70.7% 0.229867 143.9);
+    --color-negative: oklch(63.68% 0.2078 25.33);
+    --color-negative-inverse: oklch(100% 0 0);
+    --color-negative-content: var(--color-negative-surface);
 
     /* Spacing */
     --spacing-2xs: 0.125rem;
@@ -111,7 +111,7 @@
     --color-content-stark: var(--color-50);
     --color-content-neutral: var(--color-400);
     --color-content-subtle: var(--color-500);
-    --color-accent-text: oklch(90.56% 0.1724 148.7);
+    --color-accent-content: oklch(90.56% 0.1724 148.7);
 }
 
 /* Typography */

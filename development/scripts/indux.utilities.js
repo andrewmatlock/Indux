@@ -23,6 +23,27 @@ class TailwindCompiler {
         this.hasInitialized = false;
         this.lastCompileTime = 0;
         this.minCompileInterval = 100; // Minimum time between compilations in ms
+        this.cssContentCache = new Map(); // Cache CSS file contents with timestamps
+        this.lastClassesHash = ''; // Track changes in used classes
+        this.staticClassCache = new Set(); // Cache classes found in static HTML/components
+        this.dynamicClassCache = new Set(); // Cache classes that appear dynamically
+        this.hasScannedStatic = false; // Track if we've done initial static scan
+        this.staticScanPromise = null; // Promise for initial static scan
+        this.ignoredClassPatterns = [ // Patterns for classes to ignore
+            /^hljs/, /^language-/, /^copy$/, /^copied$/, /^lines$/, /^selected$/
+        ];
+        this.ignoredElementSelectors = [ // Elements to ignore for DOM mutations
+            'pre', 'code', 'x-code', 'x-code-group'
+        ];
+        this.ignoredAttributes = [ // Attribute changes to ignore (non-visual/utility changes)
+            'id', 'data-order', 'data-component-id', 'data-highlighted', 'data-processed',
+            'x-intersect', 'x-intersect:leave', 'x-show', 'x-hide', 'x-transition',
+            'aria-expanded', 'aria-selected', 'aria-current', 'aria-hidden', 'aria-label',
+            'tabindex', 'role', 'title', 'alt', 'data-state', 'data-value'
+        ];
+        this.significantChangeSelectors = [ // Only these DOM additions trigger recompilation
+            '[data-component]', '[x-data]' // Components and Alpine elements
+        ];
         this.options = {
             rootSelector: options.rootSelector || ':root',
             themeSelector: options.themeSelector || '@theme',
@@ -449,6 +470,32 @@ class TailwindCompiler {
         });
     }
 
+    // Public API for other plugins to configure behavior
+    addIgnoredClassPattern(pattern) {
+        if (pattern instanceof RegExp) {
+            this.ignoredClassPatterns.push(pattern);
+        } else if (typeof pattern === 'string') {
+            this.ignoredClassPatterns.push(new RegExp(pattern));
+        }
+    }
+
+    addIgnoredElementSelector(selector) {
+        if (typeof selector === 'string') {
+            this.ignoredElementSelectors.push(selector);
+        }
+    }
+
+    addSignificantChangeSelector(selector) {
+        if (typeof selector === 'string') {
+            this.significantChangeSelectors.push(selector);
+        }
+    }
+
+    // Allow plugins to trigger recompilation when needed
+    triggerRecompilation(reason = 'manual') {
+        this.compile();
+    }
+
     setupComponentLoadListener() {
         // Use a single debounced handler for all component-related events
         const debouncedCompile = this.debounce(() => {
@@ -462,18 +509,107 @@ class TailwindCompiler {
             debouncedCompile();
         });
 
+        // Listen for route changes but don't recompile unnecessarily
+        document.addEventListener('indux:route-change', (event) => {
+            // Only trigger compilation if we detect new dynamic classes
+            // The existing MutationObserver will handle actual DOM changes
+            if (this.hasScannedStatic) {
+                // Wait longer for route content to fully load before checking
+                setTimeout(() => {
+                    const currentDynamicCount = this.dynamicClassCache.size;
+                    const currentClassesHash = this.lastClassesHash;
+                    
+                    // Scan for new classes
+                    const usedData = this.getUsedClasses();
+                    const newDynamicCount = this.dynamicClassCache.size;
+                    const dynamicClasses = Array.from(this.dynamicClassCache);
+                    const newClassesHash = dynamicClasses.sort().join(',');
+                    
+                    // Only compile if we found genuinely new classes, not just code processing artifacts
+                    if (newDynamicCount > currentDynamicCount && newClassesHash !== currentClassesHash) {
+                        const newClasses = dynamicClasses.filter(cls => 
+                            // Filter out classes that are likely from code processing
+                            !cls.includes('hljs') && 
+                            !cls.startsWith('language-') && 
+                            !cls.includes('copy') &&
+                            !cls.includes('lines')
+                        );
+                        
+                        if (newClasses.length > 0) {
+                            debouncedCompile();
+                        }
+                    }
+                }, 300); // Longer delay to let code processing finish
+            }
+        });
+
         // Use a single MutationObserver for all DOM changes
         const observer = new MutationObserver((mutations) => {
             let shouldRecompile = false;
 
             for (const mutation of mutations) {
-                if (mutation.type === 'childList') {
-                    for (const node of mutation.addedNodes) {
-                        if (node.nodeType === Node.ELEMENT_NODE &&
-                            (node.hasAttribute('data-component') ||
-                                node.querySelector('[data-component]'))) {
+                // Skip attribute changes that don't affect utilities
+                if (mutation.type === 'attributes') {
+                    const attributeName = mutation.attributeName;
+                    
+                    // Skip ignored attributes (like id changes from router)
+                    if (this.ignoredAttributes.includes(attributeName)) {
+                        continue;
+                    }
+                    
+                    // Only care about class attribute changes
+                    if (attributeName !== 'class') {
+                        continue;
+                    }
+                    
+                    // If it's a class change, check if we have new classes that need utilities
+                    const element = mutation.target;
+                    if (element.nodeType === Node.ELEMENT_NODE) {
+                        const currentClasses = Array.from(element.classList || []);
+                        const newClasses = currentClasses.filter(cls => {
+                            // Skip ignored patterns
+                            if (this.ignoredClassPatterns.some(pattern => pattern.test(cls))) {
+                                return false;
+                            }
+                            
+                            // Check if this class is new (not in our cache)
+                            return !this.staticClassCache.has(cls) && !this.dynamicClassCache.has(cls);
+                        });
+                        
+                        if (newClasses.length > 0) {
+                            // Add new classes to dynamic cache
+                            newClasses.forEach(cls => this.dynamicClassCache.add(cls));
                             shouldRecompile = true;
                             break;
+                        }
+                    }
+                }
+                else if (mutation.type === 'childList') {
+                    for (const node of mutation.addedNodes) {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            // Skip ignored elements using configurable selectors
+                            const isIgnoredElement = this.ignoredElementSelectors.some(selector => 
+                                node.tagName?.toLowerCase() === selector.toLowerCase() ||
+                                node.closest(selector)
+                            );
+                            
+                            if (isIgnoredElement) {
+                                continue;
+                            }
+
+                            // Only recompile for significant changes using configurable selectors
+                            const hasSignificantChange = this.significantChangeSelectors.some(selector => {
+                                try {
+                                    return node.matches?.(selector) || node.querySelector?.(selector);
+                                } catch (e) {
+                                    return false; // Invalid selector
+                                }
+                            });
+
+                            if (hasSignificantChange) {
+                            shouldRecompile = true;
+                            break;
+                            }
                         }
                     }
                 }
@@ -488,7 +624,9 @@ class TailwindCompiler {
         // Start observing the document with the configured parameters
         observer.observe(document.documentElement, {
             childList: true,
-            subtree: true
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class'] // Only observe class changes
         });
     }
 
@@ -640,16 +778,22 @@ class TailwindCompiler {
             // Process each stylesheet
             for (const sheet of stylesheets) {
                 try {
-                    // Only process local files
-                    if (sheet.href && sheet.href.startsWith(window.location.origin)) {
+                    // Only process local files (exclude CDNs and external resources)
+                    if (sheet.href && 
+                        sheet.href.startsWith(window.location.origin) &&
+                        !sheet.href.includes('cdn.') &&
+                        !sheet.href.includes('jsdelivr') &&
+                        !sheet.href.includes('unpkg') &&
+                        !sheet.href.includes('cdnjs')) {
                         this.cssFiles.add(sheet.href);
                     }
 
-                    // Get all @import rules
+                    // Get all @import rules (only local ones)
                     const rules = Array.from(sheet.cssRules || []);
                     for (const rule of rules) {
                         if (rule.type === CSSRule.IMPORT_RULE &&
-                            rule.href.startsWith(window.location.origin)) {
+                            rule.href.startsWith(window.location.origin) &&
+                            !rule.href.includes('cdn.')) {
                             this.cssFiles.add(rule.href);
                         }
                     }
@@ -659,11 +803,11 @@ class TailwindCompiler {
                 }
             }
 
-            // Add any inline styles
-            const styleElements = document.querySelectorAll('style');
+            // Add any inline styles (exclude generated styles)
+            const styleElements = document.querySelectorAll('style:not(#utility-styles)');
             for (const style of styleElements) {
-                if (style.textContent) {
-                    const id = style.id || 'inline-style';
+                if (style.textContent && style.textContent.trim()) {
+                    const id = style.id || `inline-style-${Array.from(styleElements).indexOf(style)}`;
                     this.cssFiles.add('inline:' + id);
                 }
             }
@@ -720,12 +864,104 @@ class TailwindCompiler {
         }
     }
 
+    // Scan static HTML files and components for classes
+    async scanStaticClasses() {
+        if (this.staticScanPromise) {
+            return this.staticScanPromise;
+        }
+
+        this.staticScanPromise = (async () => {
+            try {
+                const staticClasses = new Set();
+
+                // 1. Scan index.html content
+                const htmlContent = document.documentElement.outerHTML;
+                this.extractClassesFromHTML(htmlContent, staticClasses);
+
+                // 2. Scan component files that are likely to be loaded
+                const componentUrls = [
+                    '/components/navigation/header.html',
+                    '/components/navigation/logo.html',
+                    '/components/navigation/doc-footer.html'
+                ];
+
+                const componentPromises = componentUrls.map(async (url) => {
+                    try {
+                        const response = await fetch(url);
+                        if (response.ok) {
+                            const html = await response.text();
+                            this.extractClassesFromHTML(html, staticClasses);
+                        }
+                    } catch (error) {
+                        // Silently ignore missing components
+                    }
+                });
+
+                await Promise.all(componentPromises);
+
+                // Cache static classes
+                for (const cls of staticClasses) {
+                    this.staticClassCache.add(cls);
+                }
+
+                this.hasScannedStatic = true;
+
+                return staticClasses;
+            } catch (error) {
+                console.warn('[TailwindCompiler] Error scanning static classes:', error);
+                this.hasScannedStatic = true;
+                return new Set();
+            }
+        })();
+
+        return this.staticScanPromise;
+    }
+
+    // Extract classes from HTML content
+    extractClassesFromHTML(html, classSet) {
+
+        // Match class attributes: class="..." or class='...'
+        const classRegex = /class=["']([^"']+)["']/g;
+        let match;
+        
+        while ((match = classRegex.exec(html)) !== null) {
+            const classString = match[1];
+            const classes = classString.split(/\s+/).filter(Boolean);
+            for (const cls of classes) {
+                if (cls && !cls.startsWith('x-') && !cls.startsWith('$')) {
+                    classSet.add(cls);
+                }
+            }
+        }
+
+        // Also check for x-data and other Alpine directives that might contain classes
+        const alpineRegex = /x-(?:data|bind:class|class)=["']([^"']+)["']/g;
+        while ((match = alpineRegex.exec(html)) !== null) {
+            // Simple extraction - could be enhanced for complex Alpine expressions
+            const content = match[1];
+            const classMatches = content.match(/['"`]([^'"`\s]+)['"`]/g);
+            if (classMatches) {
+                for (const classMatch of classMatches) {
+                    const cls = classMatch.replace(/['"`]/g, '');
+                    if (cls && !cls.startsWith('$') && !cls.includes('(')) {
+                        classSet.add(cls);
+                    }
+                }
+            }
+        }
+    }
+
     getUsedClasses() {
         try {
-            const usedClasses = new Set();
+            const allClasses = new Set();
             const usedVariableSuffixes = new Set();
 
-            // Scan current DOM (including index.html and all loaded components)
+            // Add static classes (pre-scanned)
+            for (const cls of this.staticClassCache) {
+                allClasses.add(cls);
+            }
+
+            // Scan current DOM for dynamic classes only
             const elements = document.getElementsByTagName('*');
             for (const element of elements) {
                 let classes = [];
@@ -738,9 +974,27 @@ class TailwindCompiler {
                 for (const cls of classes) {
                     if (!cls) continue;
 
-                    // Add the full class name (including variants)
-                    usedClasses.add(cls);
+                    // Skip classes using configurable patterns
+                    const isIgnoredClass = this.ignoredClassPatterns.some(pattern => 
+                        pattern.test(cls)
+                    );
+                    
+                    if (isIgnoredClass) {
+                        continue;
+                    }
 
+                    // Add all classes (static + dynamic)
+                    allClasses.add(cls);
+
+                    // Track dynamic classes separately
+                    if (!this.staticClassCache.has(cls)) {
+                        this.dynamicClassCache.add(cls);
+                    }
+                }
+            }
+
+            // Process all classes for variable suffixes
+            for (const cls of allClasses) {
                     // Extract base class and variants
                     const parts = cls.split(':');
                     const baseClass = parts[parts.length - 1];
@@ -772,14 +1026,13 @@ class TailwindCompiler {
                                 usedVariableSuffixes.add(fullSuffix.split('/')[0]);
                             } else {
                                 usedVariableSuffixes.add(fullSuffix);
-                            }
                         }
                     }
                 }
             }
 
             return {
-                classes: Array.from(usedClasses),
+                classes: Array.from(allClasses),
                 variableSuffixes: Array.from(usedVariableSuffixes)
             };
         } catch (error) {
@@ -802,6 +1055,7 @@ class TailwindCompiler {
             const fetchPromise = (async () => {
                 try {
                     let content = '';
+                    let needsFetch = true;
 
                     if (source.startsWith('inline:')) {
                         const styleId = source.replace('inline:', '');
@@ -811,18 +1065,28 @@ class TailwindCompiler {
                         if (styleElement) {
                             content = styleElement.textContent;
                         }
+                        needsFetch = false;
                     } else {
-                        // Add timestamp to prevent caching
-                        const timestamp = Date.now();
-                        const url = `${source}?t=${timestamp}`;
+                        // Smart caching: use session storage + timestamp approach
+                        const cacheKey = source;
+                        const cached = this.cssContentCache.get(cacheKey);
+                        const now = Date.now();
+                        
+                        // For static compilation phase, cache for longer (30 seconds)
+                        // For dynamic compilation phase, cache for shorter (5 seconds)
+                        const cacheTime = this.hasScannedStatic ? 5000 : 30000;
+                        
+                        if (cached && (now - cached.timestamp) < cacheTime) {
+                            content = cached.content;
+                            needsFetch = false;
+                        }
 
-                        const response = await fetch(url, {
-                            cache: 'no-store',
-                            headers: {
-                                'Cache-Control': 'no-cache',
-                                'Pragma': 'no-cache'
-                            }
-                        });
+                        if (needsFetch) {
+                            // Add timestamp for development cache busting, but keep it minimal
+                            const timestamp = Math.floor(now / 1000); // Only changes every second
+                            const url = `${source}?t=${timestamp}`;
+
+                            const response = await fetch(url);
 
                         if (!response.ok) {
                             console.warn('Failed to fetch stylesheet:', url);
@@ -830,6 +1094,13 @@ class TailwindCompiler {
                         }
 
                         content = await response.text();
+                            
+                            // Cache the content with timestamp
+                            this.cssContentCache.set(cacheKey, {
+                                content: content,
+                                timestamp: now
+                            });
+                        }
                     }
 
                     if (content) {
@@ -925,12 +1196,46 @@ class TailwindCompiler {
             className = className.slice(1);
         }
 
-        // Split by variant separator
-        const parts = className.split(':');
+        // Split by variant separator, but preserve content within brackets
+        const parts = [];
+        let current = '';
+        let bracketDepth = 0;
+        
+        for (let i = 0; i < className.length; i++) {
+            const char = className[i];
+            
+            if (char === '[') {
+                bracketDepth++;
+            } else if (char === ']') {
+                bracketDepth--;
+            }
+            
+            if (char === ':' && bracketDepth === 0) {
+                // This is a variant separator, not part of a bracket expression
+                parts.push(current);
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        parts.push(current); // Add the last part
+        
         result.baseClass = parts.pop(); // Last part is always the base class
 
         // Process variants in order (left to right)
         result.variants = parts.map(variant => {
+            // Check for arbitrary selector variants [&_selector]
+            if (variant.startsWith('[') && variant.endsWith(']')) {
+                const arbitrarySelector = variant.slice(1, -1); // Remove brackets
+                if (arbitrarySelector.startsWith('&')) {
+                    return {
+                        name: variant,
+                        selector: arbitrarySelector,
+                        isArbitrary: true
+                    };
+                }
+            }
+            
             const selector = this.variants[variant];
             if (!selector) {
                 console.warn(`Unknown variant: ${variant}`);
@@ -938,7 +1243,8 @@ class TailwindCompiler {
             }
             return {
                 name: variant,
-                selector: selector
+                selector: selector,
+                isArbitrary: false
             };
         }).filter(Boolean);
 
@@ -950,6 +1256,7 @@ class TailwindCompiler {
     generateUtilitiesFromVars(cssText, usedData) {
         try {
             const utilities = [];
+            const generatedRules = new Set(); // Track generated rules to prevent duplicates
             const variables = this.extractThemeVariables(cssText);
             const { classes: usedClasses, variableSuffixes } = usedData;
 
@@ -968,46 +1275,89 @@ class TailwindCompiler {
                 const usedVariants = usedClasses
                     .filter(cls => {
                         const parts = cls.split(':');
-                        return parts[parts.length - 1] === baseClass;
+                        const basePart = parts[parts.length - 1];
+                        return basePart === baseClass || (basePart.startsWith('!') && basePart.slice(1) === baseClass);
                     });
 
                 // Generate base utility if it's used directly
                 if (usedClasses.includes(baseClass)) {
-                    utilities.push(`.${escapeClassName(baseClass)} { ${css} }`);
+                    const rule = `.${escapeClassName(baseClass)} { ${css} }`;
+                    if (!generatedRules.has(rule)) {
+                        utilities.push(rule);
+                        generatedRules.add(rule);
+                    }
+                }
+                // Generate important version if used
+                if (usedClasses.includes('!' + baseClass)) {
+                    const importantCss = css.includes(';') ? 
+                        css.replace(/;/g, ' !important;') : 
+                        css + ' !important';
+                    const rule = `.${escapeClassName('!' + baseClass)} { ${importantCss} }`;
+                    if (!generatedRules.has(rule)) {
+                        utilities.push(rule);
+                        generatedRules.add(rule);
+                    }
                 }
 
                 // Generate each variant as a separate class
                 for (const variantClass of usedVariants) {
                     if (variantClass === baseClass) continue;
 
-                    const parts = variantClass.split(':');
-                    const variants = parts.slice(0, -1);
+                    const parsed = this.parseClassName(variantClass);
 
-                    // For pseudo-classes, we need to generate a rule that matches the actual class name
-                    if (variants.length === 1 && this.variants[variants[0]]?.startsWith(':')) {
-                        // Generate a rule that matches the actual class name and applies the pseudo-class
-                        const pseudoClass = this.variants[variants[0]];
-                        const rule = `.${escapeClassName(variantClass)}${pseudoClass} { ${css} }`;
-                        utilities.push(rule);
-                    } else {
-                        // For other variants (like dark mode, media queries)
+                    // Check if this is an important variant
+                    const isImportant = parsed.important;
+                    const cssContent = isImportant ? 
+                        (css.includes(';') ? css.replace(/;/g, ' !important;') : css + ' !important') : 
+                        css;
+
+                    // Build selector by applying variants
                         let selector = `.${escapeClassName(variantClass)}`;
-                        for (const variant of variants) {
-                            const variantSelector = this.variants[variant];
-                            if (!variantSelector) continue;
+                    let hasMediaQuery = false;
+                    let mediaQueryRule = '';
 
-                            if (variantSelector.startsWith('@')) {
-                                // For media queries, we need to include the CSS content inside the media query block
-                                selector = `${variantSelector} { ${selector} { ${css} } }`;
-
-                                // Skip the final utilities.push since we already included the CSS content
-                                continue;
-                            } else if (variantSelector.startsWith('.')) {
-                                selector = variantSelector.replace('&', selector);
-                            }
+                    for (const variant of parsed.variants) {
+                        if (variant.isArbitrary) {
+                            // Handle arbitrary selectors like [&_figure] or [&_fieldset:has(legend):not(.whatever)]
+                            // Convert underscores to spaces, but be careful with complex selectors
+                            let arbitrarySelector = variant.selector;
+                            
+                            // Replace underscores with spaces, but preserve them inside parentheses
+                            // This handles cases like :not(.whatever,_else) where the underscore should become a space
+                            arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
+                            
+                            // We'll handle this in the CSS generation - store for later use
+                            selector = { baseClass: selector, arbitrarySelector };
+                        } else if (variant.selector.startsWith(':')) {
+                            // For pseudo-classes, append to selector
+                            selector = `${selector}${variant.selector}`;
+                        } else if (variant.selector.startsWith('@')) {
+                            // For media queries, wrap the whole rule
+                            hasMediaQuery = true;
+                            mediaQueryRule = variant.selector;
+                        } else if (variant.selector.includes('&')) {
+                            // For contextual selectors (like dark mode)
+                            selector = variant.selector.replace('&', selector);
                         }
-                        const finalRule = `${selector} { ${css} }`;
-                        utilities.push(finalRule);
+                    }
+
+                    // Generate the final rule
+                    let rule;
+                    if (typeof selector === 'object' && selector.arbitrarySelector) {
+                        // Handle arbitrary selectors with nested CSS
+                        rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContent}\n    }\n}`;
+                    } else {
+                        // Regular selector
+                        rule = `${selector} { ${cssContent} }`;
+                    }
+                    
+                    const finalRule = hasMediaQuery ? 
+                        `${mediaQueryRule} { ${rule} }` : 
+                        rule;
+
+                        if (!generatedRules.has(finalRule)) {
+                            utilities.push(finalRule);
+                            generatedRules.add(finalRule);
                     }
                 }
             };
@@ -1026,11 +1376,16 @@ class TailwindCompiler {
                 if (generator) {
                     const utilityPairs = generator(suffix, value);
                     for (const [className, css] of utilityPairs) {
-                        // Check if this specific utility class is actually used (including variants)
+                        // Check if this specific utility class is actually used (including variants and important)
                         const isUsed = usedClasses.some(cls => {
-                            const parts = cls.split(':');
-                            const baseClass = parts[parts.length - 1];
-                            return baseClass === className;
+                            // Parse the class to extract the base utility name
+                            const parsed = this.parseClassName(cls);
+                            const baseClass = parsed.baseClass;
+                            
+                            // Check both normal and important versions
+                            return baseClass === className || 
+                                   baseClass === '!' + className ||
+                                   (baseClass.startsWith('!') && baseClass.slice(1) === className);
                         });
                         if (isUsed) {
                             generateUtility(className, css);
@@ -1038,9 +1393,13 @@ class TailwindCompiler {
 
                         // Check for opacity variants of this utility
                         const opacityVariants = usedClasses.filter(cls => {
+                            // Parse the class to extract the base utility name
+                            const parsed = this.parseClassName(cls);
+                            const baseClass = parsed.baseClass;
+                            
                             // Check if this class has an opacity modifier and matches our base class
-                            if (cls.includes('/') && cls.startsWith(className + '/')) {
-                                const opacity = cls.split('/')[1];
+                            if (baseClass.includes('/') && baseClass.startsWith(className + '/')) {
+                                const opacity = baseClass.split('/')[1];
                                 // Validate that the opacity is a number between 0-100
                                 return !isNaN(opacity) && opacity >= 0 && opacity <= 100;
                             }
@@ -1079,52 +1438,88 @@ class TailwindCompiler {
             }
             this.isCompiling = true;
 
-            // Get used classes first
-            const usedData = this.getUsedClasses();
-
-            // If no classes found, wait a bit and try again
-            if (usedData.classes.length === 0) {
-                await new Promise(resolve => setTimeout(resolve, 100));
+            // On first run, scan static classes and CSS variables
+            if (!this.hasScannedStatic) {
+                await this.scanStaticClasses();
+                
+                // Fetch CSS content once for initial compilation
+                const themeCss = await this.fetchThemeContent();
+                if (themeCss) {
+                    const variables = this.extractThemeVariables(themeCss);
+                    for (const [name, value] of variables.entries()) {
+                        this.currentThemeVars.set(name, value);
+                    }
+                    
+                    // Generate utilities for all static classes
+                    const staticUsedData = {
+                        classes: Array.from(this.staticClassCache),
+                        variableSuffixes: []
+                    };
+                    // Process static classes for variable suffixes
+                    for (const cls of this.staticClassCache) {
+                        const parts = cls.split(':');
+                        const baseClass = parts[parts.length - 1];
+                        const classParts = baseClass.split('-');
+                        if (classParts.length > 1) {
+                            staticUsedData.variableSuffixes.push(classParts.slice(1).join('-'));
+                        }
+                    }
+                    
+                    const utilities = this.generateUtilitiesFromVars(themeCss, staticUsedData);
+                    if (utilities) {
+                        const finalCss = `@layer utilities {\n${utilities}\n}`;
+                        this.styleElement.textContent = finalCss;
+                        this.lastClassesHash = staticUsedData.classes.sort().join(',');
+                    }
+                }
+                
+                this.hasInitialized = true;
                 this.isCompiling = false;
-                return this.compile();
+                return;
             }
 
-            // Start fetching theme content
+            // For subsequent compilations, only check for new dynamic classes
+            const usedData = this.getUsedClasses();
+            const dynamicClasses = Array.from(this.dynamicClassCache);
+            
+            // Create a hash of current dynamic classes to detect changes
+            const dynamicClassesHash = dynamicClasses.sort().join(',');
+            
+            // Check if dynamic classes have actually changed
+            if (dynamicClassesHash === this.lastClassesHash && this.hasInitialized) {
+                // No new dynamic classes, skip compilation
+                this.isCompiling = false;
+                return;
+            }
+
+            // Only fetch CSS if we have new dynamic classes
+            if (dynamicClasses.length > 0) {
             const themeCss = await this.fetchThemeContent();
-            if (!themeCss) return;
+                if (!themeCss) {
+                    this.isCompiling = false;
+                    return;
+                }
 
-            // Process theme content and generate utilities in one pass
+                // Check for variable changes
             const variables = this.extractThemeVariables(themeCss);
-            if (variables.size === 0) return;
-
-            // Update variables and check for changes
-            let hasChanges = false;
+                let hasVariableChanges = false;
             for (const [name, value] of variables.entries()) {
                 const currentValue = this.currentThemeVars.get(name);
                 if (currentValue !== value) {
-                    hasChanges = true;
+                        hasVariableChanges = true;
                     this.currentThemeVars.set(name, value);
                 }
             }
 
-            // Always generate utilities when variables change or when we have new classes
-            if (hasChanges || usedData.classes.length > 0) {
+                // Generate utilities for all classes (static + dynamic) if needed
+                if (hasVariableChanges || dynamicClassesHash !== this.lastClassesHash) {
                 const utilities = this.generateUtilitiesFromVars(themeCss, usedData);
-                if (!utilities) return;
-
+                    if (utilities) {
                 const finalCss = `@layer utilities {\n${utilities}\n}`;
                 this.styleElement.textContent = finalCss;
-
-                // Cache the result
-                const themeHash = this.generateThemeHash(themeCss);
-                const cacheKey = `${themeHash}:${usedData.classes.sort().join(',')}`;
-                this.cache.set(cacheKey, {
-                    css: finalCss,
-                    timestamp: Date.now(),
-                    themeHash: themeHash
-                });
-                this.savePersistentCache();
-                this.cleanupCache();
+                        this.lastClassesHash = dynamicClassesHash;
+                    }
+                }
             }
 
         } catch (error) {
@@ -1137,6 +1532,9 @@ class TailwindCompiler {
 
 // Initialize immediately without waiting for DOMContentLoaded
 const compiler = new TailwindCompiler();
+
+// Expose utilities compiler for optional integration
+window.InduxUtilities = compiler;
 
 // Also handle DOMContentLoaded for any elements that might be added later
 document.addEventListener('DOMContentLoaded', () => {

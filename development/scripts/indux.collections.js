@@ -12,10 +12,20 @@ async function loadYamlLibrary() {
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/js-yaml/dist/js-yaml.min.js';
         script.onload = () => {
-            jsyaml = window.jsyaml;
-            resolve(jsyaml);
+            if (typeof window.jsyaml !== 'undefined') {
+                jsyaml = window.jsyaml;
+                resolve(jsyaml);
+            } else {
+                console.error('[Indux Collections] js-yaml failed to load - jsyaml is undefined');
+                yamlLoadingPromise = null; // Reset so we can try again
+                reject(new Error('js-yaml failed to load'));
+            }
         };
-        script.onerror = reject;
+        script.onerror = (error) => {
+            console.error('[Indux Collections] Script failed to load:', error);
+            yamlLoadingPromise = null; // Reset so we can try again
+            reject(error);
+        };
         document.head.appendChild(script);
     });
     
@@ -234,9 +244,15 @@ async function initializeCollectionsPlugin() {
                 // Handle route() function - always available
                 if (key === 'route') {
                     return function(pathKey) {
-                        // Return a safe fallback proxy that returns undefined for all properties
+                        // Return a safe fallback proxy that returns empty strings for all properties
                         return new Proxy({}, {
-                            get() { return undefined; }
+                            get(target, prop) {
+                                // Return empty string for any property to prevent expression display
+                                if (typeof prop === 'string') {
+                                    return '';
+                                }
+                                return undefined;
+                            }
                         });
                     };
                 }
@@ -246,9 +262,24 @@ async function initializeCollectionsPlugin() {
                     return function () { return ''; };
                 }
 
+                // Handle valueOf for text content
+                if (key === 'valueOf') {
+                    return function () { return ''; };
+                }
+
+                // Handle toString for text content
+                if (key === 'toString') {
+                    return function () { return ''; };
+                }
+
                 // Handle numeric keys for array access
                 if (typeof key === 'string' && !isNaN(Number(key))) {
                     return createLoadingProxy();
+                }
+
+                // Return empty string for most properties to prevent expression display
+                if (typeof key === 'string') {
+                    return '';
                 }
 
                 // Return empty object for nested properties
@@ -288,9 +319,9 @@ async function initializeCollectionsPlugin() {
                     const currentPath = store?._currentUrl || window.location.pathname;
                     const pathSegments = currentPath.split('/').filter(segment => segment);
                     
-                    // If collection data is not loaded yet, return undefined
+                    // If collection data is not loaded yet, return empty string for string properties
                     if (!collectionData || typeof collectionData !== 'object') {
-                        return undefined;
+                        return typeof prop === 'string' ? '' : undefined;
                     }
                     
                     // Search through collection data recursively
@@ -300,10 +331,11 @@ async function initializeCollectionsPlugin() {
                         return foundItem[prop];
                     }
                     
-                    return undefined;
+                    // Return empty string for string properties to prevent expression display
+                    return typeof prop === 'string' ? '' : undefined;
                 } catch (error) {
-                    // Return undefined if anything goes wrong
-                    return undefined;
+                    // Return empty string for string properties, undefined otherwise
+                    return typeof prop === 'string' ? '' : undefined;
                 }
             }
         });
@@ -381,6 +413,7 @@ async function initializeCollectionsPlugin() {
     Alpine.magic('x', () => {
         const pendingLoads = new Map();
         const store = Alpine.store('collections');
+        const accessCache = new Map(); // Cache for frequently accessed collections
 
         return new Proxy({}, {
             get(target, prop) {
@@ -389,16 +422,32 @@ async function initializeCollectionsPlugin() {
                     return undefined;
                 }
 
+                // Check access cache first for better performance
+                if (accessCache.has(prop)) {
+                    return accessCache.get(prop);
+                }
+
                 // Get current value from store
                 const value = store[prop];
                 const currentLocale = 'en'; // Default locale
 
                 // If not in store, try to load it
                 if (!value && !pendingLoads.has(prop)) {
-                    // Start loading
+                    // Batch collection loading to reduce simultaneous requests
                     const loadPromise = loadCollection(prop, currentLocale);
                     pendingLoads.set(prop, loadPromise);
-                    return createLoadingProxy();
+                    
+                    // Cache the loading proxy
+                    const proxy = createLoadingProxy();
+                    accessCache.set(prop, proxy);
+                    
+                    // Clear cache when loaded
+                    loadPromise.finally(() => {
+                        accessCache.delete(prop);
+                        pendingLoads.delete(prop);
+                    });
+                    
+                    return proxy;
                 }
 
                 // If we have a value, return a reactive proxy
@@ -442,6 +491,12 @@ async function initializeCollectionsPlugin() {
                                     }
                                     return createLoadingProxy();
                                 }
+                                // Add essential array methods
+                                if (key === 'filter' || key === 'map' || key === 'find' || 
+                                    key === 'findIndex' || key === 'some' || key === 'every' ||
+                                    key === 'reduce' || key === 'forEach' || key === 'slice') {
+                                    return target[key].bind(target);
+                                }
                             }
 
                             // Handle nested objects
@@ -460,21 +515,32 @@ async function initializeCollectionsPlugin() {
                                                 }
                                                 return createLoadingProxy();
                                             }
+                                            // Add essential array methods
+                                            if (nestedKey === 'filter' || nestedKey === 'map' || nestedKey === 'find' || 
+                                                nestedKey === 'findIndex' || nestedKey === 'some' || nestedKey === 'every' ||
+                                                nestedKey === 'reduce' || nestedKey === 'forEach' || nestedKey === 'slice') {
+                                                return target[nestedKey].bind(target);
+                                            }
                                             return createLoadingProxy();
                                         }
                                     });
                                 }
-                                return new Proxy(nestedValue, {
-                                    get(target, nestedKey) {
-                                        // Handle toPrimitive for text content
-                                        if (nestedKey === Symbol.toPrimitive) {
-                                            return function () {
-                                                return target[nestedKey] || '';
-                                            };
+                                // Only create proxy for objects, return primitives directly
+                                if (typeof nestedValue === 'object' && nestedValue !== null) {
+                                    return new Proxy(nestedValue, {
+                                        get(target, nestedKey) {
+                                            // Handle toPrimitive for text content
+                                            if (nestedKey === Symbol.toPrimitive) {
+                                                return function () {
+                                                    return target[nestedKey] || '';
+                                                };
+                                            }
+                                            return target[nestedKey];
                                         }
-                                        return target[nestedKey];
-                                    }
-                                });
+                                    });
+                                }
+                                // Return primitive values directly (strings, numbers, booleans)
+                                return nestedValue;
                             }
                             return createLoadingProxy();
                         }

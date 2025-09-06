@@ -29,7 +29,11 @@
     },
     "components": [
         "components/home.html",
-        "components/variant-test.html"
+        "components/variant-test.html",
+        "components/examples/disclaimer.html",
+        "components/examples/header-basic.html",
+        "components/examples/header-nested.html",
+        "components/examples/header-modified.html"
     ],
     "preloadedComponents": [
         "components/navigation/doc-footer.html",
@@ -38,6 +42,7 @@
     ],
     "collections": {
         "docs": "/collections/docs.yaml",
+        "example": "/collections/example.json",
         "blog": "/collections/blog.json",
         "pricing": {
             "en": "/collections/pricing.json",

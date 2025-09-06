@@ -37,12 +37,12 @@
 
     :where(.toast-success) {
         color: var(--color-accent-inverse);
-        background-color: var(--color-accent)
+        background-color: var(--color-accent-surface)
     }
 
     :where(.toast-error) {
-        color: var(--color-danger-inverse);
-        background-color: var(--color-danger)
+        color: var(--color-negative-inverse);
+        background-color: var(--color-negative-surface)
     }
 
     :where(.toast-icon) {

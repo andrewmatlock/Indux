@@ -1,0 +1,376 @@
+<!-- Variant Test UI for Indux Utilities -->
+<div class="p-8 max-w-7xl mx-auto">
+    <h1 class="text-4xl font-bold mb-8">Indux Utilities - Variant Test Suite</h1>
+
+    <!-- Basic State Variants -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold mb-4">Basic State Variants</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <button class="p-4 bg-brand hover:bg-brand-surface-hover focus:outline-2 focus:outline-brand active:bg-brand-surface-hover transition-colors">
+                Hover/Focus/Active
+            </button>
+            <a href="#test" class="p-4 bg-accent visited:bg-accent-hover hover:bg-accent-hover transition-colors block text-center">
+                Target Link (click to activate target element)
+            </a>
+            <div id="test" class="p-4 bg-surface-1 target:bg-accent border border-line">
+                Target Element (click link above to see target styling)
+            </div>
+            <button class="p-4 bg-brand disabled:bg-accent/20 disabled:cursor-not-allowed" disabled>
+                Disabled Button
+            </button>
+        </div>
+    </section>
+
+    <!-- Form State Variants -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold mb-4">Form State Variants</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <input type="text" placeholder="Required field" required class="w-full p-3 border border-line required:border-negative valid:border-brand invalid:border-negative">
+                <input type="email" placeholder="Email (optional)" class="w-full p-3 border border-line optional:border-line valid:border-brand invalid:border-negative">
+                <input type="number" min="1" max="10" placeholder="1-10" class="w-full p-3 border border-line in-range:border-brand out-of-range:border-negative">
+                <input type="checkbox" class="checked:bg-brand indeterminate:bg-surface-2">
+                <input type="text" placeholder="Placeholder shown" class="w-full p-3 border border-line placeholder-shown:border-accent">
+                <input type="text" readonly value="Read only" class="w-full p-3 border border-line read-only:bg-surface-2">
+                <input type="text" autocomplete="name" class="w-full p-3 border border-line autofill:bg-accent/20">
+            </div>
+            <div class="space-y-4">
+                <details class="p-4 border border-line details-content:bg-surface-2">
+                    <summary>Details Element</summary>
+                    <p class="mt-2">This content is styled with details-content variant.</p>
+                </details>
+                <input type="text" placeholder="User valid/invalid" required class="w-full p-3 border border-line user-valid:border-brand user-invalid:border-negative">
+                <input type="text" placeholder="Enabled/Disabled" class="w-full p-3 border border-line enabled:hover:border-brand disabled:opacity-50" disabled>
+                <form class="space-y-2">
+                    <button type="submit" class="p-3 border border-line default:border-accent">Default Submit Button</button>
+                    <button type="button" class="p-3 border border-line">Regular Button</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Child Selector Variants -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold mb-4">Child Selector Variants</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="space-y-2">
+                <div class="p-3 bg-surface-1 first:bg-brand first:text-brand-inverse">First Child</div>
+                <div class="p-3 bg-surface-1">Middle Child</div>
+                <div class="p-3 bg-surface-1 last:bg-accent last:text-accent-inverse">Last Child</div>
+            </div>
+            <div class="space-y-2">
+                <div class="p-3 bg-surface-1 odd:bg-brand odd:text-brand-inverse">Odd Child 1</div>
+                <div class="p-3 bg-surface-1 even:bg-accent even:text-accent-inverse">Even Child 1</div>
+                <div class="p-3 bg-surface-1 odd:bg-brand odd:text-brand-inverse">Odd Child 2</div>
+                <div class="p-3 bg-surface-1 even:bg-accent even:text-accent-inverse">Even Child 2</div>
+            </div>
+            <div class="space-y-2">
+                <div class="p-3 bg-surface-1 only:bg-brand only:text-brand-inverse">Only Child</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Type Selector Variants -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold mb-4">Type Selector Variants</h2>
+        <div class="space-y-2">
+            <p class="p-3 bg-surface-1 first-of-type:bg-brand first-of-type:text-brand-inverse">First Paragraph</p>
+            <div class="p-3 bg-surface-1">Div Element</div>
+            <p class="p-3 bg-surface-1 last-of-type:bg-accent last-of-type:text-accent-inverse">Last Paragraph</p>
+            <span class="p-3 bg-surface-1 only-of-type:bg-brand only-of-type:text-brand-inverse">Only Span</span>
+        </div>
+    </section>
+
+    <!-- Nth Child Variants -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold mb-4">Nth Child Variants</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div class="p-3 bg-surface-1 nth-3:bg-brand nth-3:text-brand-inverse">Item 1</div>
+            <div class="p-3 bg-surface-1 nth-3:bg-brand nth-3:text-brand-inverse">Item 2</div>
+            <div class="p-3 bg-surface-1 nth-3:bg-brand nth-3:text-brand-inverse">Item 3 (3rd)</div>
+            <div class="p-3 bg-surface-1 nth-3:bg-brand nth-3:text-brand-inverse">Item 4</div>
+            <div class="p-3 bg-surface-1 nth-last-2:bg-accent nth-last-2:text-accent-inverse">Item 5</div>
+            <div class="p-3 bg-surface-1 nth-last-2:bg-accent nth-last-2:text-accent-inverse">Item 6 (2nd to last)</div>
+        </div>
+    </section>
+
+    <!-- Empty State -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold mb-4">Empty State</h2>
+        <div class="space-y-2">
+            <div class="p-3 bg-surface-1 empty:hidden">Has content</div>
+            <div class="p-3 bg-surface-1 empty:hidden"></div>
+            <div class="p-3 bg-surface-1 empty:bg-accent empty:text-accent-inverse"></div>
+        </div>
+    </section>
+
+    <!-- Pseudo-elements -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold mb-4">Pseudo-elements</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="p-4 border border-line before:content-['Before:'] before:text-brand after:content-[':After'] after:text-accent">
+                    Content with before/after
+                </div>
+                <input type="text" placeholder="Placeholder text" class="w-full p-3 border border-line placeholder:text-accent">
+                <input type="file" class="file:bg-brand file:text-brand-inverse file:border-0 file:px-4 file:py-2 file:mr-4">
+                <ul class="list-disc list-inside marker:text-brand">
+                    <li>List item with custom marker</li>
+                    <li>Another list item</li>
+                </ul>
+                <div class="p-4 border border-line selection:bg-accent selection:text-accent-inverse">
+                    Select this text to see selection styling
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div class="p-4 border border-line first-letter:text-4xl first-letter:font-bold first-letter:text-brand">
+                    First letter styling
+                </div>
+                <div class="p-4 border border-line first-line:bg-accent first-line:text-accent-inverse">
+                    First line styling<br>
+                    Second line
+                </div>
+                <dialog class="p-4 border border-line backdrop:bg-overlay-dark backdrop:backdrop-blur-sm">
+                    <p>Dialog with backdrop styling</p>
+                    <button onclick="this.parentElement.close()">Close</button>
+                </dialog>
+                <button onclick="document.querySelector('dialog').showModal()" class="p-2 bg-brand text-brand-inverse">
+                    Open Dialog
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Group Variants -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold mb-4">Group Variants</h2>
+        <div class="group p-6 border border-line space-y-4" tabindex="0">
+            <h3 class="text-lg font-semibold">Group Container</h3>
+            <button class="p-3 bg-surface-1 group-hover:bg-brand group-hover:text-brand-inverse transition-colors">
+                Group Hover
+            </button>
+            <button class="p-3 bg-surface-1 group-focus:bg-accent group-focus:text-accent-inverse transition-colors">
+                Group Focus
+            </button>
+            <button class="p-3 bg-surface-1 group-active:bg-negative group-active:text-negative-inverse transition-colors">
+                Group Active
+            </button>
+            <button class="p-3 bg-surface-1 group-disabled:opacity-50" disabled>
+                Group Disabled
+            </button>
+        </div>
+    </section>
+
+    <!-- Peer Variants -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold mb-4">Peer Variants</h2>
+        <div class="space-y-4">
+            <div class="flex items-center space-x-4">
+                <input type="checkbox" class="peer">
+                <label class="p-3 bg-surface-1 peer-checked:bg-brand peer-checked:text-brand-inverse transition-colors">
+                    Peer Checked
+                </label>
+            </div>
+            <div class="flex items-center space-x-4">
+                <input type="text" placeholder="Focus me" class="peer">
+                <div class="p-3 bg-surface-1 peer-focus:bg-accent peer-focus:text-accent-inverse transition-colors">
+                    Peer Focus
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button class="peer p-2 bg-brand text-brand-inverse">Hover me</button>
+                <div class="p-3 bg-surface-1 peer-hover:bg-accent peer-hover:text-accent-inverse transition-colors">
+                    Peer Hover
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Data Attribute Variants -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold mb-4">Data Attribute Variants</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="p-4 border border-line" data-state="open">
+                <div class="data-open:bg-brand data-open:text-brand-inverse">Data Open</div>
+            </div>
+            <div class="p-4 border border-line" data-state="closed">
+                <div class="data-closed:bg-accent data-closed:text-accent-inverse">Data Closed</div>
+            </div>
+            <div class="p-4 border border-line" data-state="checked">
+                <div class="data-checked:bg-brand data-checked:text-brand-inverse">Data Checked</div>
+            </div>
+            <div class="p-4 border border-line" data-state="unchecked">
+                <div class="data-unchecked:bg-accent data-unchecked:text-accent-inverse">Data Unchecked</div>
+            </div>
+            <div class="p-4 border border-line" data-state="visible">
+                <div class="data-visible:bg-brand data-visible:text-brand-inverse">Data Visible</div>
+            </div>
+            <div class="p-4 border border-line" data-state="hidden">
+                <div class="data-hidden:bg-accent data-hidden:text-accent-inverse">Data Hidden</div>
+            </div>
+            <div class="p-4 border border-line" data-disabled>
+                <div class="data-disabled:bg-surface-2 data-disabled:opacity-50">Data Disabled</div>
+            </div>
+            <div class="p-4 border border-line" data-loading>
+                <div class="data-loading:bg-accent data-loading:text-accent-inverse">Data Loading</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Aria Attribute Variants -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold mb-4">Aria Attribute Variants</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <button class="p-4 border border-line" aria-expanded="true">
+                <div class="aria-expanded:bg-brand aria-expanded:text-brand-inverse">Aria Expanded</div>
+            </button>
+            <button class="p-4 border border-line" aria-expanded="false">
+                <div class="aria-collapsed:bg-accent aria-collapsed:text-accent-inverse">Aria Collapsed</div>
+            </button>
+            <button class="p-4 border border-line" aria-pressed="true">
+                <div class="aria-pressed:bg-brand aria-pressed:text-brand-inverse">Aria Pressed</div>
+            </button>
+            <button class="p-4 border border-line" aria-pressed="false">
+                <div class="aria-unpressed:bg-accent aria-unpressed:text-accent-inverse">Aria Unpressed</div>
+            </button>
+            <input type="checkbox" class="p-4 border border-line" aria-checked="true">
+            <div class="aria-checked:bg-brand aria-checked:text-brand-inverse">Aria Checked</div>
+            <input type="checkbox" class="p-4 border border-line" aria-checked="false">
+            <div class="aria-unchecked:bg-accent aria-unchecked:text-accent-inverse">Aria Unchecked</div>
+            <div class="p-4 border border-line" aria-selected="true">
+                <div class="aria-selected:bg-brand aria-selected:text-brand-inverse">Aria Selected</div>
+            </div>
+            <div class="p-4 border border-line" aria-selected="false">
+                <div class="aria-unselected:bg-accent aria-unselected:text-accent-inverse">Aria Unselected</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Media Query Variants -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold mb-4">Media Query Variants</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="p-4 border border-line dark:bg-surface-2 dark:text-text-stark">
+                    Dark Mode Variant
+                </div>
+                <div class="p-4 border border-line light:bg-surface-1 light:text-text-stark">
+                    Light Mode Variant
+                </div>
+                <div class="p-4 border border-line motion-safe:animate-pulse">
+                    Motion Safe (reduced motion disabled)
+                </div>
+                <div class="p-4 border border-line motion-reduce:animate-none">
+                    Motion Reduce (reduced motion enabled)
+                </div>
+                <div class="p-4 border border-line print:bg-white print:text-black">
+                    Print Media (check print preview)
+                </div>
+                <div class="p-4 border border-line portrait:bg-brand portrait:text-brand-inverse">
+                    Portrait Orientation
+                </div>
+                <div class="p-4 border border-line landscape:bg-accent landscape:text-accent-inverse">
+                    Landscape Orientation
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div dir="rtl" class="p-4 border border-line">
+                    <div class="p-3 bg-surface-1 rtl:bg-brand rtl:text-brand-inverse">
+                        RTL Direction (should be primary when parent has dir="rtl")
+                    </div>
+                </div>
+                <div dir="ltr" class="p-4 border border-line">
+                    <div class="p-3 bg-surface-1 ltr:bg-accent ltr:text-accent-inverse">
+                        LTR Direction (should be accent when parent has dir="ltr")
+                    </div>
+                </div>
+                <div class="p-4 border border-line">
+                    <div class="p-3 bg-surface-1 ltr:bg-accent ltr:text-accent-inverse">
+                        No Direction (should be accent when no dir attribute - LTR is default)
+                    </div>
+                </div>
+                <div class="p-4 border border-line bg-surface-1 can-hover:bg-brand can-hover:text-brand-inverse">
+                    Can Hover (should be primary on devices with hover capability)
+                </div>
+                <div class="p-4 border border-line bg-surface-1 can-not-hover:bg-accent can-not-hover:text-accent-inverse">
+                    Cannot Hover (should be accent on touch-only devices)
+                </div>
+                <div class="p-4 border border-line forced-colors:bg-brand forced-colors:text-brand-inverse">
+                    Forced Colors
+                </div>
+                <div class="p-4 border border-line contrast-more:bg-brand contrast-more:text-brand-inverse">
+                    High Contrast
+                </div>
+                <div class="p-4 border border-line contrast-less:bg-accent contrast-less:text-accent-inverse">
+                    Low Contrast
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Responsive Variants -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold mb-4">Responsive Variants</h2>
+        <div class="grid grid-cols-1 gap-4">
+            <div class="p-4 border border-line bg-surface-1 sm:bg-brand sm:text-brand-inverse md:bg-accent md:text-accent-inverse lg:bg-negative lg:text-negative-inverse xl:bg-brand xl:text-brand-inverse 2xl:bg-accent 2xl:text-accent-inverse">
+                Responsive Background (resize window to see changes)
+            </div>
+            <div class="p-4 border border-line text-center">
+                <span class="block sm:hidden">Mobile (default)</span>
+                <span class="hidden sm:block md:hidden">Small (sm)</span>
+                <span class="hidden md:block lg:hidden">Medium (md)</span>
+                <span class="hidden lg:block xl:hidden">Large (lg)</span>
+                <span class="hidden xl:block 2xl:hidden">Extra Large (xl)</span>
+                <span class="hidden 2xl:block">2XL</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Opacity Variants -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold mb-4">Opacity Variants</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="p-4 bg-brand/10 text-text-stark">10% Opacity</div>
+            <div class="p-4 bg-brand/25 text-text-stark">25% Opacity</div>
+            <div class="p-4 bg-brand/50 text-text-stark">50% Opacity</div>
+            <div class="p-4 bg-brand/75 text-text-stark">75% Opacity</div>
+            <div class="p-4 bg-brand/90 text-text-stark">90% Opacity</div>
+            <div class="p-4 bg-accent/20 text-text-stark">20% Opacity</div>
+            <div class="p-4 bg-accent/40 text-text-stark">40% Opacity</div>
+            <div class="p-4 bg-accent/60 text-text-stark">60% Opacity</div>
+        </div>
+    </section>
+
+    <!-- Complex Combinations -->
+    <section class="mb-12">
+        <h2 class="text-2xl font-semibold mb-4">Complex Combinations</h2>
+        <div class="space-y-4">
+            <button class="p-4 bg-surface-1 hover:bg-brand hover:text-brand-inverse focus:outline-2 focus:outline-brand active:bg-brand-surface-hover disabled:opacity-50 disabled:cursor-not-allowed dark:bg-surface-2 dark:hover:bg-brand dark:focus:outline-accent transition-colors">
+                Complex Button (hover, focus, active, disabled, dark mode)
+            </button>
+            <div class="group p-4 border border-line">
+                <div class="p-3 bg-surface-1 group-hover:bg-brand group-hover:text-brand-inverse peer-checked:bg-accent peer-checked:text-accent-inverse data-open:bg-negative data-open:text-negative-inverse aria-expanded:bg-brand aria-expanded:text-brand-inverse transition-colors">
+                    Complex Group/Peer/Data/Aria Combination
+                </div>
+            </div>
+            <div class="p-4 border border-line sm:bg-surface-1 md:bg-brand md:text-brand-inverse lg:bg-accent lg:text-accent-inverse xl:bg-negative xl:text-negative-inverse dark:bg-surface-2 dark:sm:bg-surface-1 dark:md:bg-brand dark:md:text-brand-inverse transition-colors">
+                Responsive + Dark Mode Combination
+            </div>
+        </div>
+    </section>
+
+    <!-- Test Instructions -->
+    <section class="mb-12 p-6 bg-surface-2 border border-line rounded">
+        <h2 class="text-2xl font-semibold mb-4">Test Instructions</h2>
+        <ul class="list-disc list-inside space-y-2">
+            <li><strong>Hover/Focus/Active:</strong> Interact with buttons to see state changes</li>
+            <li><strong>Form States:</strong> Fill out form fields to see validation states</li>
+            <li><strong>Group/Peer:</strong> Hover over group containers and interact with peer elements</li>
+            <li><strong>Data/Aria:</strong> Elements with data-state and aria attributes should show different styling</li>
+            <li><strong>Media Queries:</strong> Resize window, toggle dark mode, and check print preview</li>
+            <li><strong>Responsive:</strong> Resize browser window to see breakpoint changes</li>
+            <li><strong>Opacity:</strong> Background colors should have transparency applied</li>
+            <li><strong>RTL:</strong> Add <code>dir="rtl"</code> to body to test RTL variants</li>
+        </ul>
+    </section>
+</div>

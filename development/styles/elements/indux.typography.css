@@ -2,53 +2,70 @@
 
 @layer base {
 
-    :where(a, abbr, address, blockquote, code, del, figcaption, h1, h2, h3, h4, h5, h6, ins, label, legend, p, small, cite, q) {
+    :where(a, abbr, address, blockquote, code, del, figcaption, h1, h2, h3, h4, h5, h6, ins, label, legend, p, small, cite, q), .h1, .h2, .h3, .h4, .h5, .h6, .paragraph, .small, .caption {
         color: var(--color-content-stark);
+
+        &:where(:has( [x-icon])) {
+            display: inline-flex;
+            align-items: center;
+            
+            & [x-icon] {
+                margin-inline-end: 0.5ch;
+            }
+        }
+
+        & span {
+            vertical-align: inherit
+        }
     }
 
-    :where(h1, h2, h3, h4, h5, h6) {
+    :where(h1, h2, h3, h4, h5, h6), .h1, .h2, .h3, .h4, .h5, .h6 {
         font-weight: bolder;
         word-wrap: break-word
     }
 
-    :where(h1, h2, h3, h4) {
+    :where(h1, h2, h3, h4), .h1, .h2, .h3, .h4 {
         font-weight: 700;
     }
 
-    :where(h1, h2, h3) {
+    :where(h1, h2, h3), .h1, .h2, .h3 {
         letter-spacing: -0.025em
     }
 
-    :where(h1) {
+    :where(h1), .h1 {
         font-size: 2.25rem;
         line-height: 1.25
     }
 
-    :where(h2) {
+    :where(h2), .h2 {
         font-size: 1.5rem
     }
 
-    :where(h3) {
+    :where(h3), .h3 {
         font-size: 1.25rem;
         line-height: 1.4
     }
 
-    :where(h4) {
+    :where(h4), .h4 {
         font-size: 1rem
     }
 
-    :where(h5) {
+    :where(h5), .h5 {
         font-weight: 600;
         font-size: .875rem;
         line-height: 1rem;
         color: var(--color-content-neutral)
     }
 
-    :where(h6) {
+    :where(h6), .h6 {
         font-weight: 600;
         font-size: 0.8125rem;
         line-height: 1.4;
         text-transform: uppercase;
+    }
+
+    :where(p), .paragraph {
+        line-height: 1.6;
     }
 
     :where(a:not([role=button]), button.link) {
@@ -96,7 +113,7 @@
         border-radius: calc(var(--radius) / 1.5)
     }
 
-    :where(figcaption) {
+    :where(figcaption), .caption {
         font-size: 0.8125rem;
 
         & a {
@@ -105,7 +122,12 @@
         }
     }
 
-    :where(small, figcaption) {
+    :where(small), .small {
+        font-size: 0.875rem;
+        color: var(--color-content-neutral)
+    }
+
+    :where(figcaption), .caption {
         color: var(--color-content-neutral)
     }
 
@@ -195,11 +217,12 @@
             /* Allow icons to replace markers */
             &:has([x-icon]) {
                 position: relative;
+                display: inherit;
                 list-style: none;
 
                 & [x-icon] {
                     position: absolute;
-                    top: 0.2ch;
+                    top: 0.45ch;
                     left: -1.75ch
                 }
             }
@@ -209,7 +232,7 @@
     /* Nested lists */
     :where(ol, ul):not(nav ol):not(menu ol) ul,
     :where(ol, ul):not(nav ul):not(menu ul) ol {
-        margin: 1.5ch 0 1.5ch 1.25ch
+        margin-top: 1ch
     }
 
     :where(figure figcaption) {

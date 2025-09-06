@@ -195,6 +195,7 @@
             /* Allow icons to replace markers */
             &:has([x-icon]) {
                 position: relative;
+                display: block;
                 list-style: none;
 
                 & [x-icon] {

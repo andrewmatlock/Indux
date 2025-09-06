@@ -111,6 +111,8 @@ window.InduxComponentsProcessor = {
         const props = {};
         Array.from(element.attributes).forEach(attr => {
             if (attr.name !== name && attr.name !== 'class' && !attr.name.startsWith('data-')) {
+                // Store both original case and lowercase for flexibility
+                props[attr.name] = attr.value;
                 props[attr.name.toLowerCase()] = attr.value;
             }
         });
@@ -118,19 +120,39 @@ window.InduxComponentsProcessor = {
         const processElementProps = (el) => {
             Array.from(el.attributes).forEach(attr => {
                 const value = attr.value.trim();
-                if (value.includes('$attribute(')) {
-                    const propMatch = value.match(/\$attribute\(['"]([^'"]+)['"]\)/);
+                if (value.includes('$modify(')) {
+                    const propMatch = value.match(/\$modify\(['"]([^'"]+)['"]\)/);
                     if (propMatch) {
                         const propName = propMatch[1].toLowerCase();
                         const propValue = props[propName] || '';
                         if (attr.name === 'class') {
                             const existingClasses = el.getAttribute('class') || '';
                             const newClasses = existingClasses
-                                .replace(new RegExp(`\$attribute\(['"]${propName}['"]\)`, 'i'), propValue)
+                                .replace(new RegExp(`\$modify\(['"]${propName}['"]\)`, 'i'), propValue)
                                 .split(' ')
                                 .filter(Boolean)
                                 .join(' ');
                             el.setAttribute('class', newClasses);
+                        } else if (attr.name === 'x-icon') {
+                            // x-icon should get the raw value, not wrapped for Alpine evaluation
+                            el.setAttribute(attr.name, propValue);
+                        } else if (attr.name === 'x-show' || attr.name === 'x-if') {
+                            // x-show and x-if expect boolean expressions, convert string to boolean check
+                            if (value !== `$modify('${propName}')`) {
+                                const newValue = value.replace(
+                                    /\$modify\(['"]([^'"]+)['"]\)/g,
+                                    (_, name) => {
+                                        const val = props[name.toLowerCase()] || '';
+                                        // Convert to boolean check - true if value exists and is not empty
+                                        return val ? 'true' : 'false';
+                                    }
+                                );
+                                el.setAttribute(attr.name, newValue);
+                            } else {
+                                // Simple replacement - check if prop exists and is not empty
+                                const booleanValue = propValue && propValue.trim() !== '' ? 'true' : 'false';
+                                el.setAttribute(attr.name, booleanValue);
+                            }
                         } else if (
                             attr.name.startsWith('x-') ||
                             attr.name.startsWith(':') ||
@@ -138,19 +160,41 @@ window.InduxComponentsProcessor = {
                             attr.name.startsWith('x-bind:') ||
                             attr.name.startsWith('x-on:')
                         ) {
-                            const escapedValue = propValue
-                                .replace(/\\/g, '\\\\')
-                                .replace(/'/g, "\\'")
-                                .replace(/\"/g, '\\"')
-                                .replace(/`/g, '\\`');
-                            if (value !== `$attribute('${propName}')`) {
+                            // For Alpine directives, properly quote string values
+                            if (value !== `$modify('${propName}')`) {
+                                // Handle mixed content with multiple $modify() calls
                                 const newValue = value.replace(
-                                    /\$attribute\(['"]([^'"]+)['"]\)/g,
-                                    (_, name) => `\`${props[name.toLowerCase()] || ''}\``
+                                    /\$modify\(['"]([^'"]+)['"]\)/g,
+                                    (_, name) => {
+                                        const val = props[name.toLowerCase()] || '';
+                                        // For expressions with fallbacks (||), use null for empty/whitespace values
+                                        if (!val || val.trim() === '' || /^[\r\n\t\s]+$/.test(val)) {
+                                            return value.includes('||') ? 'null' : "''";
+                                        }
+                                        // If value starts with $, it's an Alpine expression - don't quote
+                                        if (val.startsWith('$')) {
+                                            return val;
+                                        }
+                                        // Always quote string values to ensure they're treated as strings, not variables
+                                        return `'${val.replace(/'/g, "\\'").replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\t/g, '\\t')}'`;
+                                    }
                                 );
                                 el.setAttribute(attr.name, newValue);
                             } else {
-                                el.setAttribute(attr.name, `\`${escapedValue}\``);
+                                // Simple $modify() replacement
+                                if (!propValue || propValue.trim() === '' || /^[\r\n\t\s]+$/.test(propValue)) {
+                                    // For empty/whitespace values, remove the attribute
+                                    el.removeAttribute(attr.name);
+                                } else {
+                                    // If value starts with $, it's an Alpine expression - don't quote
+                                    if (propValue.startsWith('$')) {
+                                        el.setAttribute(attr.name, propValue);
+                                    } else {
+                                        // Always quote string values and escape special characters
+                                        const quotedValue = `'${propValue.replace(/'/g, "\\'").replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/\t/g, '\\t')}'`;
+                                        el.setAttribute(attr.name, quotedValue);
+                                    }
+                                }
                             }
                         } else {
                             el.setAttribute(attr.name, propValue);

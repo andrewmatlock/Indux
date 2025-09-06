@@ -18,8 +18,8 @@
         &:before,
         &:after {
             content: "";
-            display: block;
-            flex-grow: 1;
+            display: inline-flex;
+            flex: 1;
             width: auto;
             height: 1px;
             background-color: var(--color-line, oklch(48.3% 0.006422 17.4 / 0.15))
@@ -33,6 +33,8 @@
 
     /* Start modifier */
     :where(.divider.start) {
+        justify-content: flex-start;
+        
         &:before {
             display: none
         }
@@ -40,6 +42,8 @@
 
     /* End modifier */
     :where(.divider.end) {
+        justify-content: flex-end;
+        
         &:after {
             display: none
         }
@@ -58,7 +62,8 @@
         &:after {
             content: "";
             width: 1px;
-            height: auto
+            height: auto;
+            min-height: 1px;
         }
 
         /* Icon */

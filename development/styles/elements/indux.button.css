@@ -14,6 +14,7 @@
         height: var(--spacing-field-height, 2.25rem);
         margin: 0;
         padding: 0 var(--spacing-field-padding, 0.625rem);
+        overflow: hidden;
         white-space: nowrap;
         text-overflow: ellipsis;
         color: var(--color-field-inverse);
@@ -23,6 +24,7 @@
         border-color: transparent;
         border-radius: var(--radius);
         outline-color: var(--color-line, oklch(48.3% 0.006422 17.4 / 0.15));
+        cursor: pointer;
         transition: var(--transition);
         -webkit-appearance: button;
         -moz-appearance: button;
@@ -31,6 +33,12 @@
         & span,
         & [x-icon] {
             color: inherit
+        }
+
+        & span {
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
         }
 
         /* Remove padding around a solo icon */

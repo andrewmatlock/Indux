@@ -33,13 +33,13 @@ function initializeToastPlugin() {
         // Create toast element
         const toast = document.createElement('div');
         toast.setAttribute('role', 'alert');
-        toast.setAttribute('class', type ? `toast-${type}` : 'toast');
+        toast.setAttribute('class', type ? `toast ${type}` : 'toast');
 
         // Create content with optional icon
         const contentHtml = `
             ${icon ? '<span class="toast-icon"></span>' : ''}
             <div class="toast-content">${message}</div>
-            ${dismissible || fixed ? '<button class="toast-dismiss-button" aria-label="Dismiss">&times;</button>' : ''}
+            ${dismissible || fixed ? '<button class="toast-dismiss-button" aria-label="Dismiss"></button>' : ''}
         `;
 
         toast.innerHTML = contentHtml;
@@ -120,8 +120,10 @@ function initializeToastPlugin() {
     Alpine.directive('toast', (el, { modifiers, expression }, { evaluate }) => {
         // Parse options from modifiers
         const options = {
-            type: modifiers.includes('success') ? 'success' :
-                modifiers.includes('error') ? 'error' : '',
+            type: modifiers.includes('brand') ? 'brand' :
+                modifiers.includes('positive') ? 'positive' :
+                modifiers.includes('negative') ? 'negative' :
+                modifiers.includes('accent') ? 'accent' : '',
             dismissible: modifiers.includes('dismiss'),
             fixed: modifiers.includes('fixed')
         };
@@ -137,8 +139,11 @@ function initializeToastPlugin() {
         // Handle both static and dynamic expressions
         let message;
         try {
-            // Check if expression contains any dynamic parts (+, `, or ${)
-            if (expression.includes('+') || expression.includes('`') || expression.includes('${')) {
+            // Check if expression starts with $x (content collections)
+            if (expression.startsWith('$x.')) {
+                // Use evaluate for $x expressions to access collections
+                message = evaluate(expression);
+            } else if (expression.includes('+') || expression.includes('`') || expression.includes('${')) {
                 // Try to evaluate as a dynamic expression
                 message = evaluate(expression);
             } else {
@@ -172,13 +177,21 @@ function initializeToastPlugin() {
             showToast(message, { ...options, type: '' });
         };
 
-        // Add methods to the toast function
-        toast.success = (message, options = {}) => {
-            showToast(message, { ...options, type: 'success' });
+        // Add type methods
+        toast.brand = (message, options = {}) => {
+            showToast(message, { ...options, type: 'brand' });
         };
 
-        toast.error = (message, options = {}) => {
-            showToast(message, { ...options, type: 'error' });
+        toast.accent = (message, options = {}) => {
+            showToast(message, { ...options, type: 'accent' });
+        };
+
+        toast.positive = (message, options = {}) => {
+            showToast(message, { ...options, type: 'positive' });
+        };
+
+        toast.negative = (message, options = {}) => {
+            showToast(message, { ...options, type: 'negative' });
         };
 
         // Add dismiss variants
@@ -186,12 +199,20 @@ function initializeToastPlugin() {
             showToast(message, { ...options, type: '', dismissible: true });
         };
 
-        toast.success.dismiss = (message, options = {}) => {
-            showToast(message, { ...options, type: 'success', dismissible: true });
+        toast.brand.dismiss = (message, options = {}) => {
+            showToast(message, { ...options, type: 'brand', dismissible: true });
         };
 
-        toast.error.dismiss = (message, options = {}) => {
-            showToast(message, { ...options, type: 'error', dismissible: true });
+        toast.accent.dismiss = (message, options = {}) => {
+            showToast(message, { ...options, type: 'accent', dismissible: true });
+        };
+
+        toast.positive.dismiss = (message, options = {}) => {
+            showToast(message, { ...options, type: 'positive', dismissible: true });
+        };
+
+        toast.negative.dismiss = (message, options = {}) => {
+            showToast(message, { ...options, type: 'negative', dismissible: true });
         };
 
         // Add fixed variants
@@ -199,12 +220,20 @@ function initializeToastPlugin() {
             showToast(message, { ...options, type: '', fixed: true });
         };
 
-        toast.success.fixed = (message, options = {}) => {
-            showToast(message, { ...options, type: 'success', fixed: true });
+        toast.brand.fixed = (message, options = {}) => {
+            showToast(message, { ...options, type: 'brand', fixed: true });
         };
 
-        toast.error.fixed = (message, options = {}) => {
-            showToast(message, { ...options, type: 'error', fixed: true });
+        toast.accent.fixed = (message, options = {}) => {
+            showToast(message, { ...options, type: 'accent', fixed: true });
+        };
+
+        toast.positive.fixed = (message, options = {}) => {
+            showToast(message, { ...options, type: 'positive', fixed: true });
+        };
+
+        toast.negative.fixed = (message, options = {}) => {
+            showToast(message, { ...options, type: 'negative', fixed: true });
         };
 
         return toast;

@@ -15,14 +15,21 @@ function initializeDropdownPlugin() {
         Alpine.directive(name, handler);
     }
 
-    // Check if a menu element is nested within another menu
+    // Check if a menu element is nested (triggered from within another menu)
     const isNestedMenu = (menu) => {
-        let parent = menu.parentElement;
-        while (parent) {
-            if (parent.tagName === 'MENU' && parent.hasAttribute('popover')) {
-                return true;
+        // Find all buttons/elements that target this menu
+        const menuId = menu.id;
+        const triggers = document.querySelectorAll(`[popovertarget="${menuId}"], [x-dropdown="${menuId}"], [x-dropdown*="${menuId}"]`);
+        
+        // Check if any trigger is inside another popover menu
+        for (const trigger of triggers) {
+            let parent = trigger.parentElement;
+            while (parent) {
+                if (parent.tagName === 'MENU' && parent.hasAttribute('popover')) {
+                    return true;
+                }
+                parent = parent.parentElement;
             }
-            parent = parent.parentElement;
         }
         return false;
     };
@@ -31,56 +38,18 @@ function initializeDropdownPlugin() {
     ensureAlpineContext();
 
     // Register dropdown directive
-    registerDirective('dropdown', (el, { modifiers, expression }, { effect }) => {
+    registerDirective('dropdown', (el, { modifiers, expression }, { effect, evaluateLater }) => {
         let menu;
 
-        if (modifiers.includes('hover')) {
-            let hoverTimeout;
-            let autoCloseTimeout;
-
-            const handleShowPopover = () => {
-                if (menu) {
-                    clearTimeout(hoverTimeout);
-                    clearTimeout(autoCloseTimeout);
-                    menu.showPopover();
-                }
-            };
-
-            const handleHidePopover = () => {
-                hoverTimeout = setTimeout(() => {
-                    if (menu && !menu.matches(':hover')) {
-                        menu.hidePopover();
-                    }
-                }, 150);
-            };
-
-            // Global mouse tracking for auto-close
-            const handleGlobalMouseMove = (e) => {
-                if (!menu?.matches(':popover-open')) return;
-
-                const isOverButton = el.contains(e.target) || el === e.target;
-                const isOverMenu = menu.contains(e.target) || menu === e.target;
-
-                if (!isOverButton && !isOverMenu) {
-                    clearTimeout(autoCloseTimeout);
-                    autoCloseTimeout = setTimeout(() => {
-                        menu?.hidePopover();
-                    }, 1000);
-                } else {
-                    clearTimeout(autoCloseTimeout);
-                }
-            };
-
-            document.addEventListener('mousemove', handleGlobalMouseMove);
-            el.addEventListener('mouseenter', handleShowPopover);
-            el.addEventListener('mouseleave', handleHidePopover);
-        }
+        // Shared hover state for all dropdown types
+        let hoverTimeout;
+        let autoCloseTimeout;
+        let startAutoCloseTimer;
 
         effect(() => {
 
             // Defer processing to ensure Alpine is fully ready
             setTimeout(() => {
-
                 if (!window.Alpine) {
                     console.warn('[Indux] Alpine not available for dropdown processing');
                     return;
@@ -89,21 +58,38 @@ function initializeDropdownPlugin() {
                 // Generate a unique anchor code for positioning
                 const anchorCode = Math.random().toString(36).substr(2, 9);
 
+                // Evaluate the expression to get the actual menu ID
+                let dropdownId;
+                if (expression) {
+                    // Check if expression contains template literals or is a static string
+                    if (expression.includes('${') || expression.includes('`')) {
+                        // Use evaluateLater for dynamic expressions
+                        const evaluator = evaluateLater(expression);
+                        evaluator(value => {
+                            dropdownId = value;
+                        });
+                    } else {
+                        // Static string - use as-is
+                        dropdownId = expression;
+                    }
+                } else {
+                    dropdownId = `dropdown-${anchorCode}`;
+                }
+
                 // Check if expression refers to a template ID
-                if (expression && document.getElementById(expression)?.tagName === 'TEMPLATE') {
+                if (dropdownId && document.getElementById(dropdownId)?.tagName === 'TEMPLATE') {
                     // Clone template content and generate unique ID
-                    const template = document.getElementById(expression);
+                    const template = document.getElementById(dropdownId);
                     menu = template.content.cloneNode(true).firstElementChild;
-                    const dropdownId = `dropdown-${anchorCode}`;
-                    menu.setAttribute('id', dropdownId);
+                    const uniqueDropdownId = `dropdown-${anchorCode}`;
+                    menu.setAttribute('id', uniqueDropdownId);
                     document.body.appendChild(menu);
-                    el.setAttribute('popovertarget', dropdownId);
+                    el.setAttribute('popovertarget', uniqueDropdownId);
 
                     // Initialize Alpine on the cloned menu
                     Alpine.initTree(menu);
                 } else {
                     // Original behavior for static dropdowns
-                    const dropdownId = expression || `dropdown-${anchorCode}`;
                     menu = document.getElementById(dropdownId);
                     if (!menu) {
                         console.warn(`[Indux] Dropdown menu with id "${dropdownId}" not found`);
@@ -120,76 +106,64 @@ function initializeDropdownPlugin() {
                 el.style.setProperty('anchor-name', anchorName);
                 menu.style.setProperty('position-anchor', anchorName);
 
-                // Define positioning maps
-                const cornerPositions = {
-                    'bottom.left': { area: 'bottom left', margin: 'var(--spacing-popover-offset)' },
-                    'bottom.right': { area: 'bottom right', margin: 'var(--spacing-popover-offset)' },
-                    'top.left': { area: 'top left', margin: 'var(--spacing-popover-offset)' },
-                    'top.right': { area: 'top right', margin: 'var(--spacing-popover-offset)' }
-                };
+                // Set up hover functionality after menu is ready
+                if (modifiers.includes('hover')) {
+                    const handleShowPopover = () => {
+                        if (menu && !menu.matches(':popover-open')) {
+                            clearTimeout(hoverTimeout);
+                            clearTimeout(autoCloseTimeout);
+                            
+                            menu.showPopover();
+                        }
+                    };
 
-                const alignmentPositions = {
-                    'bottom.start': { area: 'block-end span-inline-end', margin: 'var(--spacing-popover-offset) 0' },
-                    'bottom.end': { area: 'block-end span-inline-start', margin: 'var(--spacing-popover-offset) 0' },
-                    'top.start': { area: 'block-start span-inline-end', margin: 'var(--spacing-popover-offset) 0' },
-                    'top.end': { area: 'block-start span-inline-start', margin: 'var(--spacing-popover-offset) 0' },
-                    'left.start': { area: 'inline-start span-block-end', margin: '0 var(--spacing-popover-offset)' },
-                    'left.end': { area: 'inline-start span-block-start', margin: '0 var(--spacing-popover-offset)' },
-                    'right.start': { area: 'inline-end span-block-end', margin: '0 var(--spacing-popover-offset)' },
-                    'right.end': { area: 'inline-end span-block-start', margin: '0 var(--spacing-popover-offset)' }
-                };
+                    // Enhanced auto-close when mouse leaves both trigger and menu
+                    startAutoCloseTimer = () => {
+                        clearTimeout(autoCloseTimeout);
+                        autoCloseTimeout = setTimeout(() => {
+                            if (menu?.matches(':popover-open')) {
+                                const isOverButton = el.matches(':hover');
+                                const isOverMenu = menu.matches(':hover');
+                                
+                                if (!isOverButton && !isOverMenu) {
+                                    menu.hidePopover();
+                                }
+                            }
+                        }, 300); // Small delay to prevent accidental closes
+                    };
 
-                const singleDirections = {
-                    'bottom': { area: 'block-end', margin: 'var(--spacing-popover-offset) 0' },
-                    'top': { area: 'block-start', margin: 'var(--spacing-popover-offset) 0' },
-                    'left': { area: 'inline-start', margin: '0 var(--spacing-popover-offset)' },
-                    'right': { area: 'inline-end', margin: '0 var(--spacing-popover-offset)' }
-                };
-
-                // Find primary direction
-                const direction = ['bottom', 'top', 'left', 'right'].find(dir => modifiers.includes(dir));
-                if (!direction) {
-                    // Default positioning - right start for nested menus, bottom middle for top-level
-                    if (isNestedMenu(menu)) {
-                        const position = alignmentPositions['right.start'];
-                        menu.style.setProperty('position-area', position.area);
-                        menu.style.setProperty('margin', position.margin);
-                    } else {
-                        menu.style.setProperty('position-area', 'block-end span-inline-end');
-                        menu.style.setProperty('margin', 'var(--spacing-popover-offset) 0');
-                    }
-                    return;
+                    el.addEventListener('mouseenter', handleShowPopover);
+                    el.addEventListener('mouseleave', startAutoCloseTimer);
                 }
 
-                // Check for corner positioning
-                const corner = ['left', 'right'].find(side =>
-                    side !== direction && modifiers.includes(side)
-                );
-                if (corner) {
-                    const position = cornerPositions[`${direction}.${corner}`];
-                    menu.style.setProperty('position-area', position.area);
-                    menu.style.setProperty('margin', position.margin);
-                    return;
-                }
 
-                // Check for alignment
-                const alignment = ['start', 'end'].find(align => modifiers.includes(align));
-                if (alignment) {
-                    const position = alignmentPositions[`${direction}.${alignment}`];
-                    menu.style.setProperty('position-area', position.area);
-                    menu.style.setProperty('margin', position.margin);
-                    return;
-                }
-
-                // Single direction
-                const position = singleDirections[direction];
-                menu.style.setProperty('position-area', position.area);
-                menu.style.setProperty('margin', position.margin);
 
                 // Add keyboard navigation handling
                 menu.addEventListener('keydown', (e) => {
-                    if (e.key === 'Tab') {
-                        // Get all focusable elements
+                    // Get all navigable elements (traditional focusable + li elements)
+                    const allElements = menu.querySelectorAll(
+                        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"]), li'
+                    );
+                    const currentIndex = Array.from(allElements).indexOf(e.target);
+
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        const nextIndex = (currentIndex + 1) % allElements.length;
+                        const nextElement = allElements[nextIndex];
+                        if (nextElement.tagName === 'LI') {
+                            nextElement.setAttribute('tabindex', '0');
+                        }
+                        nextElement.focus();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        const prevIndex = (currentIndex - 1 + allElements.length) % allElements.length;
+                        const prevElement = allElements[prevIndex];
+                        if (prevElement.tagName === 'LI') {
+                            prevElement.setAttribute('tabindex', '0');
+                        }
+                        prevElement.focus();
+                    } else if (e.key === 'Tab') {
+                        // Get only traditional focusable elements for tab navigation
                         const focusable = menu.querySelectorAll(
                             'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
                         );
@@ -211,44 +185,69 @@ function initializeDropdownPlugin() {
                         if (e.shiftKey && e.target === focusable[0]) {
                             menu.hidePopover();
                         }
-                    }
-
-                    // Close on Escape
-                    if (e.key === 'Escape') {
+                    } else if (e.key === 'Escape') {
                         menu.hidePopover();
                         el.focus();
+                    } else if (e.key === 'Enter' || e.key === ' ') {
+                        // Allow Enter/Space to activate li elements or follow links
+                        if (e.target.tagName === 'LI') {
+                            const link = e.target.querySelector('a');
+                            if (link) {
+                                e.preventDefault();
+                                link.click();
+                            }
+                        }
                     }
                 });
 
-                // Add hover functionality
-                if (modifiers.includes('hover')) {
-                    let hoverTimeout;
+                // Make li elements focusable when menu opens
+                menu.addEventListener('toggle', (e) => {
+                    if (e.newState === 'open') {
+                        // Set up li elements for keyboard navigation
+                        const liElements = menu.querySelectorAll('li');
+                        liElements.forEach((li, index) => {
+                            if (!li.hasAttribute('tabindex')) {
+                                li.setAttribute('tabindex', '-1');
+                            }
+                            // Focus first li element if no other focusable elements
+                            if (index === 0 && !menu.querySelector('button, [href], input, select, textarea, [tabindex="0"]')) {
+                                li.setAttribute('tabindex', '0');
+                                li.focus();
+                            }
+                        });
+                    }
+                });
 
+                // Add hover functionality for menu
+                if (modifiers.includes('hover')) {
+                    // Simple approach: any mouse activity in the menu area cancels close timer
                     menu.addEventListener('mouseenter', () => {
+                        clearTimeout(autoCloseTimeout);
                         clearTimeout(hoverTimeout);
                     });
 
                     menu.addEventListener('mouseleave', () => {
-                        hoverTimeout = setTimeout(() => {
-                            menu.hidePopover();
-                        }, 150);
+                        // Always start timer when leaving menu bounds
+                        if (startAutoCloseTimer) {
+                            startAutoCloseTimer();
+                        }
                     });
-                }
 
-                // Update hover menu handling
-                if (modifiers.includes('hover')) {
-                    menu.addEventListener('mouseenter', () => {
+                    // Add event listeners to all interactive elements inside menu to cancel timers
+                    const cancelCloseTimer = () => {
                         clearTimeout(autoCloseTimeout);
-                    });
+                    };
 
-                    menu.addEventListener('mouseleave', () => {
-                        // Start tracking for auto-close immediately when leaving menu
-                        const event = new MouseEvent('mousemove', {
-                            clientX: window.event?.clientX ?? 0,
-                            clientY: window.event?.clientY ?? 0
+                    // Set up listeners on existing menu items
+                    const setupMenuItemListeners = () => {
+                        const menuItems = menu.querySelectorAll('li, button, a, [role="menuitem"]');
+                        menuItems.forEach(item => {
+                            item.addEventListener('mouseenter', cancelCloseTimer);
                         });
-                        document.dispatchEvent(event);
-                    });
+                    };
+
+                    // Setup listeners after a brief delay to ensure menu is rendered
+                    setTimeout(setupMenuItemListeners, 10);
                 }
             });
         });
@@ -276,4 +275,24 @@ if (document.readyState === 'loading') {
 }
 
 // Also listen for alpine:init as a backup
-document.addEventListener('alpine:init', initializeDropdownPlugin); 
+document.addEventListener('alpine:init', initializeDropdownPlugin);
+
+// Handle modal interactions - close dropdowns when modals open
+document.addEventListener('click', (event) => {
+    const button = event.target.closest('button[popovertarget]');
+    if (!button) return;
+    
+    const targetId = button.getAttribute('popovertarget');
+    const target = document.getElementById(targetId);
+    
+    if (target && target.tagName === 'DIALOG' && target.hasAttribute('popover')) {
+        // Close dropdowns BEFORE the modal opens to avoid conflicts
+        const openDropdowns = document.querySelectorAll('menu[popover]:popover-open');
+        
+        openDropdowns.forEach(dropdown => {
+            if (!target.contains(dropdown)) {
+                dropdown.hidePopover();
+            }
+        });
+    }
+}); 

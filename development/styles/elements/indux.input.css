@@ -6,7 +6,7 @@
 
 @layer components {
 
-    :where(input, textarea, label:not([role=button]):has(input)) {
+    :where(input, textarea, label:has(input:not([role=button], [type=checkbox], [type=radio], [type=file]))) {
         width: 100%;
         max-width: 100%;
         color: var(--color-field-inverse);

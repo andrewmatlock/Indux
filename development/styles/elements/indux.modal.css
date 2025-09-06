@@ -24,12 +24,12 @@
 
         /* Set layout for common children */
         & :where(header, main, footer) {
-            display: flex;
             padding: calc(var(--spacing) * 4);
         }
 
         /* Push header content apart */
         & :where(header) {
+            display: flex;
             justify-content: space-between;
             align-items: center;
             gap: calc(var(--spacing) * 4)
@@ -42,6 +42,7 @@
 
         /* Push footer content to end */
         & :where(footer) {
+            display: flex;
             justify-content: end;
             align-items: center;
             gap: calc(var(--spacing) * 2);
@@ -60,9 +61,25 @@
         background-color: rgba(0, 0, 0, 0.35)
     }
 
-    /* Close dropdown popovers when modal popover is open, except those inside */
+    /* Hide dropdowns when modals are open */
     html:has(dialog:popover-open) {
+        /* Hide dropdowns outside of any modal */
         & menu[popover]:not(dialog *) {
+            opacity: 0;
+            scale: .9;
+            pointer-events: none;
+            transition: opacity .15s ease-out, scale .15s ease-out;
+
+            &:popover-open {
+                display: flex !important;
+            }
+        }
+    }
+
+    /* When multiple modals are open, hide dropdowns in non-topmost modals */
+    html:has(dialog:popover-open ~ dialog:popover-open) {
+        /* Hide dropdowns in all but the last modal */
+        & dialog:popover-open:not(:last-of-type) menu[popover] {
             opacity: 0;
             scale: .9;
             pointer-events: none;

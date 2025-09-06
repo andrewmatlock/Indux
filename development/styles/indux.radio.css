@@ -15,8 +15,8 @@
         &::after {
             content: "";
             position: absolute;
-            top: 50%;
-            left: 50%;
+            top: 40%;
+            left: 40%;
             width: 60%;
             height: 60%;
             background-color: var(--color-field-inverse);
@@ -40,11 +40,11 @@
 
     /* .dark input[type=radio] {
         &:checked {
-            border: 1.5px solid var(--color-primary);
+            border: 1.5px solid var(--color-brand-surface);
         }
 
         &::after {
-            background-color: var(--color-primary);
+            background-color: var(--color-brand-surface);
         }
     } */
 }

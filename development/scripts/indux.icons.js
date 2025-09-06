@@ -10,12 +10,15 @@ function initializeIconPlugin() {
         const iconValue = expression
         if (!iconValue) return
 
-        // Check if it's a raw icon name
-        const isRawIconName = !iconValue.includes("'") &&
+        // Check if it's a raw icon name (should contain a colon for icon format like 'lucide:house')
+        const isRawIconName = iconValue.includes(':') &&
+            !iconValue.includes("'") &&
             !iconValue.includes('"') &&
             !iconValue.includes('$') &&
             !iconValue.includes('?') &&
-            !iconValue.includes('.')
+            !iconValue.includes('.') &&
+            !iconValue.includes('(') &&
+            !iconValue.includes(')')
 
         // For raw icon names, wrap in quotes
         const safeExpression = isRawIconName ? `'${iconValue}'` : iconValue

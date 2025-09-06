@@ -42,16 +42,16 @@
             background-color: var(--color-field-surface-hover)
         }
 
-        &.primary:hover {
-            color: var(--color-primary-inverse)
+        &.brand:hover {
+            color: var(--color-brand-inverse)
         }
 
         &.accent:hover {
             color: var(--color-accent-inverse)
         }
 
-        &.danger:hover {
-            color: var(--color-danger-inverse)
+        &.negative:hover {
+            color: var(--color-negative-inverse)
         }
     }
 
@@ -149,7 +149,7 @@
             background-color: color-mix(in oklch, var(--color-field-surface) 25%, transparent);
             border: 1px solid color-mix(in oklch, var(--color-field-surface) 50%, transparent);
 
-            &:not(.preview) * {
+            &:not(.frame) * {
                 color: inherit
             }
         }
@@ -241,30 +241,39 @@
         color: var(--color-content-neutral)
     }
 
-    :where(.primary) {
-        --color-field-surface: var(--color-primary);
-        --color-field-surface-hover: var(--color-primary-hover);
-        --color-field-inverse: var(--color-primary-inverse);
-        --color-content-stark: var(--color-primary-text);
-        --color-content-neutral: color-mix(in oklch, var(--color-primary-text) 85%, transparent);
-        --color-content-subtle: color-mix(in oklch, var(--color-primary-text) 70%, transparent);
+    :where(.brand) {
+        --color-field-surface: var(--color-brand-surface);
+        --color-field-surface-hover: var(--color-brand-surface-hover);
+        --color-field-inverse: var(--color-brand-inverse);
+        --color-content-stark: var(--color-brand-content);
+        --color-content-neutral: color-mix(in oklch, var(--color-brand-content) 85%, transparent);
+        --color-content-subtle: color-mix(in oklch, var(--color-brand-content) 70%, transparent);
     }
 
     :where(.accent) {
-        --color-field-surface: var(--color-accent);
-        --color-field-surface-hover: var(--color-accent-hover);
+        --color-field-surface: var(--color-accent-surface);
+        --color-field-surface-hover: var(--color-accent-surface-hover);
         --color-field-inverse: var(--color-accent-inverse);
-        --color-content-stark: var(--color-accent-text);
-        --color-content-neutral: color-mix(in oklch, var(--color-accent-text) 85%, transparent);
-        --color-content-subtle: color-mix(in oklch, var(--color-accent-text) 70%, transparent);
+        --color-content-stark: var(--color-accent-content);
+        --color-content-neutral: color-mix(in oklch, var(--color-accent-content) 85%, transparent);
+        --color-content-subtle: color-mix(in oklch, var(--color-accent-content) 70%, transparent);
     }
 
-    :where(.danger) {
-        --color-field-surface: var(--color-danger);
-        --color-field-surface-hover: var(--color-danger-hover);
-        --color-field-inverse: var(--color-danger-inverse);
-        --color-content-stark: var(--color-danger-text);
-        --color-content-neutral: color-mix(in oklch, var(--color-danger-text) 85%, transparent);
-        --color-content-subtle: color-mix(in oklch, var(--color-danger-text) 70%, transparent);
+    :where(.negative) {
+        --color-field-surface: var(--color-negative-surface);
+        --color-field-surface-hover: var(--color-negative-surface-hover);
+        --color-field-inverse: var(--color-negative-inverse);
+        --color-content-stark: var(--color-negative-content);
+        --color-content-neutral: color-mix(in oklch, var(--color-negative-content) 85%, transparent);
+        --color-content-subtle: color-mix(in oklch, var(--color-negative-content) 70%, transparent);
+    }
+
+    :where(.positive) {
+        --color-field-surface: var(--color-positive-surface);
+        --color-field-surface-hover: var(--color-positive-surface-hover);
+        --color-field-inverse: var(--color-positive-inverse);
+        --color-content-stark: var(--color-positive-content);
+        --color-content-neutral: color-mix(in oklch, var(--color-positive-content) 85%, transparent);
+        --color-content-subtle: color-mix(in oklch, var(--color-positive-content) 70%, transparent);
     }
 }

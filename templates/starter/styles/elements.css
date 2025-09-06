@@ -113,13 +113,13 @@ aside {
                 }
 
                 &.active {
-                    border-left-color: var(--color-accent)
+                    border-left-color: var(--color-accent-surface)
                 }
             }
         }
 
         &.active {
-            color: var(--color-accent) !important;
+            color: var(--color-accent-surface) !important;
             pointer-events: none
         }
     }
@@ -231,7 +231,7 @@ body :where(header a, footer a) {
     color: var(--color-content-neutral);
 
     &:hover {
-        color: var(--color-primary-text)
+        color: var(--color-brand-content)
     }
 }
 
@@ -287,17 +287,17 @@ input[type=checkbox]:not([role=switch]) {
 
     /* On */
     &:checked {
-        background-color: var(--color-primary);
-        border: 1.5px solid var(--color-primary);
+        background-color: var(--color-brand-surface);
+        border: 1.5px solid var(--color-brand-surface);
 
         &:hover {
-            background-color: color-mix(in oklch, var(--color-primary) 85%, var(--color-primary-inverse));
-            border: 1.5px solid color-mix(in oklch, var(--color-primary) 85%, var(--color-primary-inverse))
+            background-color: color-mix(in oklch, var(--color-brand-surface) 85%, var(--color-brand-inverse));
+            border: 1.5px solid color-mix(in oklch, var(--color-brand-surface) 85%, var(--color-brand-inverse))
         }
 
         &:active {
-            background-color: color-mix(in oklch, var(--color-primary) 74%, var(--color-primary-inverse));
-            border: 1.5px solid color-mix(in oklch, var(--color-primary) 74%, var(--color-primary-inverse))
+            background-color: color-mix(in oklch, var(--color-brand-surface) 74%, var(--color-brand-inverse));
+            border: 1.5px solid color-mix(in oklch, var(--color-brand-surface) 74%, var(--color-brand-inverse))
         }
     }
 
@@ -309,7 +309,7 @@ input[type=checkbox]:not([role=switch]) {
         left: 50%;
         width: 75%;
         height: 75%;
-        background-color: var(--color-primary-inverse);
+        background-color: var(--color-brand-inverse);
         -webkit-mask-image: var(--icon-checkbox);
         mask-image: var(--icon-checkbox);
         -webkit-mask-repeat: no-repeat;
@@ -426,16 +426,16 @@ code {
 /* Color modifiers */
 
 :where(a, abbr, address, code, del, h1, h2, h3, h4, h5, h6, ins, label, legend, p, pre, span, small, cite, q) {
-    &.primary {
-        color: var(--color-primary-text)
+    &.brand {
+        color: var(--color-brand-content)
     }
 
     &.accent {
-        color: var(--color-accent-text)
+        color: var(--color-accent-content)
     }
 
-    &.danger {
-        color: var(--color-danger-text)
+    &.negative {
+        color: var(--color-negative-content)
     }
 
     &.contrast {
@@ -444,28 +444,28 @@ code {
 }
 
 :where(a) {
-    &.primary:where(:hover, :focus, :focus-visible) {
-        color: color-mix(in oklch, var(--color-primary-text) 85%, var(--color-primary-inverse))
+    &.brand:where(:hover, :focus, :focus-visible) {
+        color: color-mix(in oklch, var(--color-brand-content) 85%, var(--color-brand-inverse))
     }
 
-    &.primary:active {
-        color: color-mix(in oklch, var(--color-primary-text) 74%, var(--color-primary-inverse))
+    &.brand:active {
+        color: color-mix(in oklch, var(--color-brand-content) 74%, var(--color-brand-inverse))
     }
 
     &.accent:where(:hover, :focus, :focus-visible) {
-        color: color-mix(in oklch, var(--color-accent-text) 85%, var(--color-accent-inverse))
+        color: color-mix(in oklch, var(--color-accent-content) 85%, var(--color-accent-inverse))
     }
 
     &.accent:active {
-        color: color-mix(in oklch, var(--color-accent-text) 74%, var(--color-accent-inverse))
+        color: color-mix(in oklch, var(--color-accent-content) 74%, var(--color-accent-inverse))
     }
 
-    &.danger:where(:hover, :focus, :focus-visible) {
-        color: color-mix(in oklch, var(--color-danger-text) 85%, var(--color-danger-inverse))
+    &.negative:where(:hover, :focus, :focus-visible) {
+        color: color-mix(in oklch, var(--color-negative-content) 85%, var(--color-negative-inverse))
     }
 
-    &.danger:active {
-        color: color-mix(in oklch, var(--color-danger-text) 74%, var(--color-danger-inverse))
+    &.negative:active {
+        color: color-mix(in oklch, var(--color-negative-content) 74%, var(--color-negative-inverse))
     }
 
     &.contrast:where(:hover, :focus, :focus-visible, :active) {
@@ -475,28 +475,28 @@ code {
 
 :where(.prose aside, button, [role=button], mark, input, select, textarea) {
 
-    &.primary,
-    &.primary:focus-visible {
-        color: var(--color-primary-inverse);
-        background-color: var(--color-primary);
-        border-color: color-mix(in oklch, var(--color-primary) 74%, var(--color-primary-inverse));
-        outline-color: color-mix(in oklch, var(--color-primary) 74%, var(--color-primary-inverse))
+    &.brand,
+    &.brand:focus-visible {
+        color: var(--color-brand-inverse);
+        background-color: var(--color-brand-surface);
+        border-color: color-mix(in oklch, var(--color-brand-surface) 74%, var(--color-brand-inverse));
+        outline-color: color-mix(in oklch, var(--color-brand-surface) 74%, var(--color-brand-inverse))
     }
 
     &.accent,
     &.accent:focus-visible {
         color: var(--color-accent-inverse);
-        background-color: var(--color-accent);
-        border-color: color-mix(in oklch, var(--color-accent) 74%, var(--color-accent-inverse));
-        outline-color: color-mix(in oklch, var(--color-accent) 74%, var(--color-accent-inverse))
+        background-color: var(--color-accent-surface);
+        border-color: color-mix(in oklch, var(--color-accent-surface) 74%, var(--color-accent-inverse));
+        outline-color: color-mix(in oklch, var(--color-accent-surface) 74%, var(--color-accent-inverse))
     }
 
-    &.danger,
-    &.danger:focus-visible {
-        color: var(--color-danger-inverse);
-        background-color: var(--color-danger);
-        border-color: color-mix(in oklch, var(--color-danger) 74%, var(--color-danger-inverse));
-        outline-color: color-mix(in oklch, var(--color-danger) 74%, var(--color-danger-inverse))
+    &.negative,
+    &.negative:focus-visible {
+        color: var(--color-negative-inverse);
+        background-color: var(--color-negative-surface);
+        border-color: color-mix(in oklch, var(--color-negative-surface) 74%, var(--color-negative-inverse));
+        outline-color: color-mix(in oklch, var(--color-negative-surface) 74%, var(--color-negative-inverse))
     }
 
     &.contrast,
@@ -509,34 +509,34 @@ code {
 }
 
 :where(button, [role=button], input, select, textarea) {
-    &.primary:hover {
-        color: color-mix(in oklch, var(--color-primary-inverse) 96%, var(--color-primary));
-        background-color: color-mix(in oklch, var(--color-primary) 85%, var(--color-primary-inverse))
+    &.brand:hover {
+        color: color-mix(in oklch, var(--color-brand-inverse) 96%, var(--color-brand-surface));
+        background-color: color-mix(in oklch, var(--color-brand-surface) 85%, var(--color-brand-inverse))
     }
 
-    &.primary:active {
-        color: var(--color-primary-inverse);
-        background-color: color-mix(in oklch, var(--color-primary) 74%, var(--color-primary-inverse))
+    &.brand:active {
+        color: var(--color-brand-inverse);
+        background-color: color-mix(in oklch, var(--color-brand-surface) 74%, var(--color-brand-inverse))
     }
 
     &.accent:hover {
-        color: color-mix(in oklch, var(--color-accent-inverse) 96%, var(--color-accent));
-        background-color: color-mix(in oklch, var(--color-accent) 85%, var(--color-accent-inverse))
+        color: color-mix(in oklch, var(--color-accent-inverse) 96%, var(--color-accent-surface));
+        background-color: color-mix(in oklch, var(--color-accent-surface) 85%, var(--color-accent-inverse))
     }
 
     &.accent:active {
-        color: var(--color-primary-inverse);
-        background-color: color-mix(in oklch, var(--color-accent) 74%, var(--color-accent-inverse))
+        color: var(--color-brand-inverse);
+        background-color: color-mix(in oklch, var(--color-accent-surface) 74%, var(--color-accent-inverse))
     }
 
-    &.danger:hover {
-        color: color-mix(in oklch, var(--color-danger-inverse) 96%, var(--color-danger));
-        background-color: color-mix(in oklch, var(--color-danger) 85%, var(--color-danger-inverse))
+    &.negative:hover {
+        color: color-mix(in oklch, var(--color-negative-inverse) 96%, var(--color-negative-surface));
+        background-color: color-mix(in oklch, var(--color-negative-surface) 85%, var(--color-negative-inverse))
     }
 
-    &.danger:active {
-        color: var(--color-danger-inverse);
-        background-color: color-mix(in oklch, var(--color-danger) 74%, var(--color-danger-inverse))
+    &.negative:active {
+        color: var(--color-negative-inverse);
+        background-color: color-mix(in oklch, var(--color-negative-surface) 74%, var(--color-negative-inverse))
     }
 
     &.contrast:hover {
@@ -551,12 +551,12 @@ code {
 }
 
 :where(input, textarea) {
-    &.primary::placeholder {
-        color: color-mix(in srgb, var(--color-primary-inverse) 70%, transparent)
+    &.brand::placeholder {
+        color: color-mix(in srgb, var(--color-brand-inverse) 70%, transparent)
     }
 
-    &.primary:where(:focus, :focus-visible) {
-        background-color: color-mix(in oklch, var(--color-primary) 95%, var(--color-primary-inverse))
+    &.brand:where(:focus, :focus-visible) {
+        background-color: color-mix(in oklch, var(--color-brand-surface) 95%, var(--color-brand-inverse))
     }
 
     &.accent::placeholder {
@@ -564,15 +564,15 @@ code {
     }
 
     &.accent:where(:focus, :focus-visible) {
-        background-color: color-mix(in oklch, var(--color-accent) 74%, var(--color-accent-inverse))
+        background-color: color-mix(in oklch, var(--color-accent-surface) 74%, var(--color-accent-inverse))
     }
 
-    &.danger::placeholder {
-        color: color-mix(in srgb, var(--color-danger-inverse) 70%, transparent)
+    &.negative::placeholder {
+        color: color-mix(in srgb, var(--color-negative-inverse) 70%, transparent)
     }
 
-    &.danger:where(:focus, :focus-visible) {
-        background-color: color-mix(in oklch, var(--color-danger) 74%, var(--color-danger-inverse))
+    &.negative:where(:focus, :focus-visible) {
+        background-color: color-mix(in oklch, var(--color-negative-surface) 74%, var(--color-negative-inverse))
     }
 
     &.contrast::placeholder {
@@ -1511,11 +1511,11 @@ menu {
 
 .dark input[type=radio] {
     &:checked {
-        border: 1.5px solid var(--color-primary);
+        border: 1.5px solid var(--color-brand-surface);
     }
 
     &::after {
-        background-color: var(--color-primary);
+        background-color: var(--color-brand-surface);
     }
 }
 
@@ -1588,7 +1588,7 @@ menu {
 
     /* On */
     &:checked {
-        background-color: var(--color-primary);
+        background-color: var(--color-brand-surface);
 
         /* Marker */
         &::before {
@@ -1597,11 +1597,11 @@ menu {
         }
 
         &:hover {
-            background-color: color-mix(in oklch, var(--color-primary) 85%, var(--color-primary-inverse))
+            background-color: color-mix(in oklch, var(--color-brand-surface) 85%, var(--color-brand-inverse))
         }
 
         &:active {
-            background-color: color-mix(in oklch, var(--color-primary) 74%, var(--color-primary-inverse))
+            background-color: color-mix(in oklch, var(--color-brand-surface) 74%, var(--color-brand-inverse))
         }
     }
 }
@@ -1742,12 +1742,12 @@ menu {
 
 :where(.toast-success) {
     color: var(--color-accent-inverse);
-    background-color: var(--color-accent)
+    background-color: var(--color-accent-surface)
 }
 
 :where(.toast-error) {
-    color: var(--color-danger-inverse);
-    background-color: var(--color-danger)
+    color: var(--color-negative-inverse);
+    background-color: var(--color-negative-surface)
 }
 
 :where(.toast-icon) {

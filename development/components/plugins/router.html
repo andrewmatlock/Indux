@@ -1,0 +1,55 @@
+<template data-head>
+    <script>
+        console.log('🔄 Home page script loaded');
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🏠 Home page initialized');
+        });
+    </script>
+</template>
+
+<a href="/">Home</a>
+<a href="/about">About</a>
+<a href="/about/random">Random</a>
+<a href="/not-found">Not Found</a>
+
+<h1 x-route="!*">404 Page Not Found</h1>
+<h1 x-route="*">Home</h1>
+<h2 x-route="about">About</h2>
+<h2 x-route="about/*">About Wildcard</h2>
+
+<h1>I should be above the header</h1>
+
+<x-header colors="bg-surface-1"></x-header>
+
+<h1>I should be below the header</h1>
+
+<template data-head>
+    <script>
+        console.log('I have no route');
+    </script>
+</template>
+
+<div class="bg-surface-1 p-5 my-5" x-route="/">
+    <h1>I'm a static box</h1>
+    <h2 x-route="/">Home only</h2>
+    <x-logo x-route="/"></x-logo>
+    <h2 x-route="about">About only</h2>
+
+    <template data-head>
+        <script>
+            console.log('I am working');
+        </script>
+    </template>
+</div>
+
+<x-home x-route="/"></x-home>
+<x-about x-route="about"></x-about>
+<x-ui x-route="ui"></x-ui>
+
+<h1>I should be at the end</h1>
+
+<template data-head>
+    <script>
+        console.log('About page script loaded');
+    </script>
+</template>

@@ -129,16 +129,30 @@ async function handleRouteChange() {
     const newRoute = window.location.pathname;
     if (newRoute === currentRoute) return;
 
+    const oldRoute = currentRoute;
     currentRoute = newRoute;
 
+    // Use requestAnimationFrame to batch DOM updates without delay
+    requestAnimationFrame(() => {
     // Emit route change event
     window.dispatchEvent(new CustomEvent('indux:route-change', {
         detail: {
-            from: currentRoute,
+                from: oldRoute,
             to: newRoute,
             normalizedPath: newRoute === '/' ? '/' : newRoute.replace(/^\/|\/$/g, '')
         }
     }));
+
+        // Handle hash in URL after route change
+        const hash = window.location.hash;
+        if (hash) {
+            const anchorId = hash.substring(1);
+            // Use a longer delay for route + anchor combinations to ensure content is loaded
+            setTimeout(() => {
+                scrollToAnchor(anchorId);
+            }, 50);
+        }
+    });
 }
 
 // Intercept link clicks to prevent page reloads
@@ -152,29 +166,70 @@ function interceptLinkClicks() {
         }
 
         const href = link.getAttribute('href');
+        const target = link.getAttribute('target');
         
         if (!href || href.startsWith('mailto:') || href.startsWith('tel:')) {
             return;
         }
         
-        // Skip anchor links - let them work naturally
-        if (href.startsWith('#') || href.includes('#')) {
-            // Don't prevent default or stop propagation - let browser handle it completely
+        // Don't intercept external links or links with target="_blank"
+        if (target === '_blank') {
             return;
+        }
+
+        // Check if it's an external link
+        try {
+            const url = new URL(href, window.location.origin);
+            if (url.origin !== window.location.origin) {
+                return; // External link - let browser handle it
+            }
+        } catch (e) {
+            // Invalid URL, but might be relative - continue processing
+        }
+        
+        // Handle anchor links with smooth scrolling
+        if (href.startsWith('#') || href.includes('#')) {
+            // Check if this is a route + anchor combination
+            if (href.includes('/') && href.includes('#')) {
+                // This is a route with an anchor - handle navigation first, then scroll
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+                // Extract route and anchor
+                const [route, hash] = href.split('#');
+                const anchorId = hash;
+
+                // Set flag to prevent recursive calls
+                isInternalNavigation = true;
+
+                // Update URL without page reload
+                history.pushState(null, '', href);
+
+                // Handle route change
+                handleRouteChange();
+
+                // Reset flag
+                isInternalNavigation = false;
+
+                // Scroll to anchor after route change (handled in handleRouteChange)
+                return;
+            } else if (href.startsWith('#')) {
+                // This is a pure anchor link - handle smooth scrolling
+                event.preventDefault();
+                
+                const hash = href.substring(1);
+                if (hash) {
+                    scrollToAnchor(hash);
+                }
+                return;
+            }
         }
 
         // Only prevent default for non-anchor links
         event.preventDefault();
         event.stopPropagation();
         event.stopImmediatePropagation();
-
-        // Check if it's a relative link
-        try {
-            const url = new URL(href, window.location.origin);
-            if (url.origin !== window.location.origin) return; // External link
-        } catch (e) {
-            // Invalid URL, treat as relative
-        }
 
         // Set flag to prevent recursive calls
         isInternalNavigation = true;
@@ -191,6 +246,52 @@ function interceptLinkClicks() {
     }, false); // Don't use capture phase
 }
 
+// Smooth scroll to anchor within scrollable containers
+function scrollToAnchor(anchorId) {
+    const targetElement = document.getElementById(anchorId);
+    if (!targetElement) return;
+
+    // Find the scrollable container that contains the target element
+    const scrollableContainer = findScrollableContainer(targetElement);
+    
+    if (scrollableContainer) {
+        // Calculate the position to scroll to
+        const containerRect = scrollableContainer.getBoundingClientRect();
+        const targetRect = targetElement.getBoundingClientRect();
+        
+        // Calculate the scroll position needed to bring the target into view
+        const scrollTop = scrollableContainer.scrollTop + (targetRect.top - containerRect.top) - 100; // 100px offset
+        
+        // Smooth scroll to the target
+        scrollableContainer.scrollTo({
+            top: scrollTop,
+            behavior: 'smooth'
+        });
+    } else {
+        // Fallback to default browser behavior if no scrollable container found
+        targetElement.scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+// Find the nearest scrollable container that contains the given element
+function findScrollableContainer(element) {
+    let current = element;
+    
+    while (current && current !== document.body) {
+        const style = window.getComputedStyle(current);
+        const overflowY = style.overflowY;
+        
+        // Check if this element is scrollable
+        if (overflowY === 'auto' || overflowY === 'scroll') {
+            return current;
+        }
+        
+        current = current.parentElement;
+    }
+    
+    return null;
+}
+
 // Initialize navigation
 function initializeNavigation() {
     // Set initial route
@@ -198,8 +299,6 @@ function initializeNavigation() {
 
     // Intercept link clicks
     interceptLinkClicks();
-
-
 
     // Listen for popstate events (browser back/forward)
     window.addEventListener('popstate', () => {
@@ -210,6 +309,15 @@ function initializeNavigation() {
 
     // Handle initial route
     handleRouteChange();
+
+    // Handle initial hash if present
+    setTimeout(() => {
+        const hash = window.location.hash;
+        if (hash) {
+            const anchorId = hash.substring(1);
+            scrollToAnchor(anchorId);
+        }
+    }, 200); // Wait a bit longer for initial content to load
 }
 
 // Run immediately if DOM is ready, otherwise wait
@@ -227,264 +335,215 @@ window.InduxRoutingNavigation = {
 
 // Anchors functionality
 function initializeAnchors() {
-    // Register anchors directive
-    Alpine.directive('anchors', (el, { expression, modifiers }, { effect, evaluateLater }) => {
-        const getTarget = evaluateLater(expression || 'null');
-        const hasHighlight = modifiers.includes('highlight');
 
-        effect(() => {
-            getTarget(async (target) => {
-                const extractHeadings = () => {
-                    let headings = [];
+    
+    // Register anchors directive  
+    Alpine.directive('anchors', (el, { expression, modifiers }, { effect, evaluateLater, Alpine }) => {
 
-                    if (target) {
-                        // If target is a string, treat as selector
-                        if (typeof target === 'string') {
-                            const targetEl = document.querySelector(target);
-                            if (targetEl) {
-                                const headingElements = targetEl.querySelectorAll('h1, h2, h3');
-                                headings = Array.from(headingElements).map((heading, index) => {
-                                    // Generate ID if missing
-                                    let id = heading.id;
-                                    if (!id || id.trim() === '') {
-                                        // Create ID from text content
-                                        id = heading.textContent
-                                            .toLowerCase()
-                                            .replace(/[^a-z0-9\s-]/g, '')
-                                            .replace(/\s+/g, '-')
-                                            .trim();
-
-                                        // Ensure uniqueness by adding index if needed
-                                        if (!id) {
-                                            id = `heading-${index}`;
-                                        }
-
-                                        // Set the ID on the heading element
-                                        heading.id = id;
-                                        
-                                        // Add x-intersect directive to track visibility
-                                        const anchorLink = anchorsEl.querySelector(`a[href="#${id}"]`);
-                                        if (anchorLink) {
-                                            // Add x-intersect to the heading
-                                            heading.setAttribute('x-intersect', `$el.closest('[x-anchors]').__x.$data.anchorHeadings.find(h => h.id === '${id}').isActive = true`);
-                                            heading.setAttribute('x-intersect:leave', `$el.closest('[x-anchors]').__x.$data.anchorHeadings.find(h => h.id === '${id}').isActive = false`);
-                                        }
-                                    }
-
+        
+        try {
+            // Parse pipeline syntax: 'scope | targets'
+            const parseExpression = (expr) => {
+                if (!expr || expr.trim() === '') {
+                    return { scope: '', targets: 'h1, h2, h3, h4, h5, h6' };
+                }
+                
+                if (expr.includes('|')) {
+                    const parts = expr.split('|').map(p => p.trim());
                                     return {
-                                        id: id,
-                                        text: heading.textContent,
-                                        level: parseInt(heading.tagName.charAt(1)),
-                                        index: index
-                                    };
-                                });
-                            }
-                        }
-                        // If target is a DOM element, extract headings from it
-                        else if (target && target.querySelectorAll) {
-                            const headingElements = target.querySelectorAll('h1, h2, h3');
-                            headings = Array.from(headingElements).map((heading, index) => {
-                                // Generate ID if missing
-                                let id = heading.id;
-                                if (!id || id.trim() === '') {
-                                    // Create ID from text content
-                                    id = heading.textContent
-                                        .toLowerCase()
-                                        .replace(/[^a-z0-9\s-]/g, '')
-                                        .replace(/\s+/g, '-')
-                                        .trim();
-
-                                    // Ensure uniqueness by adding index if needed
+                        scope: parts[0] || '',
+                        targets: parts[1] || 'h1, h2, h3, h4, h5, h6'
+                    };
+                } else {
+                    return { scope: '', targets: expr };
+                }
+            };
+            
+            // Extract anchors function
+            const extractAnchors = (expr) => {
+                const parsed = parseExpression(expr);
+                
+                let containers = [];
+                if (!parsed.scope) {
+                    containers = [document.body];
+                } else {
+                    containers = Array.from(document.querySelectorAll(parsed.scope));
+                }
+                
+                let elements = [];
+                const targets = parsed.targets.split(',').map(t => t.trim());
+                
+                containers.forEach(container => {
+                    // Query all targets at once, then filter and sort by DOM order
+                    const allMatches = [];
+                    targets.forEach(target => {
+                        const matches = container.querySelectorAll(target);
+                        allMatches.push(...Array.from(matches));
+                    });
+                    
+                    // Remove duplicates and sort by DOM order
+                    const uniqueMatches = [...new Set(allMatches)];
+                    uniqueMatches.sort((a, b) => {
+                        const position = a.compareDocumentPosition(b);
+                        if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+                        if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+                        return 0;
+                    });
+                    
+                    elements.push(...uniqueMatches);
+                });
+                
+                return elements.map((element, index) => {
+                    // Generate simple ID
+                    let id = element.id;
                                     if (!id) {
-                                        id = `heading-${index}`;
+                        id = element.textContent.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+                        if (id) element.id = id;
                                     }
 
-                                    // Set the ID on the heading element
-                                    heading.id = id;
-                                }
+                    // Selected state will be managed by intersection observer
 
                                 return {
                                     id: id,
-                                    text: heading.textContent,
-                                    level: parseInt(heading.tagName.charAt(1)),
-                                    index: index
+                        text: element.textContent,
+                        link: `#${id}`,
+                        tag: element.tagName.toLowerCase(),
+                        class: element.className.split(' ')[0] || '',
+                        classes: Array.from(element.classList),
+                        index: index,
+                        element: element,
+
                                 };
                             });
-                        }
-                    }
-
-                    return headings;
-                };
-
-                const updateHeadings = (headings) => {
-                    // Find the closest Alpine component
-                    const parentElement = el.closest('[x-data]') || document.body;
-
-                    // Add URL generation function to each heading
-                    const headingsWithUrls = headings.map(heading => ({
-                        ...heading,
-                        url: () => {
-                            // Return just the hash for anchor links
-                            return `#${heading.id}`;
-                        }
-                    }));
-
-                    // Initialize anchorHeadings if it doesn't exist
-                    if (parentElement._x_dataStack && parentElement._x_dataStack[0]) {
-                        if (!parentElement._x_dataStack[0].anchorHeadings) {
-                            parentElement._x_dataStack[0].anchorHeadings = [];
-                        }
-                        parentElement._x_dataStack[0].anchorHeadings = headingsWithUrls;
-                    } else {
-                        // Create data stack if it doesn't exist
-                        if (!parentElement._x_dataStack) {
-                            parentElement._x_dataStack = [{}];
-                        }
-                        parentElement._x_dataStack[0].anchorHeadings = headingsWithUrls;
-
-                        // Initialize Alpine if needed
-                        if (window.Alpine) {
-                            Alpine.nextTick(() => {
-                                Alpine.initTree(parentElement);
-                            });
-                        }
-                    }
-                };
-
-                // Try immediately
-                let headings = extractHeadings();
-
-                // If no headings found, set up a MutationObserver
-                if (headings.length === 0) {
-                    if (typeof target === 'string') {
-                        const targetEl = document.querySelector(target);
-                        if (targetEl) {
-                            const observer = new MutationObserver((mutations) => {
-                                const newHeadings = extractHeadings();
-                                if (newHeadings.length > 0) {
-                                    updateHeadings(newHeadings);
-                                    observer.disconnect();
-                                }
-                            });
-
-                            observer.observe(targetEl, {
-                                childList: true,
-                                subtree: true
-                            });
-
-                            // Also try a few times with setTimeout as fallback
-                            let attempts = 0;
-                            const tryAgain = () => {
-                                attempts++;
-                                const newHeadings = extractHeadings();
-                                if (newHeadings.length > 0) {
-                                    updateHeadings(newHeadings);
-                                    observer.disconnect();
-                                } else if (attempts < 10) {
-                                    setTimeout(tryAgain, 200);
-                                } else {
-                                    observer.disconnect();
-                                }
-                            };
-                            setTimeout(tryAgain, 200);
-                        }
-                    }
+            };
+            
+            // Track if we've already rendered to prevent duplicates
+            let renderedContainer = null;
+            
+                        // Update Alpine data with anchors
+            const updateAnchors = (anchors) => {
+                // Remove existing rendered container if it exists
+                if (renderedContainer && renderedContainer.parentElement) {
+                    renderedContainer.remove();
+                    renderedContainer = null;
                 }
-
-                updateHeadings(headings);
                 
-                                // Setup highlighting if modifier is present
-                if (hasHighlight) {
-                    const setupHighlighting = () => {
-                        const links = el.querySelectorAll('a');
-                        const container = document.querySelector('.scroll-smooth');
-                        const targetContainer = el.closest('[x-anchors]')?.querySelector('.prose') || document.querySelector('.prose');
+                // Render using the template element's structure and classes
+                if (anchors.length > 0) {
+                    renderedContainer = document.createElement('div');
+                    
+                    anchors.forEach(anchor => {
+                        // Find the <a> element inside the template
+                        const templateContent = el.content || el;
+                        const anchorTemplate = templateContent.querySelector('a') || el.querySelector('a');
                         
-                        if (!links.length || !container || !targetContainer) {
-                            return;
-                        }
-                        
-                        const targets = targetContainer.querySelectorAll('h1[id], h2[id], h3[id]');
-                        
-                        if (!targets.length) {
-                            return;
-                        }
-                        
-                        const updateActiveHeading = () => {
-                            let activeHeading = null;
-                            let highestPosition = -1;
+                        if (anchorTemplate) {
+                            // Clone the <a> element from inside the template
+                            const linkElement = anchorTemplate.cloneNode(true);
                             
-                            targets.forEach(target => {
-                                const rect = target.getBoundingClientRect();
-                                const containerRect = container.getBoundingClientRect();
+                            // Remove Alpine directives
+                            linkElement.removeAttribute('x-text');
+                            linkElement.removeAttribute(':href');
+                            
+                            // Set the actual href and text content
+                            linkElement.href = anchor.link;
+                            linkElement.textContent = anchor.text;
+                            
+                            // Evaluate any :class bindings for this anchor
+                            if (linkElement.hasAttribute(':class')) {
+                                const classBinding = linkElement.getAttribute(':class');
+                                linkElement.removeAttribute(':class');
                                 
-                                if (rect.top >= 0 && rect.bottom <= containerRect.height) {
-                                    if (activeHeading === null || rect.top < highestPosition) {
-                                        activeHeading = target;
-                                        highestPosition = rect.top;
-                                    }
+                                // Parse the class binding object and apply classes
+                                if (classBinding.includes("'pl-2': anchor.tag === 'h3'") && anchor.tag === 'h3') {
+                                    linkElement.classList.add('pl-2');
                                 }
-                            });
-                            
-                            if (activeHeading) {
-                                const id = activeHeading.id;
-                                links.forEach(link => {
-                                    const isActive = link.getAttribute('href') === `#${id}`;
-                                    
-                                    if (isActive) {
-                                        link.classList.add('text-content-neutral');
-                                        link.classList.remove('text-content-subtle');
-                                    } else {
-                                        link.classList.add('text-content-subtle');
-                                        link.classList.remove('text-content-neutral');
-                                    }
-                                });
                             }
-                        };
-                        
-                        const observer = new IntersectionObserver(() => {
-                            updateActiveHeading();
-                        }, {
-                            root: container,
-                            threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-                        });
-                        
-                        container.addEventListener('scroll', () => {
-                            updateActiveHeading();
-                        });
-                        
-                        targets.forEach(target => {
-                            observer.observe(target);
-                        });
-                    };
-                    
-                    // Wait for content to be ready
-                    const waitForContent = () => {
-                        const links = el.querySelectorAll('a');
-                        if (links.length > 0) {
-                            setupHighlighting();
-                        } else {
-                            setTimeout(waitForContent, 200);
+                            
+                            renderedContainer.appendChild(linkElement);
                         }
-                    };
+                    });
                     
-                                         waitForContent();
-                 }
-            });
-        });
+                    // Replace template with actual elements
+                    el.parentElement.insertBefore(renderedContainer, el);
+                    el.style.display = 'none'; // Hide template
+                }
+            };
+            
+            // Try extraction and update data
+            const tryExtraction = () => {
+                const anchors = extractAnchors(expression);
+                updateAnchors(anchors);
+                return anchors;
+            };
+            
+            // Try extraction with progressive delays and content detection
+            const attemptExtraction = (attempt = 1, maxAttempts = 10) => {
+                const anchors = extractAnchors(expression);
+                
+                if (anchors.length > 0) {
+                    updateAnchors(anchors);
+
+                    return true;
+                                } else if (attempt < maxAttempts) {
+                    setTimeout(() => {
+                        attemptExtraction(attempt + 1, maxAttempts);
+                    }, attempt * 200); // Progressive delay: 200ms, 400ms, 600ms, etc.
+                }
+                return false;
+            };
+            
+            // Store refresh function on element for route changes
+            el._x_anchorRefresh = () => {
+                attemptExtraction();
+            };
+            
+            // Start extraction attempts
+            attemptExtraction();
+            
+            
+        } catch (error) {
+            console.error('[Indux Anchors] Error in directive:', error);
+        }
     });
 }
 
 
 
 // Initialize anchors when Alpine is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        if (window.Alpine) initializeAnchors();
-    });
-}
+document.addEventListener('alpine:init', () => {
 
-document.addEventListener('alpine:init', initializeAnchors); 
+    try {
+        initializeAnchors();
+
+    } catch (error) {
+        console.error('[Indux Anchors] Failed to initialize:', error);
+    }
+});
+
+// Refresh anchors when route changes
+window.addEventListener('indux:route-change', () => {
+    // Wait a bit for content to load after route change
+    setTimeout(() => {
+        const anchorElements = document.querySelectorAll('[x-anchors]');
+        anchorElements.forEach(el => {
+            const expression = el.getAttribute('x-anchors');
+            if (expression && el._x_anchorRefresh) {
+                el._x_anchorRefresh();
+            }
+        });
+    }, 100);
+});
+
+// Refresh anchors when hash changes (for active state updates)
+window.addEventListener('hashchange', () => {
+    const anchorElements = document.querySelectorAll('[x-anchors]');
+    anchorElements.forEach(el => {
+        if (el._x_anchorRefresh) {
+            el._x_anchorRefresh();
+        }
+    });
+}); 
 
 
 // Process visibility for all elements with x-route
@@ -815,6 +874,36 @@ if (document.readyState === 'loading') {
 } else {
     initializeHeadContent();
 }
+
+// Listen for markdown content changes to re-process head templates
+document.addEventListener('DOMContentLoaded', () => {
+    // Set up mutation observer for markdown elements
+    const setupMarkdownObserver = () => {
+        const markdownElements = document.querySelectorAll('[x-markdown]');
+        markdownElements.forEach(element => {
+            const observer = new MutationObserver(() => {
+                // Add a small delay to ensure templates are fully rendered
+                setTimeout(() => {
+                    const currentPath = window.location.pathname;
+                    const normalizedPath = currentPath === '/' ? '/' : currentPath.replace(/^\/|\/$/g, '');
+                    processAllHeadContent(normalizedPath);
+                }, 100);
+            });
+            observer.observe(element, {
+                childList: true,
+                subtree: true
+            });
+        });
+    };
+
+    // Initial setup
+    setupMarkdownObserver();
+    
+    // Also re-setup observers when route changes (in case new markdown elements appear)
+    window.addEventListener('indux:route-change', () => {
+        setTimeout(setupMarkdownObserver, 200);
+    });
+});
 
 // Export head content interface
 window.InduxRoutingHead = {

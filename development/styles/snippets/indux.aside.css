@@ -31,13 +31,13 @@
                     }
 
                     &.active {
-                        border-left-color: var(--color-accent)
+                        border-left-color: var(--color-accent-surface)
                     }
                 }
             }
 
             &.active {
-                color: var(--color-accent) !important;
+                color: var(--color-accent-surface) !important;
                 pointer-events: none
             }
         }

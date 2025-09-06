@@ -1,0 +1,8 @@
+<div class="row items-center gap-4">
+    <div x-markdown>###### Inline Text Content</div>
+    <div x-markdown="`###### Template Literal`"></div>
+    <div class="row items-center gap-2" x-data="{ content: '###### Prior Content' }">
+        <button @click="content = '###### Dynamic Content'">Update</button>
+        <p x-markdown="content"></p>
+    </div>
+</div>

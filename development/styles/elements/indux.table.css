@@ -2,60 +2,66 @@
 
 @layer components {
 
-    :where(table) {
+    :where(table, .grid-table) {
+        table-layout: auto;
         width: 100%;
         max-width: 100%;
         overflow: hidden;
         border-spacing: 0;
         border-radius: var(--radius);
 
-        /* Striped modifier */
+        :where(.grid-header, .grid-row, .grid-footer) {
+            display: contents
+        }
+
+        :where(thead, .grid-header > *) {
+            background-color: var(--color-surface-1);
+            border-bottom: 1px solid var(--color-line, oklch(48.3% 0.006422 17.4 / 0.15))
+        }
+
+        :where(th,.grid-header > *) {
+            font-weight: bold
+        }
+
+        :where(tr, .grid-row > *) {
+            border-bottom: 1px solid var(--color-line, oklch(48.3% 0.006422 17.4 / 0.15))
+        }
+
+        :where(td, th, .grid-header > *, .grid-row > *, .grid-footer > *) {
+            padding: calc(var(--spacing) * 2.5) calc(var(--spacing) * 4);
+            font-size: 0.875rem;
+            text-align: left;
+            text-align: start;
+            overflow: hidden;
+
+            /* Make elements within cell inline */
+            &>*:not(template) {
+                display: inline-flex;
+                vertical-align: middle;
+
+                /* Add space between them */
+                &:not(:last-child) {
+                    margin-right: 4px
+                }
+            }
+        }
+        
+        :where(:not(:has(tfoot)) tbody tr:last-child, tfoot tr:last-child, .grid-footer > *) {
+            border-bottom: 0
+        }
+
         &.striped {
-            & tr:nth-child(even) {
+            :where(tr:nth-child(even), .grid-row:nth-child(even)) {
                 background-color: var(--color-surface-1)
             }
 
-            & tr:nth-child(odd) {
+            :where(tr:nth-child(odd), .grid-row:nth-child(odd)) {
                 background-color: transparent
             }
 
-            & tr {
+            :where(tr, .grid-row) {
                 border-bottom: 0 none
             }
         }
     }
-
-    :where(thead) {
-        background-color: var(--color-surface-1);
-        border-bottom: 1px solid var(--color-line, oklch(48.3% 0.006422 17.4 / 0.15))
-    }
-
-    :where(tr) {
-        border-bottom: 1px solid var(--color-line, oklch(48.3% 0.006422 17.4 / 0.15))
-    }
-
-    :where(td),
-    :where(th) {
-        padding: calc(var(--spacing) * 2.5) calc(var(--spacing) * 4);
-        font-size: 0.875rem;
-        text-align: left;
-        text-align: start;
-        overflow: hidden;
-
-        /* Make elements within cell inline */
-        &>*:not(template) {
-            display: inline-block;
-
-            /* Add space between them */
-            &:not(:last-child) {
-                margin-right: 4px
-            }
-        }
-    }
-
-    :where(tfoot) td,
-    :where(tfoot) th {
-        border-bottom: 0
-    }
-
 }

@@ -15,8 +15,8 @@
         --color-base-200: oklch(98% 0 0);
         --color-base-300: oklch(95% 0 0);
         --color-base-content: oklch(21% .006 285.885);
-        --color-primary: oklch(45% .24 277.023);
-        --color-primary-content: oklch(93% .034 272.788);
+        --color-brand-surface: oklch(45% .24 277.023);
+        --color-brand-content: oklch(93% .034 272.788);
         --color-secondary: oklch(65% .241 354.308);
         --color-secondary-content: oklch(94% .028 342.258);
         --color-accent: oklch(77% .152 181.912);
@@ -48,8 +48,8 @@
         --color-base-200: oklch(23.26% .014 253.1);
         --color-base-300: oklch(21.15% .012 254.09);
         --color-base-content: oklch(97.807% .029 256.847);
-        --color-primary: oklch(58% .233 277.117);
-        --color-primary-content: oklch(96% .018 272.314);
+        --color-brand-surface: oklch(58% .233 277.117);
+        --color-brand-content: oklch(96% .018 272.314);
         --color-secondary: oklch(65% .241 354.308);
         --color-secondary-content: oklch(94% .028 342.258);
         --color-accent: oklch(77% .152 181.912);
@@ -572,9 +572,9 @@
         }
     }
 
-    .checkbox-primary {
-        color: var(--color-primary-content);
-        --input-color: var(--color-primary)
+    .checkbox-brand {
+        color: var(--color-brand-content);
+        --input-color: var(--color-brand-surface)
     }
 
     .checkbox-secondary {
@@ -584,7 +584,7 @@
 
     .checkbox-accent {
         color: var(--color-accent-content);
-        --input-color: var(--color-accent)
+        --input-color: var(--color-accent-surface)
     }
 
     .checkbox-neutral {
@@ -722,9 +722,9 @@
             }
         }
 
-        .sm\:checkbox-primary {
-            color: var(--color-primary-content);
-            --input-color: var(--color-primary)
+        .sm\:checkbox-brand {
+            color: var(--color-brand-content);
+            --input-color: var(--color-brand-surface)
         }
 
         .sm\:checkbox-secondary {
@@ -734,7 +734,7 @@
 
         .sm\:checkbox-accent {
             color: var(--color-accent-content);
-            --input-color: var(--color-accent)
+            --input-color: var(--color-accent-surface)
         }
 
         .sm\:checkbox-neutral {
@@ -873,9 +873,9 @@
             }
         }
 
-        .md\:checkbox-primary {
-            color: var(--color-primary-content);
-            --input-color: var(--color-primary)
+        .md\:checkbox-brand {
+            color: var(--color-brand-content);
+            --input-color: var(--color-brand-surface)
         }
 
         .md\:checkbox-secondary {
@@ -885,7 +885,7 @@
 
         .md\:checkbox-accent {
             color: var(--color-accent-content);
-            --input-color: var(--color-accent)
+            --input-color: var(--color-accent-surface)
         }
 
         .md\:checkbox-neutral {
@@ -1024,9 +1024,9 @@
             }
         }
 
-        .lg\:checkbox-primary {
-            color: var(--color-primary-content);
-            --input-color: var(--color-primary)
+        .lg\:checkbox-brand {
+            color: var(--color-brand-content);
+            --input-color: var(--color-brand-surface)
         }
 
         .lg\:checkbox-secondary {
@@ -1036,7 +1036,7 @@
 
         .lg\:checkbox-accent {
             color: var(--color-accent-content);
-            --input-color: var(--color-accent)
+            --input-color: var(--color-accent-surface)
         }
 
         .lg\:checkbox-neutral {
@@ -1175,9 +1175,9 @@
             }
         }
 
-        .xl\:checkbox-primary {
-            color: var(--color-primary-content);
-            --input-color: var(--color-primary)
+        .xl\:checkbox-brand {
+            color: var(--color-brand-content);
+            --input-color: var(--color-brand-surface)
         }
 
         .xl\:checkbox-secondary {
@@ -1187,7 +1187,7 @@
 
         .xl\:checkbox-accent {
             color: var(--color-accent-content);
-            --input-color: var(--color-accent)
+            --input-color: var(--color-accent-surface)
         }
 
         .xl\:checkbox-neutral {
@@ -1326,9 +1326,9 @@
             }
         }
 
-        .\32 xl\:checkbox-primary {
-            color: var(--color-primary-content);
-            --input-color: var(--color-primary)
+        .\32 xl\:checkbox-brand {
+            color: var(--color-brand-content);
+            --input-color: var(--color-brand-surface)
         }
 
         .\32 xl\:checkbox-secondary {
@@ -1338,7 +1338,7 @@
 
         .\32 xl\:checkbox-accent {
             color: var(--color-accent-content);
-            --input-color: var(--color-accent)
+            --input-color: var(--color-accent-surface)
         }
 
         .\32 xl\:checkbox-neutral {
@@ -1418,9 +1418,9 @@
         }
     }
 
-    .status-primary {
-        background-color: var(--color-primary);
-        color: var(--color-primary)
+    .status-brand {
+        background-color: var(--color-brand-surface);
+        color: var(--color-brand-surface)
     }
 
     .status-secondary {
@@ -1429,8 +1429,8 @@
     }
 
     .status-accent {
-        background-color: var(--color-accent);
-        color: var(--color-accent)
+        background-color: var(--color-accent-surface);
+        color: var(--color-accent-surface)
     }
 
     .status-neutral {
@@ -1505,9 +1505,9 @@
             }
         }
 
-        .sm\:status-primary {
-            background-color: var(--color-primary);
-            color: var(--color-primary)
+        .sm\:status-brand {
+            background-color: var(--color-brand-surface);
+            color: var(--color-brand-surface)
         }
 
         .sm\:status-secondary {
@@ -1516,8 +1516,8 @@
         }
 
         .sm\:status-accent {
-            background-color: var(--color-accent);
-            color: var(--color-accent)
+            background-color: var(--color-accent-surface);
+            color: var(--color-accent-surface)
         }
 
         .sm\:status-neutral {
@@ -1593,9 +1593,9 @@
             }
         }
 
-        .md\:status-primary {
-            background-color: var(--color-primary);
-            color: var(--color-primary)
+        .md\:status-brand {
+            background-color: var(--color-brand-surface);
+            color: var(--color-brand-surface)
         }
 
         .md\:status-secondary {
@@ -1604,8 +1604,8 @@
         }
 
         .md\:status-accent {
-            background-color: var(--color-accent);
-            color: var(--color-accent)
+            background-color: var(--color-accent-surface);
+            color: var(--color-accent-surface)
         }
 
         .md\:status-neutral {
@@ -1681,9 +1681,9 @@
             }
         }
 
-        .lg\:status-primary {
-            background-color: var(--color-primary);
-            color: var(--color-primary)
+        .lg\:status-brand {
+            background-color: var(--color-brand-surface);
+            color: var(--color-brand-surface)
         }
 
         .lg\:status-secondary {
@@ -1692,8 +1692,8 @@
         }
 
         .lg\:status-accent {
-            background-color: var(--color-accent);
-            color: var(--color-accent)
+            background-color: var(--color-accent-surface);
+            color: var(--color-accent-surface)
         }
 
         .lg\:status-neutral {
@@ -1769,9 +1769,9 @@
             }
         }
 
-        .xl\:status-primary {
-            background-color: var(--color-primary);
-            color: var(--color-primary)
+        .xl\:status-brand {
+            background-color: var(--color-brand-surface);
+            color: var(--color-brand-surface)
         }
 
         .xl\:status-secondary {
@@ -1780,8 +1780,8 @@
         }
 
         .xl\:status-accent {
-            background-color: var(--color-accent);
-            color: var(--color-accent)
+            background-color: var(--color-accent-surface);
+            color: var(--color-accent-surface)
         }
 
         .xl\:status-neutral {
@@ -1857,9 +1857,9 @@
             }
         }
 
-        .\32 xl\:status-primary {
-            background-color: var(--color-primary);
-            color: var(--color-primary)
+        .\32 xl\:status-brand {
+            background-color: var(--color-brand-surface);
+            color: var(--color-brand-surface)
         }
 
         .\32 xl\:status-secondary {
@@ -1868,8 +1868,8 @@
         }
 
         .\32 xl\:status-accent {
-            background-color: var(--color-accent);
-            color: var(--color-accent)
+            background-color: var(--color-accent-surface);
+            color: var(--color-accent-surface)
         }
 
         .\32 xl\:status-neutral {
@@ -2024,8 +2024,8 @@
         }
 
         &:where(input:checked:not(.filter .btn)) {
-            --btn-color: var(--color-primary);
-            --btn-fg: var(--color-primary-content);
+            --btn-color: var(--color-brand-surface);
+            --btn-fg: var(--color-brand-content);
             isolation: isolate
         }
     }
@@ -2036,9 +2036,9 @@
         isolation: isolate
     }
 
-    .btn-primary {
-        --btn-color: var(--color-primary);
-        --btn-fg: var(--color-primary-content)
+    .btn-brand {
+        --btn-color: var(--color-brand-surface);
+        --btn-fg: var(--color-brand-content)
     }
 
     .btn-secondary {
@@ -2047,7 +2047,7 @@
     }
 
     .btn-accent {
-        --btn-color: var(--color-accent);
+        --btn-color: var(--color-accent-surface);
         --btn-fg: var(--color-accent-content)
     }
 
@@ -2103,7 +2103,7 @@
     .btn-link {
         --btn-border: #0000;
         --btn-bg: #0000;
-        --btn-fg: var(--color-primary);
+        --btn-fg: var(--color-brand-surface);
         --btn-noise: none;
         --btn-shadow: "";
         outline-color: currentColor;
@@ -2338,8 +2338,8 @@
             }
 
             &:where(input:checked:not(.filter .btn)) {
-                --btn-color: var(--color-primary);
-                --btn-fg: var(--color-primary-content);
+                --btn-color: var(--color-brand-surface);
+                --btn-fg: var(--color-brand-content);
                 isolation: isolate
             }
         }
@@ -2350,9 +2350,9 @@
             isolation: isolate
         }
 
-        .sm\:btn-primary {
-            --btn-color: var(--color-primary);
-            --btn-fg: var(--color-primary-content)
+        .sm\:btn-brand {
+            --btn-color: var(--color-brand-surface);
+            --btn-fg: var(--color-brand-content)
         }
 
         .sm\:btn-secondary {
@@ -2361,7 +2361,7 @@
         }
 
         .sm\:btn-accent {
-            --btn-color: var(--color-accent);
+            --btn-color: var(--color-accent-surface);
             --btn-fg: var(--color-accent-content)
         }
 
@@ -2417,7 +2417,7 @@
         .sm\:btn-link {
             --btn-border: #0000;
             --btn-bg: #0000;
-            --btn-fg: var(--color-primary);
+            --btn-fg: var(--color-brand-surface);
             --btn-noise: none;
             --btn-shadow: "";
             outline-color: currentColor;
@@ -2653,8 +2653,8 @@
             }
 
             &:where(input:checked:not(.filter .btn)) {
-                --btn-color: var(--color-primary);
-                --btn-fg: var(--color-primary-content);
+                --btn-color: var(--color-brand-surface);
+                --btn-fg: var(--color-brand-content);
                 isolation: isolate
             }
         }
@@ -2665,9 +2665,9 @@
             isolation: isolate
         }
 
-        .md\:btn-primary {
-            --btn-color: var(--color-primary);
-            --btn-fg: var(--color-primary-content)
+        .md\:btn-brand {
+            --btn-color: var(--color-brand-surface);
+            --btn-fg: var(--color-brand-content)
         }
 
         .md\:btn-secondary {
@@ -2676,7 +2676,7 @@
         }
 
         .md\:btn-accent {
-            --btn-color: var(--color-accent);
+            --btn-color: var(--color-accent-surface);
             --btn-fg: var(--color-accent-content)
         }
 
@@ -2732,7 +2732,7 @@
         .md\:btn-link {
             --btn-border: #0000;
             --btn-bg: #0000;
-            --btn-fg: var(--color-primary);
+            --btn-fg: var(--color-brand-surface);
             --btn-noise: none;
             --btn-shadow: "";
             outline-color: currentColor;
@@ -2968,8 +2968,8 @@
             }
 
             &:where(input:checked:not(.filter .btn)) {
-                --btn-color: var(--color-primary);
-                --btn-fg: var(--color-primary-content);
+                --btn-color: var(--color-brand-surface);
+                --btn-fg: var(--color-brand-content);
                 isolation: isolate
             }
         }
@@ -2980,9 +2980,9 @@
             isolation: isolate
         }
 
-        .lg\:btn-primary {
-            --btn-color: var(--color-primary);
-            --btn-fg: var(--color-primary-content)
+        .lg\:btn-brand {
+            --btn-color: var(--color-brand-surface);
+            --btn-fg: var(--color-brand-content)
         }
 
         .lg\:btn-secondary {
@@ -2991,7 +2991,7 @@
         }
 
         .lg\:btn-accent {
-            --btn-color: var(--color-accent);
+            --btn-color: var(--color-accent-surface);
             --btn-fg: var(--color-accent-content)
         }
 
@@ -3047,7 +3047,7 @@
         .lg\:btn-link {
             --btn-border: #0000;
             --btn-bg: #0000;
-            --btn-fg: var(--color-primary);
+            --btn-fg: var(--color-brand-surface);
             --btn-noise: none;
             --btn-shadow: "";
             outline-color: currentColor;
@@ -3283,8 +3283,8 @@
             }
 
             &:where(input:checked:not(.filter .btn)) {
-                --btn-color: var(--color-primary);
-                --btn-fg: var(--color-primary-content);
+                --btn-color: var(--color-brand-surface);
+                --btn-fg: var(--color-brand-content);
                 isolation: isolate
             }
         }
@@ -3295,9 +3295,9 @@
             isolation: isolate
         }
 
-        .xl\:btn-primary {
-            --btn-color: var(--color-primary);
-            --btn-fg: var(--color-primary-content)
+        .xl\:btn-brand {
+            --btn-color: var(--color-brand-surface);
+            --btn-fg: var(--color-brand-content)
         }
 
         .xl\:btn-secondary {
@@ -3306,7 +3306,7 @@
         }
 
         .xl\:btn-accent {
-            --btn-color: var(--color-accent);
+            --btn-color: var(--color-accent-surface);
             --btn-fg: var(--color-accent-content)
         }
 
@@ -3362,7 +3362,7 @@
         .xl\:btn-link {
             --btn-border: #0000;
             --btn-bg: #0000;
-            --btn-fg: var(--color-primary);
+            --btn-fg: var(--color-brand-surface);
             --btn-noise: none;
             --btn-shadow: "";
             outline-color: currentColor;
@@ -3598,8 +3598,8 @@
             }
 
             &:where(input:checked:not(.filter .btn)) {
-                --btn-color: var(--color-primary);
-                --btn-fg: var(--color-primary-content);
+                --btn-color: var(--color-brand-surface);
+                --btn-fg: var(--color-brand-content);
                 isolation: isolate
             }
         }
@@ -3610,9 +3610,9 @@
             isolation: isolate
         }
 
-        .\32 xl\:btn-primary {
-            --btn-color: var(--color-primary);
-            --btn-fg: var(--color-primary-content)
+        .\32 xl\:btn-brand {
+            --btn-color: var(--color-brand-surface);
+            --btn-fg: var(--color-brand-content)
         }
 
         .\32 xl\:btn-secondary {
@@ -3621,7 +3621,7 @@
         }
 
         .\32 xl\:btn-accent {
-            --btn-color: var(--color-accent);
+            --btn-color: var(--color-accent-surface);
             --btn-fg: var(--color-accent-content)
         }
 
@@ -3677,7 +3677,7 @@
         .\32 xl\:btn-link {
             --btn-border: #0000;
             --btn-bg: #0000;
-            --btn-fg: var(--color-primary);
+            --btn-fg: var(--color-brand-surface);
             --btn-noise: none;
             --btn-shadow: "";
             outline-color: currentColor;
@@ -4707,12 +4707,12 @@
         }
     }
 
-    .input-primary {
+    .input-brand {
 
         &,
         &:focus,
         &:focus-within {
-            --input-color: var(--color-primary)
+            --input-color: var(--color-brand-surface)
         }
     }
 
@@ -4730,7 +4730,7 @@
         &,
         &:focus,
         &:focus-within {
-            --input-color: var(--color-accent)
+            --input-color: var(--color-accent-surface)
         }
     }
 
@@ -4959,12 +4959,12 @@
             }
         }
 
-        .sm\:input-primary {
+        .sm\:input-brand {
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -4982,7 +4982,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -5212,12 +5212,12 @@
             }
         }
 
-        .md\:input-primary {
+        .md\:input-brand {
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -5235,7 +5235,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -5465,12 +5465,12 @@
             }
         }
 
-        .lg\:input-primary {
+        .lg\:input-brand {
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -5488,7 +5488,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -5718,12 +5718,12 @@
             }
         }
 
-        .xl\:input-primary {
+        .xl\:input-brand {
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -5741,7 +5741,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -5971,12 +5971,12 @@
             }
         }
 
-        .\32 xl\:input-primary {
+        .\32 xl\:input-brand {
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -5994,7 +5994,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -6134,8 +6134,8 @@
         }
 
         & ::part(button day today) {
-            background: var(--color-primary);
-            color: var(--color-primary-content)
+            background: var(--color-brand-surface);
+            color: var(--color-brand-content)
         }
 
         & ::part(selected) {
@@ -6371,8 +6371,8 @@
 
         & .rdp-today:not(.rdp-outside) {
             & .rdp-day_button {
-                background: var(--color-primary);
-                color: var(--color-primary-content)
+                background: var(--color-brand-surface);
+                color: var(--color-brand-content)
             }
         }
 
@@ -6608,8 +6608,8 @@
 
             & .is-today {
                 & .pika-button {
-                    background: var(--color-primary);
-                    color: var(--color-primary-content)
+                    background: var(--color-brand-surface);
+                    color: var(--color-brand-content)
                 }
             }
 
@@ -6628,14 +6628,14 @@
 
             & .has-event {
                 & .pika-button {
-                    background: var(--color-base-primary)
+                    background: var(--color-base-brand)
                 }
             }
 
             & .is-disabled,
             & .is-inrange {
                 & .pika-button {
-                    background: var(--color-base-primary)
+                    background: var(--color-base-brand)
                 }
             }
 
@@ -7361,8 +7361,8 @@
         }
     }
 
-    .progress-primary {
-        color: var(--color-primary)
+    .progress-brand {
+        color: var(--color-brand-surface)
     }
 
     .progress-secondary {
@@ -7370,7 +7370,7 @@
     }
 
     .progress-accent {
-        color: var(--color-accent)
+        color: var(--color-accent-surface)
     }
 
     .progress-neutral {
@@ -7447,8 +7447,8 @@
             }
         }
 
-        .sm\:progress-primary {
-            color: var(--color-primary)
+        .sm\:progress-brand {
+            color: var(--color-brand-surface)
         }
 
         .sm\:progress-secondary {
@@ -7456,7 +7456,7 @@
         }
 
         .sm\:progress-accent {
-            color: var(--color-accent)
+            color: var(--color-accent-surface)
         }
 
         .sm\:progress-neutral {
@@ -7528,8 +7528,8 @@
             }
         }
 
-        .md\:progress-primary {
-            color: var(--color-primary)
+        .md\:progress-brand {
+            color: var(--color-brand-surface)
         }
 
         .md\:progress-secondary {
@@ -7537,7 +7537,7 @@
         }
 
         .md\:progress-accent {
-            color: var(--color-accent)
+            color: var(--color-accent-surface)
         }
 
         .md\:progress-neutral {
@@ -7609,8 +7609,8 @@
             }
         }
 
-        .lg\:progress-primary {
-            color: var(--color-primary)
+        .lg\:progress-brand {
+            color: var(--color-brand-surface)
         }
 
         .lg\:progress-secondary {
@@ -7618,7 +7618,7 @@
         }
 
         .lg\:progress-accent {
-            color: var(--color-accent)
+            color: var(--color-accent-surface)
         }
 
         .lg\:progress-neutral {
@@ -7690,8 +7690,8 @@
             }
         }
 
-        .xl\:progress-primary {
-            color: var(--color-primary)
+        .xl\:progress-brand {
+            color: var(--color-brand-surface)
         }
 
         .xl\:progress-secondary {
@@ -7699,7 +7699,7 @@
         }
 
         .xl\:progress-accent {
-            color: var(--color-accent)
+            color: var(--color-accent-surface)
         }
 
         .xl\:progress-neutral {
@@ -7771,8 +7771,8 @@
             }
         }
 
-        .\32 xl\:progress-primary {
-            color: var(--color-primary)
+        .\32 xl\:progress-brand {
+            color: var(--color-brand-surface)
         }
 
         .\32 xl\:progress-secondary {
@@ -7780,7 +7780,7 @@
         }
 
         .\32 xl\:progress-accent {
-            color: var(--color-accent)
+            color: var(--color-accent-surface)
         }
 
         .\32 xl\:progress-neutral {
@@ -8795,9 +8795,9 @@
         }
     }
 
-    .range-primary {
-        color: var(--color-primary);
-        --range-thumb: var(--color-primary-content)
+    .range-brand {
+        color: var(--color-brand-surface);
+        --range-thumb: var(--color-brand-content)
     }
 
     .range-secondary {
@@ -8806,7 +8806,7 @@
     }
 
     .range-accent {
-        color: var(--color-accent);
+        color: var(--color-accent-surface);
         --range-thumb: var(--color-accent-content)
     }
 
@@ -8949,9 +8949,9 @@
             }
         }
 
-        .sm\:range-primary {
-            color: var(--color-primary);
-            --range-thumb: var(--color-primary-content)
+        .sm\:range-brand {
+            color: var(--color-brand-surface);
+            --range-thumb: var(--color-brand-content)
         }
 
         .sm\:range-secondary {
@@ -8960,7 +8960,7 @@
         }
 
         .sm\:range-accent {
-            color: var(--color-accent);
+            color: var(--color-accent-surface);
             --range-thumb: var(--color-accent-content)
         }
 
@@ -9104,9 +9104,9 @@
             }
         }
 
-        .md\:range-primary {
-            color: var(--color-primary);
-            --range-thumb: var(--color-primary-content)
+        .md\:range-brand {
+            color: var(--color-brand-surface);
+            --range-thumb: var(--color-brand-content)
         }
 
         .md\:range-secondary {
@@ -9115,7 +9115,7 @@
         }
 
         .md\:range-accent {
-            color: var(--color-accent);
+            color: var(--color-accent-surface);
             --range-thumb: var(--color-accent-content)
         }
 
@@ -9259,9 +9259,9 @@
             }
         }
 
-        .lg\:range-primary {
-            color: var(--color-primary);
-            --range-thumb: var(--color-primary-content)
+        .lg\:range-brand {
+            color: var(--color-brand-surface);
+            --range-thumb: var(--color-brand-content)
         }
 
         .lg\:range-secondary {
@@ -9270,7 +9270,7 @@
         }
 
         .lg\:range-accent {
-            color: var(--color-accent);
+            color: var(--color-accent-surface);
             --range-thumb: var(--color-accent-content)
         }
 
@@ -9414,9 +9414,9 @@
             }
         }
 
-        .xl\:range-primary {
-            color: var(--color-primary);
-            --range-thumb: var(--color-primary-content)
+        .xl\:range-brand {
+            color: var(--color-brand-surface);
+            --range-thumb: var(--color-brand-content)
         }
 
         .xl\:range-secondary {
@@ -9425,7 +9425,7 @@
         }
 
         .xl\:range-accent {
-            color: var(--color-accent);
+            color: var(--color-accent-surface);
             --range-thumb: var(--color-accent-content)
         }
 
@@ -9569,9 +9569,9 @@
             }
         }
 
-        .\32 xl\:range-primary {
-            color: var(--color-primary);
-            --range-thumb: var(--color-primary-content)
+        .\32 xl\:range-brand {
+            color: var(--color-brand-surface);
+            --range-thumb: var(--color-brand-content)
         }
 
         .\32 xl\:range-secondary {
@@ -9580,7 +9580,7 @@
         }
 
         .\32 xl\:range-accent {
-            color: var(--color-accent);
+            color: var(--color-accent-surface);
             --range-thumb: var(--color-accent-content)
         }
 
@@ -10095,9 +10095,9 @@
         }
     }
 
-    .chat-bubble-primary {
-        background-color: var(--color-primary);
-        color: var(--color-primary-content)
+    .chat-bubble-brand {
+        background-color: var(--color-brand-surface);
+        color: var(--color-brand-content)
     }
 
     .chat-bubble-secondary {
@@ -10106,7 +10106,7 @@
     }
 
     .chat-bubble-accent {
-        background-color: var(--color-accent);
+        background-color: var(--color-accent-surface);
         color: var(--color-accent-content)
     }
 
@@ -10246,9 +10246,9 @@
             }
         }
 
-        .sm\:chat-bubble-primary {
-            background-color: var(--color-primary);
-            color: var(--color-primary-content)
+        .sm\:chat-bubble-brand {
+            background-color: var(--color-brand-surface);
+            color: var(--color-brand-content)
         }
 
         .sm\:chat-bubble-secondary {
@@ -10257,7 +10257,7 @@
         }
 
         .sm\:chat-bubble-accent {
-            background-color: var(--color-accent);
+            background-color: var(--color-accent-surface);
             color: var(--color-accent-content)
         }
 
@@ -10398,9 +10398,9 @@
             }
         }
 
-        .md\:chat-bubble-primary {
-            background-color: var(--color-primary);
-            color: var(--color-primary-content)
+        .md\:chat-bubble-brand {
+            background-color: var(--color-brand-surface);
+            color: var(--color-brand-content)
         }
 
         .md\:chat-bubble-secondary {
@@ -10409,7 +10409,7 @@
         }
 
         .md\:chat-bubble-accent {
-            background-color: var(--color-accent);
+            background-color: var(--color-accent-surface);
             color: var(--color-accent-content)
         }
 
@@ -10550,9 +10550,9 @@
             }
         }
 
-        .lg\:chat-bubble-primary {
-            background-color: var(--color-primary);
-            color: var(--color-primary-content)
+        .lg\:chat-bubble-brand {
+            background-color: var(--color-brand-surface);
+            color: var(--color-brand-content)
         }
 
         .lg\:chat-bubble-secondary {
@@ -10561,7 +10561,7 @@
         }
 
         .lg\:chat-bubble-accent {
-            background-color: var(--color-accent);
+            background-color: var(--color-accent-surface);
             color: var(--color-accent-content)
         }
 
@@ -10702,9 +10702,9 @@
             }
         }
 
-        .xl\:chat-bubble-primary {
-            background-color: var(--color-primary);
-            color: var(--color-primary-content)
+        .xl\:chat-bubble-brand {
+            background-color: var(--color-brand-surface);
+            color: var(--color-brand-content)
         }
 
         .xl\:chat-bubble-secondary {
@@ -10713,7 +10713,7 @@
         }
 
         .xl\:chat-bubble-accent {
-            background-color: var(--color-accent);
+            background-color: var(--color-accent-surface);
             color: var(--color-accent-content)
         }
 
@@ -10854,9 +10854,9 @@
             }
         }
 
-        .\32 xl\:chat-bubble-primary {
-            background-color: var(--color-primary);
-            color: var(--color-primary-content)
+        .\32 xl\:chat-bubble-brand {
+            background-color: var(--color-brand-surface);
+            color: var(--color-brand-content)
         }
 
         .\32 xl\:chat-bubble-secondary {
@@ -10865,7 +10865,7 @@
         }
 
         .\32 xl\:chat-bubble-accent {
-            background-color: var(--color-accent);
+            background-color: var(--color-accent-surface);
             color: var(--color-accent-content)
         }
 
@@ -14308,12 +14308,12 @@
         }
     }
 
-    .textarea-primary {
+    .textarea-brand {
 
         &,
         &:focus,
         &:focus-within {
-            --input-color: var(--color-primary)
+            --input-color: var(--color-brand-surface)
         }
     }
 
@@ -14331,7 +14331,7 @@
         &,
         &:focus,
         &:focus-within {
-            --input-color: var(--color-accent)
+            --input-color: var(--color-accent-surface)
         }
     }
 
@@ -14478,12 +14478,12 @@
             }
         }
 
-        .sm\:textarea-primary {
+        .sm\:textarea-brand {
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -14501,7 +14501,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -14649,12 +14649,12 @@
             }
         }
 
-        .md\:textarea-primary {
+        .md\:textarea-brand {
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -14672,7 +14672,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -14820,12 +14820,12 @@
             }
         }
 
-        .lg\:textarea-primary {
+        .lg\:textarea-brand {
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -14843,7 +14843,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -14991,12 +14991,12 @@
             }
         }
 
-        .xl\:textarea-primary {
+        .xl\:textarea-brand {
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -15014,7 +15014,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -15162,12 +15162,12 @@
             }
         }
 
-        .\32 xl\:textarea-primary {
+        .\32 xl\:textarea-brand {
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -15185,7 +15185,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -17009,12 +17009,12 @@
         }
     }
 
-    .tooltip-primary {
-        --tt-bg: var(--color-primary);
+    .tooltip-brand {
+        --tt-bg: var(--color-brand-surface);
 
         &>.tooltip-content,
         &[data-tip]:before {
-            color: var(--color-primary-content)
+            color: var(--color-brand-content)
         }
     }
 
@@ -17028,7 +17028,7 @@
     }
 
     .tooltip-accent {
-        --tt-bg: var(--color-accent);
+        --tt-bg: var(--color-accent-surface);
 
         &>.tooltip-content,
         &[data-tip]:before {
@@ -17202,12 +17202,12 @@
             }
         }
 
-        .sm\:tooltip-primary {
-            --tt-bg: var(--color-primary);
+        .sm\:tooltip-brand {
+            --tt-bg: var(--color-brand-surface);
 
             &>.tooltip-content,
             &[data-tip]:before {
-                color: var(--color-primary-content)
+                color: var(--color-brand-content)
             }
         }
 
@@ -17221,7 +17221,7 @@
         }
 
         .sm\:tooltip-accent {
-            --tt-bg: var(--color-accent);
+            --tt-bg: var(--color-accent-surface);
 
             &>.tooltip-content,
             &[data-tip]:before {
@@ -17396,12 +17396,12 @@
             }
         }
 
-        .md\:tooltip-primary {
-            --tt-bg: var(--color-primary);
+        .md\:tooltip-brand {
+            --tt-bg: var(--color-brand-surface);
 
             &>.tooltip-content,
             &[data-tip]:before {
-                color: var(--color-primary-content)
+                color: var(--color-brand-content)
             }
         }
 
@@ -17415,7 +17415,7 @@
         }
 
         .md\:tooltip-accent {
-            --tt-bg: var(--color-accent);
+            --tt-bg: var(--color-accent-surface);
 
             &>.tooltip-content,
             &[data-tip]:before {
@@ -17590,12 +17590,12 @@
             }
         }
 
-        .lg\:tooltip-primary {
-            --tt-bg: var(--color-primary);
+        .lg\:tooltip-brand {
+            --tt-bg: var(--color-brand-surface);
 
             &>.tooltip-content,
             &[data-tip]:before {
-                color: var(--color-primary-content)
+                color: var(--color-brand-content)
             }
         }
 
@@ -17609,7 +17609,7 @@
         }
 
         .lg\:tooltip-accent {
-            --tt-bg: var(--color-accent);
+            --tt-bg: var(--color-accent-surface);
 
             &>.tooltip-content,
             &[data-tip]:before {
@@ -17784,12 +17784,12 @@
             }
         }
 
-        .xl\:tooltip-primary {
-            --tt-bg: var(--color-primary);
+        .xl\:tooltip-brand {
+            --tt-bg: var(--color-brand-surface);
 
             &>.tooltip-content,
             &[data-tip]:before {
-                color: var(--color-primary-content)
+                color: var(--color-brand-content)
             }
         }
 
@@ -17803,7 +17803,7 @@
         }
 
         .xl\:tooltip-accent {
-            --tt-bg: var(--color-accent);
+            --tt-bg: var(--color-accent-surface);
 
             &>.tooltip-content,
             &[data-tip]:before {
@@ -17978,12 +17978,12 @@
             }
         }
 
-        .\32 xl\:tooltip-primary {
-            --tt-bg: var(--color-primary);
+        .\32 xl\:tooltip-brand {
+            --tt-bg: var(--color-brand-surface);
 
             &>.tooltip-content,
             &[data-tip]:before {
-                color: var(--color-primary-content)
+                color: var(--color-brand-content)
             }
         }
 
@@ -17997,7 +17997,7 @@
         }
 
         .\32 xl\:tooltip-accent {
-            --tt-bg: var(--color-accent);
+            --tt-bg: var(--color-accent-surface);
 
             &>.tooltip-content,
             &[data-tip]:before {
@@ -18101,8 +18101,8 @@
         }
     }
 
-    .radio-primary {
-        --input-color: var(--color-primary)
+    .radio-brand {
+        --input-color: var(--color-brand-surface)
     }
 
     .radio-secondary {
@@ -18110,7 +18110,7 @@
     }
 
     .radio-accent {
-        --input-color: var(--color-accent)
+        --input-color: var(--color-accent-surface)
     }
 
     .radio-neutral {
@@ -18248,8 +18248,8 @@
             }
         }
 
-        .sm\:radio-primary {
-            --input-color: var(--color-primary)
+        .sm\:radio-brand {
+            --input-color: var(--color-brand-surface)
         }
 
         .sm\:radio-secondary {
@@ -18257,7 +18257,7 @@
         }
 
         .sm\:radio-accent {
-            --input-color: var(--color-accent)
+            --input-color: var(--color-accent-surface)
         }
 
         .sm\:radio-neutral {
@@ -18386,8 +18386,8 @@
             }
         }
 
-        .md\:radio-primary {
-            --input-color: var(--color-primary)
+        .md\:radio-brand {
+            --input-color: var(--color-brand-surface)
         }
 
         .md\:radio-secondary {
@@ -18395,7 +18395,7 @@
         }
 
         .md\:radio-accent {
-            --input-color: var(--color-accent)
+            --input-color: var(--color-accent-surface)
         }
 
         .md\:radio-neutral {
@@ -18524,8 +18524,8 @@
             }
         }
 
-        .lg\:radio-primary {
-            --input-color: var(--color-primary)
+        .lg\:radio-brand {
+            --input-color: var(--color-brand-surface)
         }
 
         .lg\:radio-secondary {
@@ -18533,7 +18533,7 @@
         }
 
         .lg\:radio-accent {
-            --input-color: var(--color-accent)
+            --input-color: var(--color-accent-surface)
         }
 
         .lg\:radio-neutral {
@@ -18662,8 +18662,8 @@
             }
         }
 
-        .xl\:radio-primary {
-            --input-color: var(--color-primary)
+        .xl\:radio-brand {
+            --input-color: var(--color-brand-surface)
         }
 
         .xl\:radio-secondary {
@@ -18671,7 +18671,7 @@
         }
 
         .xl\:radio-accent {
-            --input-color: var(--color-accent)
+            --input-color: var(--color-accent-surface)
         }
 
         .xl\:radio-neutral {
@@ -18800,8 +18800,8 @@
             }
         }
 
-        .\32 xl\:radio-primary {
-            --input-color: var(--color-primary)
+        .\32 xl\:radio-brand {
+            --input-color: var(--color-brand-surface)
         }
 
         .\32 xl\:radio-secondary {
@@ -18809,7 +18809,7 @@
         }
 
         .\32 xl\:radio-accent {
-            --input-color: var(--color-accent)
+            --input-color: var(--color-accent-surface)
         }
 
         .\32 xl\:radio-neutral {
@@ -20416,11 +20416,11 @@
         }
     }
 
-    .toggle-primary {
+    .toggle-brand {
 
         &:checked,
         &[aria-checked=true] {
-            --input-color: var(--color-primary)
+            --input-color: var(--color-brand-surface)
         }
     }
 
@@ -20436,7 +20436,7 @@
 
         &:checked,
         &[aria-checked=true] {
-            --input-color: var(--color-accent)
+            --input-color: var(--color-accent-surface)
         }
     }
 
@@ -20665,11 +20665,11 @@
             }
         }
 
-        .sm\:toggle-primary {
+        .sm\:toggle-brand {
 
             &:checked,
             &[aria-checked=true] {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -20685,7 +20685,7 @@
 
             &:checked,
             &[aria-checked=true] {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -20915,11 +20915,11 @@
             }
         }
 
-        .md\:toggle-primary {
+        .md\:toggle-brand {
 
             &:checked,
             &[aria-checked=true] {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -20935,7 +20935,7 @@
 
             &:checked,
             &[aria-checked=true] {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -21165,11 +21165,11 @@
             }
         }
 
-        .lg\:toggle-primary {
+        .lg\:toggle-brand {
 
             &:checked,
             &[aria-checked=true] {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -21185,7 +21185,7 @@
 
             &:checked,
             &[aria-checked=true] {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -21415,11 +21415,11 @@
             }
         }
 
-        .xl\:toggle-primary {
+        .xl\:toggle-brand {
 
             &:checked,
             &[aria-checked=true] {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -21435,7 +21435,7 @@
 
             &:checked,
             &[aria-checked=true] {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -21665,11 +21665,11 @@
             }
         }
 
-        .\32 xl\:toggle-primary {
+        .\32 xl\:toggle-brand {
 
             &:checked,
             &[aria-checked=true] {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -21685,7 +21685,7 @@
 
             &:checked,
             &[aria-checked=true] {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -23296,12 +23296,12 @@
         }
     }
 
-    .link-primary {
-        color: var(--color-primary);
+    .link-brand {
+        color: var(--color-brand-surface);
 
         @media (hover:hover) {
             &:hover {
-                color: color-mix(in oklab, var(--color-primary)80%, #000)
+                color: color-mix(in oklab, var(--color-brand-surface)80%, #000)
             }
         }
     }
@@ -23317,11 +23317,11 @@
     }
 
     .link-accent {
-        color: var(--color-accent);
+        color: var(--color-accent-surface);
 
         @media (hover:hover) {
             &:hover {
-                color: color-mix(in oklab, var(--color-accent)80%, #000)
+                color: color-mix(in oklab, var(--color-accent-surface)80%, #000)
             }
         }
     }
@@ -23411,12 +23411,12 @@
             }
         }
 
-        .sm\:link-primary {
-            color: var(--color-primary);
+        .sm\:link-brand {
+            color: var(--color-brand-surface);
 
             @media (hover:hover) {
                 &:hover {
-                    color: color-mix(in oklab, var(--color-primary)80%, #000)
+                    color: color-mix(in oklab, var(--color-brand-surface)80%, #000)
                 }
             }
         }
@@ -23432,11 +23432,11 @@
         }
 
         .sm\:link-accent {
-            color: var(--color-accent);
+            color: var(--color-accent-surface);
 
             @media (hover:hover) {
                 &:hover {
-                    color: color-mix(in oklab, var(--color-accent)80%, #000)
+                    color: color-mix(in oklab, var(--color-accent-surface)80%, #000)
                 }
             }
         }
@@ -23527,12 +23527,12 @@
             }
         }
 
-        .md\:link-primary {
-            color: var(--color-primary);
+        .md\:link-brand {
+            color: var(--color-brand-surface);
 
             @media (hover:hover) {
                 &:hover {
-                    color: color-mix(in oklab, var(--color-primary)80%, #000)
+                    color: color-mix(in oklab, var(--color-brand-surface)80%, #000)
                 }
             }
         }
@@ -23548,11 +23548,11 @@
         }
 
         .md\:link-accent {
-            color: var(--color-accent);
+            color: var(--color-accent-surface);
 
             @media (hover:hover) {
                 &:hover {
-                    color: color-mix(in oklab, var(--color-accent)80%, #000)
+                    color: color-mix(in oklab, var(--color-accent-surface)80%, #000)
                 }
             }
         }
@@ -23643,12 +23643,12 @@
             }
         }
 
-        .lg\:link-primary {
-            color: var(--color-primary);
+        .lg\:link-brand {
+            color: var(--color-brand-surface);
 
             @media (hover:hover) {
                 &:hover {
-                    color: color-mix(in oklab, var(--color-primary)80%, #000)
+                    color: color-mix(in oklab, var(--color-brand-surface)80%, #000)
                 }
             }
         }
@@ -23664,11 +23664,11 @@
         }
 
         .lg\:link-accent {
-            color: var(--color-accent);
+            color: var(--color-accent-surface);
 
             @media (hover:hover) {
                 &:hover {
-                    color: color-mix(in oklab, var(--color-accent)80%, #000)
+                    color: color-mix(in oklab, var(--color-accent-surface)80%, #000)
                 }
             }
         }
@@ -23759,12 +23759,12 @@
             }
         }
 
-        .xl\:link-primary {
-            color: var(--color-primary);
+        .xl\:link-brand {
+            color: var(--color-brand-surface);
 
             @media (hover:hover) {
                 &:hover {
-                    color: color-mix(in oklab, var(--color-primary)80%, #000)
+                    color: color-mix(in oklab, var(--color-brand-surface)80%, #000)
                 }
             }
         }
@@ -23780,11 +23780,11 @@
         }
 
         .xl\:link-accent {
-            color: var(--color-accent);
+            color: var(--color-accent-surface);
 
             @media (hover:hover) {
                 &:hover {
-                    color: color-mix(in oklab, var(--color-accent)80%, #000)
+                    color: color-mix(in oklab, var(--color-accent-surface)80%, #000)
                 }
             }
         }
@@ -23875,12 +23875,12 @@
             }
         }
 
-        .\32 xl\:link-primary {
-            color: var(--color-primary);
+        .\32 xl\:link-brand {
+            color: var(--color-brand-surface);
 
             @media (hover:hover) {
                 &:hover {
-                    color: color-mix(in oklab, var(--color-primary)80%, #000)
+                    color: color-mix(in oklab, var(--color-brand-surface)80%, #000)
                 }
             }
         }
@@ -23896,11 +23896,11 @@
         }
 
         .\32 xl\:link-accent {
-            color: var(--color-accent);
+            color: var(--color-accent-surface);
 
             @media (hover:hover) {
                 &:hover {
-                    color: color-mix(in oklab, var(--color-accent)80%, #000)
+                    color: color-mix(in oklab, var(--color-accent-surface)80%, #000)
                 }
             }
         }
@@ -25527,13 +25527,13 @@
             }
         }
 
-        & .step-primary {
+        & .step-brand {
 
-            &+.step-primary:before,
+            &+.step-brand:before,
             &:after,
             &>.step-icon {
-                --step-bg: var(--color-primary);
-                --step-fg: var(--color-primary-content)
+                --step-bg: var(--color-brand-surface);
+                --step-fg: var(--color-brand-content)
             }
         }
 
@@ -25552,7 +25552,7 @@
             &+.step-accent:before,
             &:after,
             &>.step-icon {
-                --step-bg: var(--color-accent);
+                --step-bg: var(--color-accent-surface);
                 --step-fg: var(--color-accent-content)
             }
         }
@@ -25721,13 +25721,13 @@
                 }
             }
 
-            & .step-primary {
+            & .step-brand {
 
-                &+.step-primary:before,
+                &+.step-brand:before,
                 &:after,
                 &>.step-icon {
-                    --step-bg: var(--color-primary);
-                    --step-fg: var(--color-primary-content)
+                    --step-bg: var(--color-brand-surface);
+                    --step-fg: var(--color-brand-content)
                 }
             }
 
@@ -25746,7 +25746,7 @@
                 &+.step-accent:before,
                 &:after,
                 &>.step-icon {
-                    --step-bg: var(--color-accent);
+                    --step-bg: var(--color-accent-surface);
                     --step-fg: var(--color-accent-content)
                 }
             }
@@ -25916,13 +25916,13 @@
                 }
             }
 
-            & .step-primary {
+            & .step-brand {
 
-                &+.step-primary:before,
+                &+.step-brand:before,
                 &:after,
                 &>.step-icon {
-                    --step-bg: var(--color-primary);
-                    --step-fg: var(--color-primary-content)
+                    --step-bg: var(--color-brand-surface);
+                    --step-fg: var(--color-brand-content)
                 }
             }
 
@@ -25941,7 +25941,7 @@
                 &+.step-accent:before,
                 &:after,
                 &>.step-icon {
-                    --step-bg: var(--color-accent);
+                    --step-bg: var(--color-accent-surface);
                     --step-fg: var(--color-accent-content)
                 }
             }
@@ -26111,13 +26111,13 @@
                 }
             }
 
-            & .step-primary {
+            & .step-brand {
 
-                &+.step-primary:before,
+                &+.step-brand:before,
                 &:after,
                 &>.step-icon {
-                    --step-bg: var(--color-primary);
-                    --step-fg: var(--color-primary-content)
+                    --step-bg: var(--color-brand-surface);
+                    --step-fg: var(--color-brand-content)
                 }
             }
 
@@ -26136,7 +26136,7 @@
                 &+.step-accent:before,
                 &:after,
                 &>.step-icon {
-                    --step-bg: var(--color-accent);
+                    --step-bg: var(--color-accent-surface);
                     --step-fg: var(--color-accent-content)
                 }
             }
@@ -26306,13 +26306,13 @@
                 }
             }
 
-            & .step-primary {
+            & .step-brand {
 
-                &+.step-primary:before,
+                &+.step-brand:before,
                 &:after,
                 &>.step-icon {
-                    --step-bg: var(--color-primary);
-                    --step-fg: var(--color-primary-content)
+                    --step-bg: var(--color-brand-surface);
+                    --step-fg: var(--color-brand-content)
                 }
             }
 
@@ -26331,7 +26331,7 @@
                 &+.step-accent:before,
                 &:after,
                 &>.step-icon {
-                    --step-bg: var(--color-accent);
+                    --step-bg: var(--color-accent-surface);
                     --step-fg: var(--color-accent-content)
                 }
             }
@@ -26501,13 +26501,13 @@
                 }
             }
 
-            & .step-primary {
+            & .step-brand {
 
-                &+.step-primary:before,
+                &+.step-brand:before,
                 &:after,
                 &>.step-icon {
-                    --step-bg: var(--color-primary);
-                    --step-fg: var(--color-primary-content)
+                    --step-bg: var(--color-brand-surface);
+                    --step-fg: var(--color-brand-content)
                 }
             }
 
@@ -26526,7 +26526,7 @@
                 &+.step-accent:before,
                 &:after,
                 &>.step-icon {
-                    --step-bg: var(--color-accent);
+                    --step-bg: var(--color-accent-surface);
                     --step-fg: var(--color-accent-content)
                 }
             }
@@ -27935,11 +27935,11 @@
         }
     }
 
-    .divider-primary {
+    .divider-brand {
 
         &:before,
         &:after {
-            background-color: var(--color-primary)
+            background-color: var(--color-brand-surface)
         }
     }
 
@@ -27955,7 +27955,7 @@
 
         &:before,
         &:after {
-            background-color: var(--color-accent)
+            background-color: var(--color-accent-surface)
         }
     }
 
@@ -28069,11 +28069,11 @@
             }
         }
 
-        .sm\:divider-primary {
+        .sm\:divider-brand {
 
             &:before,
             &:after {
-                background-color: var(--color-primary)
+                background-color: var(--color-brand-surface)
             }
         }
 
@@ -28089,7 +28089,7 @@
 
             &:before,
             &:after {
-                background-color: var(--color-accent)
+                background-color: var(--color-accent-surface)
             }
         }
 
@@ -28204,11 +28204,11 @@
             }
         }
 
-        .md\:divider-primary {
+        .md\:divider-brand {
 
             &:before,
             &:after {
-                background-color: var(--color-primary)
+                background-color: var(--color-brand-surface)
             }
         }
 
@@ -28224,7 +28224,7 @@
 
             &:before,
             &:after {
-                background-color: var(--color-accent)
+                background-color: var(--color-accent-surface)
             }
         }
 
@@ -28339,11 +28339,11 @@
             }
         }
 
-        .lg\:divider-primary {
+        .lg\:divider-brand {
 
             &:before,
             &:after {
-                background-color: var(--color-primary)
+                background-color: var(--color-brand-surface)
             }
         }
 
@@ -28359,7 +28359,7 @@
 
             &:before,
             &:after {
-                background-color: var(--color-accent)
+                background-color: var(--color-accent-surface)
             }
         }
 
@@ -28474,11 +28474,11 @@
             }
         }
 
-        .xl\:divider-primary {
+        .xl\:divider-brand {
 
             &:before,
             &:after {
-                background-color: var(--color-primary)
+                background-color: var(--color-brand-surface)
             }
         }
 
@@ -28494,7 +28494,7 @@
 
             &:before,
             &:after {
-                background-color: var(--color-accent)
+                background-color: var(--color-accent-surface)
             }
         }
 
@@ -28609,11 +28609,11 @@
             }
         }
 
-        .\32 xl\:divider-primary {
+        .\32 xl\:divider-brand {
 
             &:before,
             &:after {
-                background-color: var(--color-primary)
+                background-color: var(--color-brand-surface)
             }
         }
 
@@ -28629,7 +28629,7 @@
 
             &:before,
             &:after {
-                background-color: var(--color-accent)
+                background-color: var(--color-accent-surface)
             }
         }
 
@@ -30338,17 +30338,17 @@
         }
     }
 
-    .file-input-primary {
-        --btn-color: var(--color-primary);
+    .file-input-brand {
+        --btn-color: var(--color-brand-surface);
 
         &::file-selector-button {
-            color: var(--color-primary-content)
+            color: var(--color-brand-content)
         }
 
         &,
         &:focus,
         &:focus-within {
-            --input-color: var(--color-primary)
+            --input-color: var(--color-brand-surface)
         }
     }
 
@@ -30367,7 +30367,7 @@
     }
 
     .file-input-accent {
-        --btn-color: var(--color-accent);
+        --btn-color: var(--color-accent-surface);
 
         &::file-selector-button {
             color: var(--color-accent-content)
@@ -30376,7 +30376,7 @@
         &,
         &:focus,
         &:focus-within {
-            --input-color: var(--color-accent)
+            --input-color: var(--color-accent-surface)
         }
     }
 
@@ -30615,17 +30615,17 @@
             }
         }
 
-        .sm\:file-input-primary {
-            --btn-color: var(--color-primary);
+        .sm\:file-input-brand {
+            --btn-color: var(--color-brand-surface);
 
             &::file-selector-button {
-                color: var(--color-primary-content)
+                color: var(--color-brand-content)
             }
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -30644,7 +30644,7 @@
         }
 
         .sm\:file-input-accent {
-            --btn-color: var(--color-accent);
+            --btn-color: var(--color-accent-surface);
 
             &::file-selector-button {
                 color: var(--color-accent-content)
@@ -30653,7 +30653,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -30893,17 +30893,17 @@
             }
         }
 
-        .md\:file-input-primary {
-            --btn-color: var(--color-primary);
+        .md\:file-input-brand {
+            --btn-color: var(--color-brand-surface);
 
             &::file-selector-button {
-                color: var(--color-primary-content)
+                color: var(--color-brand-content)
             }
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -30922,7 +30922,7 @@
         }
 
         .md\:file-input-accent {
-            --btn-color: var(--color-accent);
+            --btn-color: var(--color-accent-surface);
 
             &::file-selector-button {
                 color: var(--color-accent-content)
@@ -30931,7 +30931,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -31171,17 +31171,17 @@
             }
         }
 
-        .lg\:file-input-primary {
-            --btn-color: var(--color-primary);
+        .lg\:file-input-brand {
+            --btn-color: var(--color-brand-surface);
 
             &::file-selector-button {
-                color: var(--color-primary-content)
+                color: var(--color-brand-content)
             }
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -31200,7 +31200,7 @@
         }
 
         .lg\:file-input-accent {
-            --btn-color: var(--color-accent);
+            --btn-color: var(--color-accent-surface);
 
             &::file-selector-button {
                 color: var(--color-accent-content)
@@ -31209,7 +31209,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -31449,17 +31449,17 @@
             }
         }
 
-        .xl\:file-input-primary {
-            --btn-color: var(--color-primary);
+        .xl\:file-input-brand {
+            --btn-color: var(--color-brand-surface);
 
             &::file-selector-button {
-                color: var(--color-primary-content)
+                color: var(--color-brand-content)
             }
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -31478,7 +31478,7 @@
         }
 
         .xl\:file-input-accent {
-            --btn-color: var(--color-accent);
+            --btn-color: var(--color-accent-surface);
 
             &::file-selector-button {
                 color: var(--color-accent-content)
@@ -31487,7 +31487,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -31727,17 +31727,17 @@
             }
         }
 
-        .\32 xl\:file-input-primary {
-            --btn-color: var(--color-primary);
+        .\32 xl\:file-input-brand {
+            --btn-color: var(--color-brand-surface);
 
             &::file-selector-button {
-                color: var(--color-primary-content)
+                color: var(--color-brand-content)
             }
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -31756,7 +31756,7 @@
         }
 
         .\32 xl\:file-input-accent {
-            --btn-color: var(--color-accent);
+            --btn-color: var(--color-accent-surface);
 
             &::file-selector-button {
                 color: var(--color-accent-content)
@@ -31765,7 +31765,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -35757,9 +35757,9 @@
         background-image: none
     }
 
-    .badge-primary {
-        --badge-color: var(--color-primary);
-        --badge-fg: var(--color-primary-content)
+    .badge-brand {
+        --badge-color: var(--color-brand-surface);
+        --badge-fg: var(--color-brand-content)
     }
 
     .badge-secondary {
@@ -35768,7 +35768,7 @@
     }
 
     .badge-accent {
-        --badge-color: var(--color-accent);
+        --badge-color: var(--color-accent-surface);
         --badge-fg: var(--color-accent-content)
     }
 
@@ -35878,9 +35878,9 @@
             background-image: none
         }
 
-        .sm\:badge-primary {
-            --badge-color: var(--color-primary);
-            --badge-fg: var(--color-primary-content)
+        .sm\:badge-brand {
+            --badge-color: var(--color-brand-surface);
+            --badge-fg: var(--color-brand-content)
         }
 
         .sm\:badge-secondary {
@@ -35889,7 +35889,7 @@
         }
 
         .sm\:badge-accent {
-            --badge-color: var(--color-accent);
+            --badge-color: var(--color-accent-surface);
             --badge-fg: var(--color-accent-content)
         }
 
@@ -36000,9 +36000,9 @@
             background-image: none
         }
 
-        .md\:badge-primary {
-            --badge-color: var(--color-primary);
-            --badge-fg: var(--color-primary-content)
+        .md\:badge-brand {
+            --badge-color: var(--color-brand-surface);
+            --badge-fg: var(--color-brand-content)
         }
 
         .md\:badge-secondary {
@@ -36011,7 +36011,7 @@
         }
 
         .md\:badge-accent {
-            --badge-color: var(--color-accent);
+            --badge-color: var(--color-accent-surface);
             --badge-fg: var(--color-accent-content)
         }
 
@@ -36122,9 +36122,9 @@
             background-image: none
         }
 
-        .lg\:badge-primary {
-            --badge-color: var(--color-primary);
-            --badge-fg: var(--color-primary-content)
+        .lg\:badge-brand {
+            --badge-color: var(--color-brand-surface);
+            --badge-fg: var(--color-brand-content)
         }
 
         .lg\:badge-secondary {
@@ -36133,7 +36133,7 @@
         }
 
         .lg\:badge-accent {
-            --badge-color: var(--color-accent);
+            --badge-color: var(--color-accent-surface);
             --badge-fg: var(--color-accent-content)
         }
 
@@ -36244,9 +36244,9 @@
             background-image: none
         }
 
-        .xl\:badge-primary {
-            --badge-color: var(--color-primary);
-            --badge-fg: var(--color-primary-content)
+        .xl\:badge-brand {
+            --badge-color: var(--color-brand-surface);
+            --badge-fg: var(--color-brand-content)
         }
 
         .xl\:badge-secondary {
@@ -36255,7 +36255,7 @@
         }
 
         .xl\:badge-accent {
-            --badge-color: var(--color-accent);
+            --badge-color: var(--color-accent-surface);
             --badge-fg: var(--color-accent-content)
         }
 
@@ -36366,9 +36366,9 @@
             background-image: none
         }
 
-        .\32 xl\:badge-primary {
-            --badge-color: var(--color-primary);
-            --badge-fg: var(--color-primary-content)
+        .\32 xl\:badge-brand {
+            --badge-color: var(--color-brand-surface);
+            --badge-fg: var(--color-brand-content)
         }
 
         .\32 xl\:badge-secondary {
@@ -36377,7 +36377,7 @@
         }
 
         .\32 xl\:badge-accent {
-            --badge-color: var(--color-accent);
+            --badge-color: var(--color-accent-surface);
             --badge-fg: var(--color-accent-content)
         }
 
@@ -38831,12 +38831,12 @@
         }
     }
 
-    .select-primary {
+    .select-brand {
 
         &,
         &:focus,
         &:focus-within {
-            --input-color: var(--color-primary)
+            --input-color: var(--color-brand-surface)
         }
     }
 
@@ -38854,7 +38854,7 @@
         &,
         &:focus,
         &:focus-within {
-            --input-color: var(--color-accent)
+            --input-color: var(--color-accent-surface)
         }
     }
 
@@ -39033,12 +39033,12 @@
             }
         }
 
-        .sm\:select-primary {
+        .sm\:select-brand {
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -39056,7 +39056,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -39236,12 +39236,12 @@
             }
         }
 
-        .md\:select-primary {
+        .md\:select-brand {
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -39259,7 +39259,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -39439,12 +39439,12 @@
             }
         }
 
-        .lg\:select-primary {
+        .lg\:select-brand {
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -39462,7 +39462,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -39642,12 +39642,12 @@
             }
         }
 
-        .xl\:select-primary {
+        .xl\:select-brand {
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -39665,7 +39665,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -39845,12 +39845,12 @@
             }
         }
 
-        .\32 xl\:select-primary {
+        .\32 xl\:select-brand {
 
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-primary)
+                --input-color: var(--color-brand-surface)
             }
         }
 
@@ -39868,7 +39868,7 @@
             &,
             &:focus,
             &:focus-within {
-                --input-color: var(--color-accent)
+                --input-color: var(--color-accent-surface)
             }
         }
 
@@ -43647,244 +43647,244 @@
         border-color: color-mix(in oklab, var(--color-base-content)90%, #0000)
     }
 
-    .bg-primary {
-        background-color: var(--color-primary)
+    .bg-brand {
+        background-color: var(--color-brand-surface)
     }
 
-    .bg-primary\/10 {
-        background-color: color-mix(in oklab, var(--color-primary)10%, #0000)
+    .bg-brand\/10 {
+        background-color: color-mix(in oklab, var(--color-brand-surface)10%, #0000)
     }
 
-    .bg-primary\/20 {
-        background-color: color-mix(in oklab, var(--color-primary)20%, #0000)
+    .bg-brand\/20 {
+        background-color: color-mix(in oklab, var(--color-brand-surface)20%, #0000)
     }
 
-    .bg-primary\/30 {
-        background-color: color-mix(in oklab, var(--color-primary)30%, #0000)
+    .bg-brand\/30 {
+        background-color: color-mix(in oklab, var(--color-brand-surface)30%, #0000)
     }
 
-    .bg-primary\/40 {
-        background-color: color-mix(in oklab, var(--color-primary)40%, #0000)
+    .bg-brand\/40 {
+        background-color: color-mix(in oklab, var(--color-brand-surface)40%, #0000)
     }
 
-    .bg-primary\/50 {
-        background-color: color-mix(in oklab, var(--color-primary)50%, #0000)
+    .bg-brand\/50 {
+        background-color: color-mix(in oklab, var(--color-brand-surface)50%, #0000)
     }
 
-    .bg-primary\/60 {
-        background-color: color-mix(in oklab, var(--color-primary)60%, #0000)
+    .bg-brand\/60 {
+        background-color: color-mix(in oklab, var(--color-brand-surface)60%, #0000)
     }
 
-    .bg-primary\/70 {
-        background-color: color-mix(in oklab, var(--color-primary)70%, #0000)
+    .bg-brand\/70 {
+        background-color: color-mix(in oklab, var(--color-brand-surface)70%, #0000)
     }
 
-    .bg-primary\/80 {
-        background-color: color-mix(in oklab, var(--color-primary)80%, #0000)
+    .bg-brand\/80 {
+        background-color: color-mix(in oklab, var(--color-brand-surface)80%, #0000)
     }
 
-    .bg-primary\/90 {
-        background-color: color-mix(in oklab, var(--color-primary)90%, #0000)
+    .bg-brand\/90 {
+        background-color: color-mix(in oklab, var(--color-brand-surface)90%, #0000)
     }
 
-    .text-primary {
-        color: var(--color-primary)
+    .text-brand {
+        color: var(--color-brand-surface)
     }
 
-    .text-primary\/10 {
-        color: color-mix(in oklab, var(--color-primary)10%, #0000)
+    .text-brand\/10 {
+        color: color-mix(in oklab, var(--color-brand-surface)10%, #0000)
     }
 
-    .text-primary\/20 {
-        color: color-mix(in oklab, var(--color-primary)20%, #0000)
+    .text-brand\/20 {
+        color: color-mix(in oklab, var(--color-brand-surface)20%, #0000)
     }
 
-    .text-primary\/30 {
-        color: color-mix(in oklab, var(--color-primary)30%, #0000)
+    .text-brand\/30 {
+        color: color-mix(in oklab, var(--color-brand-surface)30%, #0000)
     }
 
-    .text-primary\/40 {
-        color: color-mix(in oklab, var(--color-primary)40%, #0000)
+    .text-brand\/40 {
+        color: color-mix(in oklab, var(--color-brand-surface)40%, #0000)
     }
 
-    .text-primary\/50 {
-        color: color-mix(in oklab, var(--color-primary)50%, #0000)
+    .text-brand\/50 {
+        color: color-mix(in oklab, var(--color-brand-surface)50%, #0000)
     }
 
-    .text-primary\/60 {
-        color: color-mix(in oklab, var(--color-primary)60%, #0000)
+    .text-brand\/60 {
+        color: color-mix(in oklab, var(--color-brand-surface)60%, #0000)
     }
 
-    .text-primary\/70 {
-        color: color-mix(in oklab, var(--color-primary)70%, #0000)
+    .text-brand\/70 {
+        color: color-mix(in oklab, var(--color-brand-surface)70%, #0000)
     }
 
-    .text-primary\/80 {
-        color: color-mix(in oklab, var(--color-primary)80%, #0000)
+    .text-brand\/80 {
+        color: color-mix(in oklab, var(--color-brand-surface)80%, #0000)
     }
 
-    .text-primary\/90 {
-        color: color-mix(in oklab, var(--color-primary)90%, #0000)
+    .text-brand\/90 {
+        color: color-mix(in oklab, var(--color-brand-surface)90%, #0000)
     }
 
-    .border-primary {
-        border-color: var(--color-primary)
+    .border-brand {
+        border-color: var(--color-brand-surface)
     }
 
-    .border-primary\/10 {
-        border-color: color-mix(in oklab, var(--color-primary)10%, #0000)
+    .border-brand\/10 {
+        border-color: color-mix(in oklab, var(--color-brand-surface)10%, #0000)
     }
 
-    .border-primary\/20 {
-        border-color: color-mix(in oklab, var(--color-primary)20%, #0000)
+    .border-brand\/20 {
+        border-color: color-mix(in oklab, var(--color-brand-surface)20%, #0000)
     }
 
-    .border-primary\/30 {
-        border-color: color-mix(in oklab, var(--color-primary)30%, #0000)
+    .border-brand\/30 {
+        border-color: color-mix(in oklab, var(--color-brand-surface)30%, #0000)
     }
 
-    .border-primary\/40 {
-        border-color: color-mix(in oklab, var(--color-primary)40%, #0000)
+    .border-brand\/40 {
+        border-color: color-mix(in oklab, var(--color-brand-surface)40%, #0000)
     }
 
-    .border-primary\/50 {
-        border-color: color-mix(in oklab, var(--color-primary)50%, #0000)
+    .border-brand\/50 {
+        border-color: color-mix(in oklab, var(--color-brand-surface)50%, #0000)
     }
 
-    .border-primary\/60 {
-        border-color: color-mix(in oklab, var(--color-primary)60%, #0000)
+    .border-brand\/60 {
+        border-color: color-mix(in oklab, var(--color-brand-surface)60%, #0000)
     }
 
-    .border-primary\/70 {
-        border-color: color-mix(in oklab, var(--color-primary)70%, #0000)
+    .border-brand\/70 {
+        border-color: color-mix(in oklab, var(--color-brand-surface)70%, #0000)
     }
 
-    .border-primary\/80 {
-        border-color: color-mix(in oklab, var(--color-primary)80%, #0000)
+    .border-brand\/80 {
+        border-color: color-mix(in oklab, var(--color-brand-surface)80%, #0000)
     }
 
-    .border-primary\/90 {
-        border-color: color-mix(in oklab, var(--color-primary)90%, #0000)
+    .border-brand\/90 {
+        border-color: color-mix(in oklab, var(--color-brand-surface)90%, #0000)
     }
 
-    .bg-primary-content {
-        background-color: var(--color-primary-content)
+    .bg-brand-content {
+        background-color: var(--color-brand-content)
     }
 
-    .bg-primary-content\/10 {
-        background-color: color-mix(in oklab, var(--color-primary-content)10%, #0000)
+    .bg-brand-content\/10 {
+        background-color: color-mix(in oklab, var(--color-brand-content)10%, #0000)
     }
 
-    .bg-primary-content\/20 {
-        background-color: color-mix(in oklab, var(--color-primary-content)20%, #0000)
+    .bg-brand-content\/20 {
+        background-color: color-mix(in oklab, var(--color-brand-content)20%, #0000)
     }
 
-    .bg-primary-content\/30 {
-        background-color: color-mix(in oklab, var(--color-primary-content)30%, #0000)
+    .bg-brand-content\/30 {
+        background-color: color-mix(in oklab, var(--color-brand-content)30%, #0000)
     }
 
-    .bg-primary-content\/40 {
-        background-color: color-mix(in oklab, var(--color-primary-content)40%, #0000)
+    .bg-brand-content\/40 {
+        background-color: color-mix(in oklab, var(--color-brand-content)40%, #0000)
     }
 
-    .bg-primary-content\/50 {
-        background-color: color-mix(in oklab, var(--color-primary-content)50%, #0000)
+    .bg-brand-content\/50 {
+        background-color: color-mix(in oklab, var(--color-brand-content)50%, #0000)
     }
 
-    .bg-primary-content\/60 {
-        background-color: color-mix(in oklab, var(--color-primary-content)60%, #0000)
+    .bg-brand-content\/60 {
+        background-color: color-mix(in oklab, var(--color-brand-content)60%, #0000)
     }
 
-    .bg-primary-content\/70 {
-        background-color: color-mix(in oklab, var(--color-primary-content)70%, #0000)
+    .bg-brand-content\/70 {
+        background-color: color-mix(in oklab, var(--color-brand-content)70%, #0000)
     }
 
-    .bg-primary-content\/80 {
-        background-color: color-mix(in oklab, var(--color-primary-content)80%, #0000)
+    .bg-brand-content\/80 {
+        background-color: color-mix(in oklab, var(--color-brand-content)80%, #0000)
     }
 
-    .bg-primary-content\/90 {
-        background-color: color-mix(in oklab, var(--color-primary-content)90%, #0000)
+    .bg-brand-content\/90 {
+        background-color: color-mix(in oklab, var(--color-brand-content)90%, #0000)
     }
 
-    .text-primary-content {
-        color: var(--color-primary-content)
+    .text-brand-content {
+        color: var(--color-brand-content)
     }
 
-    .text-primary-content\/10 {
-        color: color-mix(in oklab, var(--color-primary-content)10%, #0000)
+    .text-brand-content\/10 {
+        color: color-mix(in oklab, var(--color-brand-content)10%, #0000)
     }
 
-    .text-primary-content\/20 {
-        color: color-mix(in oklab, var(--color-primary-content)20%, #0000)
+    .text-brand-content\/20 {
+        color: color-mix(in oklab, var(--color-brand-content)20%, #0000)
     }
 
-    .text-primary-content\/30 {
-        color: color-mix(in oklab, var(--color-primary-content)30%, #0000)
+    .text-brand-content\/30 {
+        color: color-mix(in oklab, var(--color-brand-content)30%, #0000)
     }
 
-    .text-primary-content\/40 {
-        color: color-mix(in oklab, var(--color-primary-content)40%, #0000)
+    .text-brand-content\/40 {
+        color: color-mix(in oklab, var(--color-brand-content)40%, #0000)
     }
 
-    .text-primary-content\/50 {
-        color: color-mix(in oklab, var(--color-primary-content)50%, #0000)
+    .text-brand-content\/50 {
+        color: color-mix(in oklab, var(--color-brand-content)50%, #0000)
     }
 
-    .text-primary-content\/60 {
-        color: color-mix(in oklab, var(--color-primary-content)60%, #0000)
+    .text-brand-content\/60 {
+        color: color-mix(in oklab, var(--color-brand-content)60%, #0000)
     }
 
-    .text-primary-content\/70 {
-        color: color-mix(in oklab, var(--color-primary-content)70%, #0000)
+    .text-brand-content\/70 {
+        color: color-mix(in oklab, var(--color-brand-content)70%, #0000)
     }
 
-    .text-primary-content\/80 {
-        color: color-mix(in oklab, var(--color-primary-content)80%, #0000)
+    .text-brand-content\/80 {
+        color: color-mix(in oklab, var(--color-brand-content)80%, #0000)
     }
 
-    .text-primary-content\/90 {
-        color: color-mix(in oklab, var(--color-primary-content)90%, #0000)
+    .text-brand-content\/90 {
+        color: color-mix(in oklab, var(--color-brand-content)90%, #0000)
     }
 
-    .border-primary-content {
-        border-color: var(--color-primary-content)
+    .border-brand-content {
+        border-color: var(--color-brand-content)
     }
 
-    .border-primary-content\/10 {
-        border-color: color-mix(in oklab, var(--color-primary-content)10%, #0000)
+    .border-brand-content\/10 {
+        border-color: color-mix(in oklab, var(--color-brand-content)10%, #0000)
     }
 
-    .border-primary-content\/20 {
-        border-color: color-mix(in oklab, var(--color-primary-content)20%, #0000)
+    .border-brand-content\/20 {
+        border-color: color-mix(in oklab, var(--color-brand-content)20%, #0000)
     }
 
-    .border-primary-content\/30 {
-        border-color: color-mix(in oklab, var(--color-primary-content)30%, #0000)
+    .border-brand-content\/30 {
+        border-color: color-mix(in oklab, var(--color-brand-content)30%, #0000)
     }
 
-    .border-primary-content\/40 {
-        border-color: color-mix(in oklab, var(--color-primary-content)40%, #0000)
+    .border-brand-content\/40 {
+        border-color: color-mix(in oklab, var(--color-brand-content)40%, #0000)
     }
 
-    .border-primary-content\/50 {
-        border-color: color-mix(in oklab, var(--color-primary-content)50%, #0000)
+    .border-brand-content\/50 {
+        border-color: color-mix(in oklab, var(--color-brand-content)50%, #0000)
     }
 
-    .border-primary-content\/60 {
-        border-color: color-mix(in oklab, var(--color-primary-content)60%, #0000)
+    .border-brand-content\/60 {
+        border-color: color-mix(in oklab, var(--color-brand-content)60%, #0000)
     }
 
-    .border-primary-content\/70 {
-        border-color: color-mix(in oklab, var(--color-primary-content)70%, #0000)
+    .border-brand-content\/70 {
+        border-color: color-mix(in oklab, var(--color-brand-content)70%, #0000)
     }
 
-    .border-primary-content\/80 {
-        border-color: color-mix(in oklab, var(--color-primary-content)80%, #0000)
+    .border-brand-content\/80 {
+        border-color: color-mix(in oklab, var(--color-brand-content)80%, #0000)
     }
 
-    .border-primary-content\/90 {
-        border-color: color-mix(in oklab, var(--color-primary-content)90%, #0000)
+    .border-brand-content\/90 {
+        border-color: color-mix(in oklab, var(--color-brand-content)90%, #0000)
     }
 
     .bg-secondary {
@@ -44128,123 +44128,123 @@
     }
 
     .bg-accent {
-        background-color: var(--color-accent)
+        background-color: var(--color-accent-surface)
     }
 
     .bg-accent\/10 {
-        background-color: color-mix(in oklab, var(--color-accent)10%, #0000)
+        background-color: color-mix(in oklab, var(--color-accent-surface)10%, #0000)
     }
 
     .bg-accent\/20 {
-        background-color: color-mix(in oklab, var(--color-accent)20%, #0000)
+        background-color: color-mix(in oklab, var(--color-accent-surface)20%, #0000)
     }
 
     .bg-accent\/30 {
-        background-color: color-mix(in oklab, var(--color-accent)30%, #0000)
+        background-color: color-mix(in oklab, var(--color-accent-surface)30%, #0000)
     }
 
     .bg-accent\/40 {
-        background-color: color-mix(in oklab, var(--color-accent)40%, #0000)
+        background-color: color-mix(in oklab, var(--color-accent-surface)40%, #0000)
     }
 
     .bg-accent\/50 {
-        background-color: color-mix(in oklab, var(--color-accent)50%, #0000)
+        background-color: color-mix(in oklab, var(--color-accent-surface)50%, #0000)
     }
 
     .bg-accent\/60 {
-        background-color: color-mix(in oklab, var(--color-accent)60%, #0000)
+        background-color: color-mix(in oklab, var(--color-accent-surface)60%, #0000)
     }
 
     .bg-accent\/70 {
-        background-color: color-mix(in oklab, var(--color-accent)70%, #0000)
+        background-color: color-mix(in oklab, var(--color-accent-surface)70%, #0000)
     }
 
     .bg-accent\/80 {
-        background-color: color-mix(in oklab, var(--color-accent)80%, #0000)
+        background-color: color-mix(in oklab, var(--color-accent-surface)80%, #0000)
     }
 
     .bg-accent\/90 {
-        background-color: color-mix(in oklab, var(--color-accent)90%, #0000)
+        background-color: color-mix(in oklab, var(--color-accent-surface)90%, #0000)
     }
 
     .text-accent {
-        color: var(--color-accent)
+        color: var(--color-accent-surface)
     }
 
     .text-accent\/10 {
-        color: color-mix(in oklab, var(--color-accent)10%, #0000)
+        color: color-mix(in oklab, var(--color-accent-surface)10%, #0000)
     }
 
     .text-accent\/20 {
-        color: color-mix(in oklab, var(--color-accent)20%, #0000)
+        color: color-mix(in oklab, var(--color-accent-surface)20%, #0000)
     }
 
     .text-accent\/30 {
-        color: color-mix(in oklab, var(--color-accent)30%, #0000)
+        color: color-mix(in oklab, var(--color-accent-surface)30%, #0000)
     }
 
     .text-accent\/40 {
-        color: color-mix(in oklab, var(--color-accent)40%, #0000)
+        color: color-mix(in oklab, var(--color-accent-surface)40%, #0000)
     }
 
     .text-accent\/50 {
-        color: color-mix(in oklab, var(--color-accent)50%, #0000)
+        color: color-mix(in oklab, var(--color-accent-surface)50%, #0000)
     }
 
     .text-accent\/60 {
-        color: color-mix(in oklab, var(--color-accent)60%, #0000)
+        color: color-mix(in oklab, var(--color-accent-surface)60%, #0000)
     }
 
     .text-accent\/70 {
-        color: color-mix(in oklab, var(--color-accent)70%, #0000)
+        color: color-mix(in oklab, var(--color-accent-surface)70%, #0000)
     }
 
     .text-accent\/80 {
-        color: color-mix(in oklab, var(--color-accent)80%, #0000)
+        color: color-mix(in oklab, var(--color-accent-surface)80%, #0000)
     }
 
     .text-accent\/90 {
-        color: color-mix(in oklab, var(--color-accent)90%, #0000)
+        color: color-mix(in oklab, var(--color-accent-surface)90%, #0000)
     }
 
     .border-accent {
-        border-color: var(--color-accent)
+        border-color: var(--color-accent-surface)
     }
 
     .border-accent\/10 {
-        border-color: color-mix(in oklab, var(--color-accent)10%, #0000)
+        border-color: color-mix(in oklab, var(--color-accent-surface)10%, #0000)
     }
 
     .border-accent\/20 {
-        border-color: color-mix(in oklab, var(--color-accent)20%, #0000)
+        border-color: color-mix(in oklab, var(--color-accent-surface)20%, #0000)
     }
 
     .border-accent\/30 {
-        border-color: color-mix(in oklab, var(--color-accent)30%, #0000)
+        border-color: color-mix(in oklab, var(--color-accent-surface)30%, #0000)
     }
 
     .border-accent\/40 {
-        border-color: color-mix(in oklab, var(--color-accent)40%, #0000)
+        border-color: color-mix(in oklab, var(--color-accent-surface)40%, #0000)
     }
 
     .border-accent\/50 {
-        border-color: color-mix(in oklab, var(--color-accent)50%, #0000)
+        border-color: color-mix(in oklab, var(--color-accent-surface)50%, #0000)
     }
 
     .border-accent\/60 {
-        border-color: color-mix(in oklab, var(--color-accent)60%, #0000)
+        border-color: color-mix(in oklab, var(--color-accent-surface)60%, #0000)
     }
 
     .border-accent\/70 {
-        border-color: color-mix(in oklab, var(--color-accent)70%, #0000)
+        border-color: color-mix(in oklab, var(--color-accent-surface)70%, #0000)
     }
 
     .border-accent\/80 {
-        border-color: color-mix(in oklab, var(--color-accent)80%, #0000)
+        border-color: color-mix(in oklab, var(--color-accent-surface)80%, #0000)
     }
 
     .border-accent\/90 {
-        border-color: color-mix(in oklab, var(--color-accent)90%, #0000)
+        border-color: color-mix(in oklab, var(--color-accent-surface)90%, #0000)
     }
 
     .bg-accent-content {
@@ -45616,28 +45616,28 @@
             border-color: var(--color-base-content)
         }
 
-        .sm\:bg-primary {
-            background-color: var(--color-primary)
+        .sm\:bg-brand {
+            background-color: var(--color-brand-surface)
         }
 
-        .sm\:text-primary {
-            color: var(--color-primary)
+        .sm\:text-brand {
+            color: var(--color-brand-surface)
         }
 
-        .sm\:border-primary {
-            border-color: var(--color-primary)
+        .sm\:border-brand {
+            border-color: var(--color-brand-surface)
         }
 
-        .sm\:bg-primary-content {
-            background-color: var(--color-primary-content)
+        .sm\:bg-brand-content {
+            background-color: var(--color-brand-content)
         }
 
-        .sm\:text-primary-content {
-            color: var(--color-primary-content)
+        .sm\:text-brand-content {
+            color: var(--color-brand-content)
         }
 
-        .sm\:border-primary-content {
-            border-color: var(--color-primary-content)
+        .sm\:border-brand-content {
+            border-color: var(--color-brand-content)
         }
 
         .sm\:bg-secondary {
@@ -45665,15 +45665,15 @@
         }
 
         .sm\:bg-accent {
-            background-color: var(--color-accent)
+            background-color: var(--color-accent-surface)
         }
 
         .sm\:text-accent {
-            color: var(--color-accent)
+            color: var(--color-accent-surface)
         }
 
         .sm\:border-accent {
-            border-color: var(--color-accent)
+            border-color: var(--color-accent-surface)
         }
 
         .sm\:bg-accent-content {
@@ -45858,28 +45858,28 @@
             border-color: var(--color-base-content)
         }
 
-        .md\:bg-primary {
-            background-color: var(--color-primary)
+        .md\:bg-brand {
+            background-color: var(--color-brand-surface)
         }
 
-        .md\:text-primary {
-            color: var(--color-primary)
+        .md\:text-brand {
+            color: var(--color-brand-surface)
         }
 
-        .md\:border-primary {
-            border-color: var(--color-primary)
+        .md\:border-brand {
+            border-color: var(--color-brand-surface)
         }
 
-        .md\:bg-primary-content {
-            background-color: var(--color-primary-content)
+        .md\:bg-brand-content {
+            background-color: var(--color-brand-content)
         }
 
-        .md\:text-primary-content {
-            color: var(--color-primary-content)
+        .md\:text-brand-content {
+            color: var(--color-brand-content)
         }
 
-        .md\:border-primary-content {
-            border-color: var(--color-primary-content)
+        .md\:border-brand-content {
+            border-color: var(--color-brand-content)
         }
 
         .md\:bg-secondary {
@@ -45907,15 +45907,15 @@
         }
 
         .md\:bg-accent {
-            background-color: var(--color-accent)
+            background-color: var(--color-accent-surface)
         }
 
         .md\:text-accent {
-            color: var(--color-accent)
+            color: var(--color-accent-surface)
         }
 
         .md\:border-accent {
-            border-color: var(--color-accent)
+            border-color: var(--color-accent-surface)
         }
 
         .md\:bg-accent-content {
@@ -46100,28 +46100,28 @@
             border-color: var(--color-base-content)
         }
 
-        .lg\:bg-primary {
-            background-color: var(--color-primary)
+        .lg\:bg-brand {
+            background-color: var(--color-brand-surface)
         }
 
-        .lg\:text-primary {
-            color: var(--color-primary)
+        .lg\:text-brand {
+            color: var(--color-brand-surface)
         }
 
-        .lg\:border-primary {
-            border-color: var(--color-primary)
+        .lg\:border-brand {
+            border-color: var(--color-brand-surface)
         }
 
-        .lg\:bg-primary-content {
-            background-color: var(--color-primary-content)
+        .lg\:bg-brand-content {
+            background-color: var(--color-brand-content)
         }
 
-        .lg\:text-primary-content {
-            color: var(--color-primary-content)
+        .lg\:text-brand-content {
+            color: var(--color-brand-content)
         }
 
-        .lg\:border-primary-content {
-            border-color: var(--color-primary-content)
+        .lg\:border-brand-content {
+            border-color: var(--color-brand-content)
         }
 
         .lg\:bg-secondary {
@@ -46149,15 +46149,15 @@
         }
 
         .lg\:bg-accent {
-            background-color: var(--color-accent)
+            background-color: var(--color-accent-surface)
         }
 
         .lg\:text-accent {
-            color: var(--color-accent)
+            color: var(--color-accent-surface)
         }
 
         .lg\:border-accent {
-            border-color: var(--color-accent)
+            border-color: var(--color-accent-surface)
         }
 
         .lg\:bg-accent-content {
@@ -46342,28 +46342,28 @@
             border-color: var(--color-base-content)
         }
 
-        .xl\:bg-primary {
-            background-color: var(--color-primary)
+        .xl\:bg-brand {
+            background-color: var(--color-brand-surface)
         }
 
-        .xl\:text-primary {
-            color: var(--color-primary)
+        .xl\:text-brand {
+            color: var(--color-brand-surface)
         }
 
-        .xl\:border-primary {
-            border-color: var(--color-primary)
+        .xl\:border-brand {
+            border-color: var(--color-brand-surface)
         }
 
-        .xl\:bg-primary-content {
-            background-color: var(--color-primary-content)
+        .xl\:bg-brand-content {
+            background-color: var(--color-brand-content)
         }
 
-        .xl\:text-primary-content {
-            color: var(--color-primary-content)
+        .xl\:text-brand-content {
+            color: var(--color-brand-content)
         }
 
-        .xl\:border-primary-content {
-            border-color: var(--color-primary-content)
+        .xl\:border-brand-content {
+            border-color: var(--color-brand-content)
         }
 
         .xl\:bg-secondary {
@@ -46391,15 +46391,15 @@
         }
 
         .xl\:bg-accent {
-            background-color: var(--color-accent)
+            background-color: var(--color-accent-surface)
         }
 
         .xl\:text-accent {
-            color: var(--color-accent)
+            color: var(--color-accent-surface)
         }
 
         .xl\:border-accent {
-            border-color: var(--color-accent)
+            border-color: var(--color-accent-surface)
         }
 
         .xl\:bg-accent-content {
@@ -46584,28 +46584,28 @@
             border-color: var(--color-base-content)
         }
 
-        .\32 xl\:bg-primary {
-            background-color: var(--color-primary)
+        .\32 xl\:bg-brand {
+            background-color: var(--color-brand-surface)
         }
 
-        .\32 xl\:text-primary {
-            color: var(--color-primary)
+        .\32 xl\:text-brand {
+            color: var(--color-brand-surface)
         }
 
-        .\32 xl\:border-primary {
-            border-color: var(--color-primary)
+        .\32 xl\:border-brand {
+            border-color: var(--color-brand-surface)
         }
 
-        .\32 xl\:bg-primary-content {
-            background-color: var(--color-primary-content)
+        .\32 xl\:bg-brand-content {
+            background-color: var(--color-brand-content)
         }
 
-        .\32 xl\:text-primary-content {
-            color: var(--color-primary-content)
+        .\32 xl\:text-brand-content {
+            color: var(--color-brand-content)
         }
 
-        .\32 xl\:border-primary-content {
-            border-color: var(--color-primary-content)
+        .\32 xl\:border-brand-content {
+            border-color: var(--color-brand-content)
         }
 
         .\32 xl\:bg-secondary {
@@ -46633,15 +46633,15 @@
         }
 
         .\32 xl\:bg-accent {
-            background-color: var(--color-accent)
+            background-color: var(--color-accent-surface)
         }
 
         .\32 xl\:text-accent {
-            color: var(--color-accent)
+            color: var(--color-accent-surface)
         }
 
         .\32 xl\:border-accent {
-            border-color: var(--color-accent)
+            border-color: var(--color-accent-surface)
         }
 
         .\32 xl\:bg-accent-content {
@@ -46897,61 +46897,61 @@
         }
     }
 
-    .hover\:bg-primary:hover {
+    .hover\:bg-brand:hover {
         &:hover {
             @media (hover:hover) {
                 & {
-                    background-color: var(--color-primary)
+                    background-color: var(--color-brand-surface)
                 }
             }
         }
     }
 
-    .hover\:text-primary:hover {
+    .hover\:text-brand:hover {
         &:hover {
             @media (hover:hover) {
                 & {
-                    color: var(--color-primary)
+                    color: var(--color-brand-surface)
                 }
             }
         }
     }
 
-    .hover\:border-primary:hover {
+    .hover\:border-brand:hover {
         &:hover {
             @media (hover:hover) {
                 & {
-                    border-color: var(--color-primary)
+                    border-color: var(--color-brand-surface)
                 }
             }
         }
     }
 
-    .hover\:bg-primary-content:hover {
+    .hover\:bg-brand-content:hover {
         &:hover {
             @media (hover:hover) {
                 & {
-                    background-color: var(--color-primary-content)
+                    background-color: var(--color-brand-content)
                 }
             }
         }
     }
 
-    .hover\:text-primary-content:hover {
+    .hover\:text-brand-content:hover {
         &:hover {
             @media (hover:hover) {
                 & {
-                    color: var(--color-primary-content)
+                    color: var(--color-brand-content)
                 }
             }
         }
     }
 
-    .hover\:border-primary-content:hover {
+    .hover\:border-brand-content:hover {
         &:hover {
             @media (hover:hover) {
                 & {
-                    border-color: var(--color-primary-content)
+                    border-color: var(--color-brand-content)
                 }
             }
         }
@@ -47021,7 +47021,7 @@
         &:hover {
             @media (hover:hover) {
                 & {
-                    background-color: var(--color-accent)
+                    background-color: var(--color-accent-surface)
                 }
             }
         }
@@ -47031,7 +47031,7 @@
         &:hover {
             @media (hover:hover) {
                 & {
-                    color: var(--color-accent)
+                    color: var(--color-accent-surface)
                 }
             }
         }
@@ -47041,7 +47041,7 @@
         &:hover {
             @media (hover:hover) {
                 & {
-                    border-color: var(--color-accent)
+                    border-color: var(--color-accent-surface)
                 }
             }
         }

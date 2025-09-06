@@ -49,9 +49,15 @@
   <script src="/scripts/indux.themes.js"></script>
   <script src="/scripts/indux.tooltips.js"></script>
   <script src="/scripts/indux.toasts.js"></script>
-  <script src="/scripts/indux.url.queries.js"></script>
+  <script src="/scripts/indux.url.parameters.js"></script>
   <script src="/scripts/indux.utilities.js"></script>
-  
+
+  <!-- Anchor Positioning Polyfill -->
+  <script type="module">
+    if (!("anchorName" in document.documentElement.style)) {
+      import("https://unpkg.com/@oddbird/css-anchor-positioning");
+    }
+  </script>
 
   <!-- Styles -->
   <link rel="stylesheet" href="/styles/core/indux.theme.css">
@@ -76,8 +82,6 @@
   <link rel="stylesheet" href="/styles/utilities/indux.utilities.css">
   <link rel="stylesheet" href="/styles/utilities/indux.layout.css">
 
-
-
 </head>
 
 <body class="col" x-data="{ 
@@ -100,7 +104,7 @@
             <h5 class="mb-2.5 pl-2.5 text-content-subtle" x-text="group.group"></h5>
             <div class="col mb-8">
               <template x-for="item in group.items" :key="item.name">
-                <a :href="'/' + group.group.toLowerCase().replace(' ', '-') + '/' + item.path" role="button" class="ghost justify-start w-full text-content-neutral" :class="$x.docs.route('path') && $x.docs.route('path').path === item.path ? 'selected accent pointer-events-none' : ''">
+                <a :href="'/' + group.group.toLowerCase().replace(' ', '-') + '/' + item.path" role="button" class="ghost justify-start w-full text-content-neutral" :class="$x.docs.route('path') && $x.docs.route('path').path === item.path ? 'selected brand !text-content-stark pointer-events-none' : ''">
                   <span x-icon="item.icon"></span>
                   <span x-text="item.name"></span>
                 </a>
@@ -116,7 +120,7 @@
         <div class="x-3xl max-w-full mx-auto">
 
           <!-- Eyebrow Group Name -->
-          <h5 x-show="$x.docs.route('path')" class="mb-2.5 text-accent-text" x-text="$el.textContent || window.location.pathname.split('/')[1]?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'No group'"></h5>
+          <h5 x-show="$x.docs.route('path')" class="mb-2.5 text-brand-content" x-text="$el.textContent || window.location.pathname.split('/')[1]?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'No group'"></h5>
 
           <!-- Markdown Document for Route -->
           <div x-show="$x.docs.route('path')" class="prose [&_:where(h1,h2,h3)]:scroll-mt-26" x-markdown="$x.docs.route('path').doc"></div>
@@ -140,13 +144,17 @@
           <span x-icon="lucide:align-left" class="[dir=rtl]:rotate-180"></span>
           <span>On this page</span>
         </h5>
-        <div x-anchors.highlight="'.prose'" class="col gap-2.5">
-          <template x-for="heading in anchorHeadings || []" :key="`${heading.id}-${heading.index}`">
-            <a :href="heading.url()" 
-               class="text-content-subtle hover:text-content-neutral text-sm no-underline" 
-               :class="heading.level === 1 ? 'pl-0' : heading.level === 2 ? 'pl-2' : 'pl-4'" 
-               x-text="heading.text"
-            ></a>
+
+        <div class="col gap-2.5">
+          <template x-anchors=".prose | h2, h3">
+            <a :href="anchor.link" 
+              class="text-content-subtle hover:text-content-neutral text-sm no-underline block mb-2" 
+              :class="{
+                'pl-2': anchor.tag === 'h3',
+                '!text-content-stark font-medium': anchor.selected
+              }"
+             x-text="anchor.text">
+            </a>
           </template>
         </div>
 

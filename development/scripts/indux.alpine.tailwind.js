@@ -6343,7 +6343,7 @@ ${H}`)
   	    const validLanguages = ['javascript', 'js', 'typescript', 'ts', 'html', 'css', 'python', 'py', 'java', 'c', 'cpp', 'csharp', 'cs', 'php', 'ruby', 'rb', 'go', 'rust', 'rs', 'swift', 'kotlin', 'kt', 'scala', 'sql', 'json', 'yaml', 'yml', 'xml', 'markdown', 'md', 'bash', 'sh', 'powershell', 'ps', 'dockerfile', 'docker', 'nginx', 'apache', 'git', 'diff', 'text', 'plaintext'];
   	    
   	    // Define callout types that should be converted to aside elements
-  	    const calloutTypes = ['preview', 'note', 'warning', 'info', 'tip', 'success', 'error', 'danger'];
+  	    const calloutTypes = ['preview', 'note', 'warning', 'info', 'tip', 'success', 'error', 'negative'];
   	    
   	    codeBlocks.forEach((codeBlock, index) => {
   	        const pre = codeBlock.parentElement;

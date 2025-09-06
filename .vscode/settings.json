@@ -1,0 +1,6 @@
+{
+    "editor.formatOnSave": false,
+    "html.format.preserveNewLines": true,
+    "html.format.maxPreserveNewLines": 2,
+    "html.format.indentInnerHtml": false
+}

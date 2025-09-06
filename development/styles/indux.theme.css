@@ -28,18 +28,18 @@
     --color-field-inverse: var(--color-content-stark);
     --color-popover-surface: var(--color-page);
     --color-line: color-mix(in oklch, var(--color-content-stark) 11%, transparent);
-    --color-primary: var(--color-900);
-    --color-primary-hover: var(--color-700);
-    --color-primary-inverse: var(--color-page);
-    --color-primary-text: var(--color-content-stark);
+    --color-brand-surface: var(--color-900);
+    --color-brand-surface-hover: var(--color-700);
+    --color-brand-inverse: var(--color-page);
+    --color-brand-content: var(--color-content-stark);
     --color-accent: #f6c07b;
-    --color-accent-hover: #f19b46;
+    --color-accent-surface-hover: #f19b46;
     --color-accent-inverse: #763518;
-    --color-accent-text: #de6618;
-    --color-danger: #ef4444;
-    --color-danger-hover: #dc2626;
-    --color-danger-inverse: white;
-    --color-danger-text: var(--color-danger);
+    --color-accent-content: #de6618;
+    --color-negative: #ef4444;
+    --color-negative-surface-hover: #dc2626;
+    --color-negative-inverse: white;
+    --color-negative-content: var(--color-negative-surface);
 
     /* Overlays */
     --color-overlay-dark: oklch(50% 0 0);
@@ -68,9 +68,9 @@
     --color-content-stark: var(--color-50);
     --color-content-neutral: var(--color-400);
     --color-content-subtle: var(--color-500);
-    --color-primary: var(--color-50);
-    --color-primary-hover: var(--color-100);
-    --color-accent-text: #f6c07b;
+    --color-brand-surface: var(--color-50);
+    --color-brand-surface-hover: var(--color-100);
+    --color-accent-content: #f6c07b;
 }
 
 @layer base {

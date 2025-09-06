@@ -1,5 +1,3 @@
-import './indux.components.js';
-import './indux.anchors.js';
 import './indux.carousels.js';
 import './indux.code.js';
 import './indux.collections.js';
@@ -7,13 +5,14 @@ import './indux.components.js';
 import './indux.dropdowns.js';
 import './indux.icons.js';
 import './indux.localization.js';
+import './indux.markdown.js';
 import './indux.resizer.js';
 import './indux.router.js';
 import './indux.tabs.js';
 import './indux.themes.js';
 import './indux.toasts.js';
 import './indux.tooltips.js';
-import './indux.url.queries.js';
+import './indux.url.parameters.js';
 import './indux.utilities.js';
 import "./temp.plugin.js";
 

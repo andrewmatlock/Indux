@@ -1,12 +1,20 @@
 /*! Indux Markdown 1.0.0 - MIT License */
 
+// Cache for marked.js loading
+let markedPromise = null;
+
 // Load marked.js from CDN
 async function loadMarkedJS() {
     if (typeof marked !== 'undefined') {
         return marked;
     }
     
-    return new Promise((resolve, reject) => {
+    // Return existing promise if already loading
+    if (markedPromise) {
+        return markedPromise;
+    }
+    
+    markedPromise = new Promise((resolve, reject) => {
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
         script.onload = () => {
@@ -15,15 +23,19 @@ async function loadMarkedJS() {
                 resolve(marked);
             } else {
                 console.error('[Indux Markdown] Marked.js failed to load - marked is undefined');
+                markedPromise = null; // Reset so we can try again
                 reject(new Error('marked.js failed to load'));
             }
         };
         script.onerror = (error) => {
             console.error('[Indux Markdown] Script failed to load:', error);
+            markedPromise = null; // Reset so we can try again
             reject(error);
         };
         document.head.appendChild(script);
     });
+    
+    return markedPromise;
 }
 
 // Configure marked to preserve full language strings
@@ -54,11 +66,17 @@ async function configureMarked(marked) {
                 }
                 
                 // For x-code elements, use the raw text to preserve formatting
-                // The code plugin will handle HTML content properly
-                const code = text;
+                let code = text;
+                let preserveOriginal = '';
+                
+                // For HTML language code blocks, preserve the original raw text to maintain indentation
+                if (attributes.language === 'html' || text.includes('<!DOCTYPE') || (text.includes('<html') && text.includes('<head') && text.includes('<body'))) {
+                    // Store the original content in a data attribute to preserve indentation
+                    preserveOriginal = ` data-original-content="${text.replace(/"/g, '&quot;')}"`;
+                }
                 
                 // Always create an x-code element, with or without attributes
-                return `<x-code${xCodeAttributes}>${code}</x-code>\n`;
+                return `<x-code${xCodeAttributes}${preserveOriginal}>${code}</x-code>\n`;
             }
         },
         // Configure marked to allow custom HTML tags
@@ -79,7 +97,20 @@ async function configureMarked(marked) {
                 const openMatch = src.match(/^:::(.*?)(?:\n|$)/);
                 if (!openMatch) return;
                 
-                const calloutType = openMatch[1].trim();
+                // Parse the opening line for classes and icon
+                const openingLine = openMatch[1].trim();
+                let classes = '';
+                let iconValue = '';
+                
+                // Match icon="value" pattern
+                const iconMatch = openingLine.match(/icon="([^"]+)"/);
+                if (iconMatch) {
+                    iconValue = iconMatch[1];
+                }
+                
+                // Get all class names (remove icon attribute first)
+                classes = openingLine.replace(/\s*icon="[^"]+"\s*/, '').trim();
+                
                 const startPos = openMatch[0].length;
                 
                 // Find the closing ::: from the remaining content
@@ -93,14 +124,42 @@ async function configureMarked(marked) {
                     return {
                         type: 'callout',
                         raw: raw,
-                        calloutType: calloutType,
+                        classes: classes,
+                        iconValue: iconValue,
                         text: content.trim()
                     };
                 }
             },
             renderer(token) {
-                const calloutType = token.calloutType || 'info';
-                return `<aside class="${calloutType}">${token.text}</aside>\n`;
+                const classes = token.classes || '';
+                const iconValue = token.iconValue || '';
+                
+                // For frame callouts, don't parse as markdown to avoid wrapping HTML in <p> tags
+                let parsedContent;
+                if (classes.includes('frame')) {
+                    // Use raw content for frame callouts to preserve HTML structure
+                    parsedContent = token.text;
+                } else {
+                    // Parse the content as markdown to support nested markdown syntax
+                    parsedContent = marked.parse(token.text);
+                }
+                
+                const iconHtml = iconValue ? `<span x-icon="${iconValue}"></span>` : '';
+                
+                // Create a temporary div to count top-level elements
+                const temp = document.createElement('div');
+                temp.innerHTML = parsedContent;
+                const elementCount = temp.children.length;
+                
+                // Only wrap in a div if:
+                // 1. There are 2 or more elements AND
+                // 2. There's an icon (which needs the content to be wrapped as a sibling)
+                const needsWrapper = elementCount >= 2 && iconValue;
+                const wrappedContent = needsWrapper ? 
+                    `<div>${parsedContent}</div>` : 
+                    parsedContent;
+                
+                return `<aside${classes ? ` class="${classes}"` : ''}>${iconHtml}${wrappedContent}</aside>\n`;
             }
         }]
     });
@@ -202,6 +261,11 @@ function parseLanguageString(languageString) {
     return attributes;
 }
 
+// Preload marked.js as soon as script loads
+loadMarkedJS().catch(() => {
+    // Silently ignore errors during preload
+});
+
 // Initialize plugin when either DOM is ready or Alpine is ready
 async function initializeMarkdownPlugin() {
     try {
@@ -223,7 +287,6 @@ async function initializeMarkdownPlugin() {
                 }
             }
         });
-
     
     // Check if there are any elements with x-markdown already on the page
     const existingMarkdownElements = document.querySelectorAll('[x-markdown]');
@@ -235,9 +298,15 @@ async function initializeMarkdownPlugin() {
         if (!expression) {
             return;
         }
+        
+        // Hide element initially to prevent flicker
+        el.style.opacity = '0';
+        el.style.transition = 'opacity 0.15s ease-in-out';
+        
         // Store original markdown content
         let markdownSource = '';
         let isUpdating = false;
+        let hasContent = false;
 
         const normalizeContent = (content) => {
             const lines = content.split('\n');
@@ -264,6 +333,12 @@ async function initializeMarkdownPlugin() {
                     markdownSource = normalizeContent(newContent);
                 }
 
+                // Skip if no content
+                if (!markdownSource || markdownSource.trim() === '') {
+                    element.style.opacity = '0';
+                    return;
+                }
+
                 // Load marked.js and parse markdown
                 const marked = await loadMarkedJS();
                 const processedMarkdown = renderXCodeGroup(markdownSource);
@@ -280,11 +355,13 @@ async function initializeMarkdownPlugin() {
                     while (temp.firstChild) {
                         element.appendChild(temp.firstChild);
                     }
-                
-                // Re-highlight code blocks after content update
-                if (isHighlightJsAvailable()) {
-                    hljs.highlightAll();
-                }
+                    
+                    // Show element with content
+                    hasContent = true;
+                    element.style.opacity = '1';
+                } else if (!hasContent) {
+                    // Keep hidden if no valid content
+                    element.style.opacity = '0';
                 }
             } finally {
                 isUpdating = false;
@@ -335,6 +412,13 @@ async function initializeMarkdownPlugin() {
 
         effect(() => {
             getMarkdownContent(async (pathOrContent) => {
+                // Reset visibility if content is empty/undefined
+                if (!pathOrContent || pathOrContent === undefined || pathOrContent === '') {
+                    el.style.opacity = '0';
+                    hasContent = false;
+                    return;
+                }
+
                 if (pathOrContent === undefined) {
                     pathOrContent = expression;
                 }
@@ -364,6 +448,13 @@ async function initializeMarkdownPlugin() {
                     }
                 }
 
+                // Skip empty content
+                if (!markdownContent || markdownContent.trim() === '') {
+                    el.style.opacity = '0';
+                    hasContent = false;
+                    return;
+                }
+
                 const marked = await loadMarkedJS();
                 const html = marked.parse(markdownContent);
                 
@@ -376,10 +467,11 @@ async function initializeMarkdownPlugin() {
                     el.appendChild(temp.firstChild);
                 }
                 
-                // Re-highlight code blocks after content update
-                if (isHighlightJsAvailable()) {
-                    hljs.highlightAll();
-                }
+                // Code highlighting is handled by indux.code.js plugin
+
+                // Show content with fade-in
+                hasContent = true;
+                el.style.opacity = '1';
 
                 // Extract headings for anchor links
                 const headings = [];
@@ -439,9 +531,7 @@ async function initializeMarkdownPlugin() {
                     }
                     
                     // Re-highlight code blocks after content update
-                    if (isHighlightJsAvailable()) {
-                        hljs.highlightAll();
-                    }
+                    // Code highlighting is handled by indux.code.js plugin
                 } catch (error) {
                     console.error('[Indux Markdown] Failed to process element:', error);
                 }
