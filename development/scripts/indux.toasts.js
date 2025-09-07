@@ -139,7 +139,7 @@ function initializeToastPlugin() {
         // Handle both static and dynamic expressions
         let message;
         try {
-            // Check if expression starts with $x (content collections)
+            // Check if expression starts with $x (data sources)
             if (expression.startsWith('$x.')) {
                 // Use evaluate for $x expressions to access collections
                 message = evaluate(expression);

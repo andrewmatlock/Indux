@@ -1,0 +1,22 @@
+# Slides
+
+---
+
+## Carousels
+
+Carousels are a great way to display content in a scrollable area. They are often used to display images, but can be used to display any type of content.
+
+---
+
+
+## Setup
+
+Add an [Indux script](/getting-started/setup) to your project, or use the standalone carousels plugin:
+
+```html "<head> or <body>" copy
+<!-- Alpine -->
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+<!-- Indux carousels plugin -->
+<script src="https://cdn.jsdelivr.net/npm/indux/dist/indux.carousels.js"></script>
+```

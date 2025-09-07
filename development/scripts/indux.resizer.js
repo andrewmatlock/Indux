@@ -2,7 +2,7 @@
 
 function initializeResizablePlugin() {
 
-    Alpine.directive('resizable', (el, { modifiers, expression }, { evaluate }) => {
+    Alpine.directive('resize', (el, { modifiers, expression }, { evaluate }) => {
         // Helper to parse value and unit from CSS dimension
         const parseDimension = (value) => {
             if (typeof value === 'number') return { value, unit: 'px' };

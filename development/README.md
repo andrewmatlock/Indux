@@ -30,5 +30,5 @@
 - Configure the project in app.yaml
 - Add HTML pages with only <body> tag wrappers in /pages
 - Add HTML components with a single parent element in /components
-- Add YAML dynamic content collection files in /content
+- Add YAML dynamic data sources files in /content
 - Customize your theme, selector styles, and classes in /styles/styles.css

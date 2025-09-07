@@ -102,9 +102,9 @@ Load markdown content from external `.md` files by providing a file path like `x
 
 </x-code-group>
 
-### From Content Collection
+### From Data Source
 
-A file path can be referenced from within a [content collection](/plugins/content-collections).
+A file path can be referenced from within a [data source](/plugins/data-sources).
 
 ::: frame col p-10
 <span class="h3">Burn Book</span>

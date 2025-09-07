@@ -1,0 +1,54 @@
+/* Selects */
+
+:root {
+    --icon-select: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath fill='%23808080a6' d='m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32'/%3E%3C/svg%3E")
+}
+
+@layer components {
+
+    :where(select) {
+        width: fit-content;
+        max-width: 100%;
+        height: var(--spacing-field-height, 2.25rem);
+        margin: 0;
+        padding-left: var(--spacing-field-padding);
+        padding-right: calc(var(--spacing-field-height) * 0.75);
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        color: var(--color-field-inverse);
+        background-color: var(--color-field-surface);
+        border-width: 0;
+        border-style: solid;
+        border-color: transparent;
+        border-radius: var(--radius);
+        outline-color: var(--color-line, oklch(48.3% 0.006422 17.4 / 0.15));
+        transition: var(--transition);
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+
+        /* Caret icon */
+        background-image: var(--icon-select);
+        background-repeat: no-repeat;
+        background-position: right calc(var(--spacing-field-height) * 0.25) center;
+        background-size: calc(var(--spacing-field-height) * 0.35);
+
+        &::-ms-expand {
+            border: 0;
+            background-color: transparent
+        }
+
+        &:hover {
+            background-color: var(--color-field-surface-hover)
+        }
+
+        &:active {
+            background-color: var(--color-field-surface-hover)
+        }
+
+        &:focus-visible {
+            background-color: var(--color-field-surface)
+        }
+    }
+
+}
