@@ -69,6 +69,8 @@ Default buttons use the following [theme](/styles/theme) variables:
 | `--radius` | Border radius for button corners |
 | `--transition` | Transition for interactive states |
 
+---
+
 ## Utilities
 
 Buttons accept Indux [utility](/styles/utilities) classes, which can be stacked in any combination.

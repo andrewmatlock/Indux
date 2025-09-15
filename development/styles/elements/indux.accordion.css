@@ -6,21 +6,22 @@
 
 @layer components {
 
-    :where(details):not(.raw) {
+    :where(details):not(.unset) {
+        width: 100%;
         transition: var(--transition, all 0.1s ease-in-out);
 
         /* Rotate icon */
         &[open]>summary:before {
-            transform: rotate(90deg);
+            transform: rotate(90deg)
         }
 
         & [open] summary {
-            margin-bottom: calc(var(--spacing) * 4);
+            margin-bottom: calc(var(--spacing) * 4)
         }
 
         /* Content padding */
         &> :not(summary) {
-            padding: var(--spacing-field-padding) 0;
+            padding: var(--spacing-field-padding) 0
         }
 
         :where(summary) {
@@ -38,7 +39,7 @@
             &::marker,
             &::-webkit-details-marker {
                 display: none;
-                content: "";
+                content: ""
             }
 
             &:hover {
@@ -63,9 +64,8 @@
                 -webkit-mask-size: 100% 100%;
                 mask-size: 100% 100%;
                 transform: rotate(0);
-                transition: 0.25s transform ease;
+                transition: 0.25s transform ease
             }
         }
     }
-
 }
