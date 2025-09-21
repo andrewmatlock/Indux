@@ -2,12 +2,14 @@
   "name": "@indux/create-starter",
   "version": "1.5.9",
   "description": "Create a new Indux project with a single command",
-  "main": "index.js",
+  "main": "index.html",
   "bin": {
-    "create-indux-starter": "./bin/create-indux-starter.js"
+    "create-indux-starter": "./create-starter.js"
   },
   "files": [
-    "bin"
+    ".",
+    "!node_modules",
+    "!package-lock.json"
   ],
   "keywords": [
     "indux",

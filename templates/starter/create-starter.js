@@ -42,11 +42,28 @@ async function init() {
         fs.removeSync(projectPath);
     }
 
-    // Copy template from root templates directory
-    const templatePath = path.join(__dirname, '../../templates/starter');
-    fs.copySync(templatePath, projectPath);
+    // Copy all template files except this script and package.json
+    const templateFiles = fs.readdirSync(__dirname);
+    const filesToCopy = templateFiles.filter(file => 
+        file !== 'create-starter.js' && 
+        file !== 'package.json' &&
+        file !== 'node_modules'
+    );
 
-    // Create package.json
+    fs.ensureDirSync(projectPath);
+    
+    for (const file of filesToCopy) {
+        const sourcePath = path.join(__dirname, file);
+        const targetPath = path.join(projectPath, file);
+        
+        if (fs.statSync(sourcePath).isDirectory()) {
+            fs.copySync(sourcePath, targetPath);
+        } else {
+            fs.copyFileSync(sourcePath, targetPath);
+        }
+    }
+
+    // Create package.json for the new project
     const packageJson = {
         name: projectName,
         version: '0.1.0',
