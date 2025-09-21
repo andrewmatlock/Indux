@@ -7,21 +7,25 @@
     ],
     "scripts": {
         "clean": "rimraf packages/*/dist/* dist/ src/scripts/indux.min.js",
-        "build:core": "cd src && npm run build",
+        "build:core": "cd src && node scripts/build.js && rollup -c rollup.config.mjs",
+        "build:docs": "echo 'Docs is a static website - no build needed'",
         "build": "npm run build:core",
         "build:packages": "npm run build --workspaces",
+        "build:all": "npm run build:core && npm run build:docs",
+        "start:docs": "cd docs && browser-sync start --config bs-config.js",
         "publish-packages": "node src/scripts/publish-packages.js",
         "test": "npm run test --workspaces",
         "lint": "npm run lint --workspaces"
     },
     "devDependencies": {
-        "@rollup/plugin-commonjs": "^25.0.0",
-        "@rollup/plugin-node-resolve": "^15.0.0",
-        "@rollup/plugin-terser": "^0.4.0",
+        "@rollup/plugin-commonjs": "^28.0.1",
+        "@rollup/plugin-node-resolve": "^15.3.0",
+        "@rollup/plugin-terser": "^0.4.4",
+        "browser-sync": "^3.0.3",
         "fs-extra": "^11.2.0",
         "prompts": "^2.4.2",
         "rimraf": "^5.0.0",
-        "rollup": "^4.0.0"
+        "rollup": "^4.24.2"
     },
     "main": "index.js",
     "keywords": [],
