@@ -1,0 +1,47 @@
+{
+    "name": "packages/core",
+    "version": "1.5.9",
+    "description": "Core JavaScript functionality for the Indux framework",
+    "main": "dist/index.js",
+    "module": "dist/index.esm.js",
+    "bin": {
+        "indux": "./bin/cli.js"
+    },
+    "scripts": {
+        "build": "rollup -c",
+        "postinstall": "node bin/install.js",
+        "update": "node bin/update.js",
+        "prepublishOnly": "npm run build"
+    },
+    "files": [
+        "dist",
+        "bin"
+    ],
+    "keywords": [
+        "indux",
+        "framework",
+        "javascript",
+        "alpinejs",
+        "plugins"
+    ],
+    "author": "Andrew Matlock",
+    "license": "MIT",
+    "dependencies": {
+        "commander": "^11.0.0",
+        "fs-extra": "^11.2.0",
+        "prompts": "^2.4.2"
+    },
+    "devDependencies": {
+        "@rollup/plugin-commonjs": "^25.0.0",
+        "@rollup/plugin-node-resolve": "^15.0.0",
+        "@rollup/plugin-terser": "^0.4.0",
+        "glob": "^10.3.10",
+        "rollup": "^4.0.0"
+    },
+    "peerDependencies": {
+        "alpinejs": "^3.0.0"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}

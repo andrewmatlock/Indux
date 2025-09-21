@@ -1,0 +1,30 @@
+/* Badges */
+
+@layer components {
+
+    :where(mark) {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.25rem;
+        width: fit-content;
+        height: fit-content;
+        padding: calc(var(--spacing, 0.25rem) * 0.5) calc(var(--spacing, 0.25rem) * 2);
+        font-weight: 500;
+        font-size: 0.75rem;
+        color: var(--color-content-stark, oklch(16.6% 0.026 267));
+        background-color: var(--color-field-surface, oklch(91.79% 0.0029 264.26));
+        border-radius: 100px;
+
+        & span,
+        & [x-icon] {
+            color: inherit
+        }
+
+        /* Solo icons */
+        &:has([x-icon]:only-child) {
+            aspect-ratio: 1/1
+        }
+    }
+
+}

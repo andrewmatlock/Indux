@@ -1,0 +1,220 @@
+/*! Indux Resize 1.0.0 - MIT License */
+
+:root { 
+    --spacing-resize-handle: 1rem;
+}
+
+@layer utilities {
+
+    :where([x-resize]) {
+        position: relative;
+
+        /* Resize handle area */
+        .resize-handle {
+            position: absolute;
+            display: block;
+            width: var(--spacing-resize-handle, 1rem);
+            height: var(--spacing-resize-handle, 1rem);
+            z-index: 100;
+            background: transparent;
+            border: none;
+            outline: none;
+
+            /* Visual feedback */
+            &::before {    
+                content: '';
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 0.1875rem;
+                height: 0.1875rem;
+                background: transparent;
+                border-radius: var(--radius, 0.5rem);
+                transition: background-color 0.2s ease;
+                pointer-events: none
+            }
+
+            &:hover::before, &:active::before {
+                background-color: var(--color-line, oklch(48.3% 0.006422 17.4 / 0.15));
+            }
+        }
+
+        /* Edge handles - full width/height */
+        .resize-handle-top,
+        .resize-handle-bottom {
+            width: 100%;
+            left: 0;
+            cursor: ns-resize;
+
+            &::before {
+                width: 100%;
+            }
+        }
+
+        .resize-handle-left,
+        .resize-handle-right,
+        .resize-handle-start,
+        .resize-handle-end {
+            height: 100%;
+            top: 0;
+            cursor: ew-resize;
+
+            &::before {
+                height: 100%;
+            }
+        }
+
+        .resize-handle-top {
+            top: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+        }
+
+        .resize-handle-bottom {
+            top: auto;
+            bottom: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+        }
+
+        .resize-handle-left,
+        .resize-handle-start {
+            left: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+        }
+
+        .resize-handle-right,
+        .resize-handle-end {
+            right: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+        }
+
+        /* Corner handles */
+        .resize-handle-top-left {
+            width: var(--spacing-resize-handle, 1rem);
+            height: var(--spacing-resize-handle, 1rem);
+            top: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+            left: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+            cursor: nw-resize;
+        }
+
+        .resize-handle-top-right {
+            width: var(--spacing-resize-handle, 1rem);
+            height: var(--spacing-resize-handle, 1rem);
+            top: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+            right: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+            cursor: ne-resize;
+        }
+
+        .resize-handle-bottom-left {
+            width: var(--spacing-resize-handle, 1rem);
+            height: var(--spacing-resize-handle, 1rem);
+            bottom: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+            left: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+            cursor: sw-resize;
+        }
+
+        .resize-handle-bottom-right {
+            width: var(--spacing-resize-handle, 1rem);
+            height: var(--spacing-resize-handle, 1rem);
+            bottom: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+            right: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+            cursor: se-resize;
+        }
+
+        /* Logical direction handles */
+
+        .resize-handle-top-start {
+            width: var(--spacing-resize-handle, 1rem);
+            height: var(--spacing-resize-handle, 1rem);
+            top: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+            left: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+            cursor: nw-resize;
+        }
+
+        .resize-handle-top-end {
+            width: var(--spacing-resize-handle, 1rem);
+            height: var(--spacing-resize-handle, 1rem);
+            top: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+            right: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+            cursor: ne-resize;
+        }
+
+        .resize-handle-bottom-start {
+            width: var(--spacing-resize-handle, 1rem);
+            height: var(--spacing-resize-handle, 1rem);
+            bottom: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+            left: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+            cursor: sw-resize;
+        }
+
+        .resize-handle-bottom-end {
+            width: var(--spacing-resize-handle, 1rem);
+            height: var(--spacing-resize-handle, 1rem);
+            bottom: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+            right: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+            cursor: se-resize;
+        }
+
+
+        /* RTL adjustments for logical directions */
+        [dir="rtl"] .resize-handle-top-start {
+            cursor: ne-resize
+        }
+
+        [dir="rtl"] .resize-handle-top-end {
+            cursor: nw-resize
+        }
+
+        [dir="rtl"] .resize-handle-bottom-start {
+            cursor: se-resize
+        }
+
+        [dir="rtl"] .resize-handle-bottom-end {
+            cursor: sw-resize
+        }
+
+        /* Resize overlay */
+        .resize-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 9999;
+            display: none;
+            background: transparent
+        }
+
+        /* Resize states */
+        .resizable-closing {
+            opacity: 0.5;
+            transition: opacity 0.2s ease
+        }
+
+        .resizable-closed {
+            display: none !important
+        }
+
+        /* Focus states for accessibility */
+        .resize-handle:focus {
+            outline: 2px solid rgba(59, 130, 246, 0.5);
+            outline-offset: 2px
+        }
+
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+            :where(.resize-handle:hover .resize-handle-inner) {
+                background: rgba(0, 0, 0, 0.3)
+            }
+            
+            :where(.resize-handle:active .resize-handle-inner) {
+                background: rgba(0, 0, 0, 0.5)
+            }
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            :where(.resize-handle-inner,
+            .resizable-closing,
+            .resize-handle) {
+                transition: none
+            }
+        }
+    }
+}

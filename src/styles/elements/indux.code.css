@@ -1,0 +1,544 @@
+@import url('https://fonts.googleapis.com/css2?family=Gabarito:wght@400..900&family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=Lexend+Exa&display=swap');
+
+:root {
+    /* Copy code button icons */
+    --icon-copy-code: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'%3E%3Crect width='14' height='14' x='8' y='8' rx='2' ry='2'/%3E%3Cpath d='M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2'/%3E%3C/g%3E%3C/svg%3E");
+    --icon-copied-code: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23000' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M20 6L9 17l-5-5'/%3E%3C/svg%3E");
+
+    /* VS Code Light Theme Colors */
+    --color-code-keyword: #0000ff;
+    --color-code-string: #a31515;
+    --color-code-comment: #008000;
+    --color-code-function: #795e26;
+    --color-code-number: #098658;
+    --color-code-operator: #000000;
+    --color-code-class-name: #267f99;
+    --color-code-tag: #0000ff;
+    --color-code-attr-name: #ff0000;
+    --color-code-attr-value: #a31515;
+    --color-code-property: #001080;
+    --color-code-selector: #0000ff;
+    --color-code-punctuation: #000000;
+    --color-code-builtin: #0000ff;
+    --color-code-constant: #0000ff;
+    --color-code-boolean: #0000ff;
+    --color-code-regex: #811f3f;
+    --color-code-symbol: #0000ff;
+    --color-code-entity: #0000ff;
+    --color-code-url: #0000ff;
+    --color-code-atrule: #0000ff;
+    --color-code-rule: #0000ff;
+    --color-code-doctype: #000000;
+    --color-code-cdata: #000000;
+    --color-code-prolog: #000000;
+    --color-code-namespace: #000000;
+    --color-code-important: #0000ff;
+    --color-code-inserted: #000000;
+    --color-code-deleted: #000000;
+    --color-code-char: #000000;
+}
+
+.dark {
+    /* VS Code Dark Theme Colors */
+    --color-code-keyword: #569cd6;
+    --color-code-string: #ce9178;
+    --color-code-comment: #6a9955;
+    --color-code-function: #dcdcaa;
+    --color-code-number: #b5cea8;
+    --color-code-operator: #d4d4d4;
+    --color-code-class-name: #4ec9b0;
+    --color-code-tag: #569cd6;
+    --color-code-attr-name: #9cdcfe;
+    --color-code-attr-value: #ce9178;
+    --color-code-property: #9cdcfe;
+    --color-code-selector: #d7ba7d;
+    --color-code-punctuation: #d4d4d4;
+    --color-code-builtin: #569cd6;
+    --color-code-constant: #569cd6;
+    --color-code-boolean: #569cd6;
+    --color-code-regex: #d16969;
+    --color-code-symbol: #dcdcaa;
+    --color-code-entity: #569cd6;
+    --color-code-url: #569cd6;
+    --color-code-atrule: #c586c0;
+    --color-code-rule: #d7ba7d;
+    --color-code-doctype: #808080;
+    --color-code-cdata: #808080;
+    --color-code-prolog: #808080;
+    --color-code-namespace: #808080;
+    --color-code-important: #569cd6;
+    --color-code-inserted: #4ec9b0;
+    --color-code-deleted: #f44747;
+    --color-code-char: #dcdcaa;
+}
+
+/* Code syntax highlighting with prism.js and highlight.js support */
+@layer base {
+
+    /* Token highlighting styles for code elements */
+    ::highlight(keyword), .hljs-keyword {
+        color: var(--color-code-keyword) !important;
+        font-weight: 600 !important
+    }
+
+    ::highlight(string), .hljs-string {
+        color: var(--color-code-string) !important
+    }
+
+    ::highlight(comment), .hljs-comment {
+        color: var(--color-code-comment) !important;
+        font-style: italic !important
+    }
+
+    ::highlight(function), .hljs-title.function_ {
+        color: var(--color-code-function) !important
+    }
+
+    ::highlight(number), .hljs-number {
+        color: var(--color-code-number) !important
+    }
+
+    ::highlight(operator), .hljs-operator {
+        color: var(--color-code-operator) !important
+    }
+
+    ::highlight(class-name), .hljs-title.class_ {
+        color: var(--color-code-class-name) !important
+    }
+
+    ::highlight(tag), .hljs-tag {
+        color: var(--color-code-tag) !important
+    }
+
+    ::highlight(attr-name), .hljs-attr {
+        color: var(--color-code-attr-name) !important
+    }
+
+    ::highlight(attr-value), .hljs-string {
+        color: var(--color-code-attr-value) !important
+    }
+
+    ::highlight(property), .hljs-property {
+        color: var(--color-code-property) !important
+    }
+
+    ::highlight(selector), .hljs-selector-tag {
+        color: var(--color-code-selector) !important
+    }
+
+    ::highlight(punctuation), .hljs-punctuation {
+        color: var(--color-code-punctuation) !important
+    }
+
+    ::highlight(builtin), .hljs-built_in {
+        color: var(--color-code-builtin) !important
+    }
+
+    ::highlight(constant), .hljs-literal {
+        color: var(--color-code-constant) !important
+    }
+
+    ::highlight(boolean), .hljs-literal {
+        color: var(--color-code-boolean) !important
+    }
+
+    ::highlight(regex), .hljs-regexp {
+        color: var(--color-code-regex) !important
+    }
+
+    ::highlight(symbol), .hljs-symbol {
+        color: var(--color-code-symbol) !important
+    }
+
+    ::highlight(entity), .hljs-entity {
+        color: var(--color-code-entity) !important
+    }
+
+    ::highlight(url), .hljs-link {
+        color: var(--color-code-url) !important
+    }
+
+    ::highlight(atrule), .hljs-atrule {
+        color: var(--color-code-atrule) !important
+    }
+
+    ::highlight(rule), .hljs-rule {
+        color: var(--color-code-rule) !important
+    }
+
+    ::highlight(doctype), .hljs-doctype {
+        color: var(--color-code-doctype) !important
+    }
+
+    ::highlight(cdata), .hljs-cdata {
+        color: var(--color-code-cdata) !important
+    }
+
+    ::highlight(prolog), .hljs-prolog {
+        color: var(--color-code-prolog) !important
+    }
+
+    ::highlight(namespace), .hljs-namespace {
+        color: var(--color-code-namespace) !important
+    }
+
+    ::highlight(important), .hljs-important {
+        color: var(--color-code-important) !important;
+        font-weight: 600 !important
+    }
+
+    ::highlight(bold), .hljs-strong {
+        font-weight: 600 !important
+    }
+
+    ::highlight(italic), .hljs-emphasis {
+        font-style: italic !important
+    }
+
+    ::highlight(inserted), .hljs-addition {
+        color: var(--color-code-inserted) !important
+    }
+
+    ::highlight(deleted), .hljs-deletion {
+        color: var(--color-code-deleted) !important
+    }
+
+    ::highlight(char), .hljs-char.escape_ {
+        color: var(--color-code-char) !important
+    }
+
+    /* Additional highlight.js specific classes */
+    .hljs-type {
+        color: var(--color-code-class-name) !important
+    }
+
+    .hljs-variable {
+        color: var(--color-code-property) !important
+    }
+
+    .hljs-variable.language_ {
+        color: var(--color-code-keyword) !important
+    }
+
+    .hljs-variable.constant_ {
+        color: var(--color-code-constant) !important
+    }
+
+    .hljs-title {
+        color: var(--color-code-function) !important
+    }
+
+    .hljs-title.class_.inherited__ {
+        color: var(--color-code-class-name) !important
+    }
+
+    .hljs-title.function_.invoke__ {
+        color: var(--color-code-function) !important
+    }
+
+    .hljs-params {
+        color: var(--color-code-property) !important
+    }
+
+    .hljs-doctag {
+        color: var(--color-code-keyword) !important;
+        font-weight: 600 !important
+    }
+
+    .hljs-meta {
+        color: var(--color-code-comment) !important
+    }
+
+    .hljs-meta.prompt_ {
+        color: var(--color-code-keyword) !important
+    }
+
+    .hljs-meta.keyword_ {
+        color: var(--color-code-keyword) !important
+    }
+
+    .hljs-meta.string_ {
+        color: var(--color-code-string) !important
+    }
+
+    .hljs-section {
+        color: var(--color-code-keyword) !important;
+        font-weight: 600 !important
+    }
+
+    .hljs-name {
+        color: var(--color-code-tag) !important
+    }
+
+    .hljs-attribute {
+        color: var(--color-code-attr-name) !important
+    }
+
+    .hljs-bullet {
+        color: var(--color-code-punctuation) !important
+    }
+
+    .hljs-code {
+        color: var(--color-code-property) !important
+    }
+
+    .hljs-formula {
+        color: var(--color-code-number) !important
+    }
+
+    .hljs-quote {
+        color: var(--color-code-string) !important
+    }
+
+    .hljs-selector-id {
+        color: var(--color-code-selector) !important
+    }
+
+    .hljs-selector-class {
+        color: var(--color-code-selector) !important
+    }
+
+    .hljs-selector-attr {
+        color: var(--color-code-selector) !important
+    }
+
+    .hljs-selector-pseudo {
+        color: var(--color-code-selector) !important
+    }
+
+    .hljs-template-tag {
+        color: var(--color-code-tag) !important
+    }
+
+    .hljs-template-variable {
+        color: var(--color-code-property) !important
+    }
+
+    .hljs-subst {
+        color: var(--color-code-string) !important
+    }
+}
+
+/* Code blocks */
+@layer components {
+
+    :where(pre) {
+        display: flex;
+        flex: 1;
+        -ms-overflow-style: scrollbar;
+        overflow-x: auto;
+        width: auto;
+        padding: calc(var(--spacing, 0.25rem) * 4);
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.8125rem;
+        line-height: 1.5;
+        text-indent: 0;
+        color: var(--color-content-neutral, oklch(48.26% 0.0365 255.09));
+        background-color: var(--color-page, oklch(100% 0 0));
+        border: 1px solid var(--color-field-surface, oklch(91.79% 0.0029 264.26));
+        border-radius: 1rem;
+        tab-size: 4;
+        white-space: pre;
+        white-space-collapse: preserve
+    }
+
+    :where(pre code) {
+        display: block;
+        width: 100%;
+        padding: 0;
+        font-size: inherit;
+        font-family: inherit;
+        font-weight: inherit;
+        line-height: inherit;
+        color: inherit;
+        background-color: transparent;
+
+        & span {
+            vertical-align: initial
+        }
+    }
+
+    :where(x-code-group, x-code, [x-code]) {
+        position: relative;
+        display: flex;
+        flex-flow: row wrap;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.8125rem;
+        line-height: 1.5;
+        background: color-mix(in oklch, var(--color-field-surface, oklch(91.79% 0.0029 264.26)) 45%, transparent);
+        border: 1px solid var(--color-field-surface, oklch(91.79% 0.0029 264.26));
+        border-radius: 1rem;
+        overflow: hidden;
+
+        &:has(> header) {
+            padding: 0.125rem
+        }
+
+        /* Title bar */
+        & > header {
+            display: flex;
+            align-items: center;
+            gap: calc(var(--spacing, 0.25rem) * 2);
+            width: 100%;
+            padding: 0.5rem 1rem;
+            font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji');
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: var(--color-content-subtle, oklch(67.4% 0.0318 251.27));
+            border-bottom: none;
+            border-radius: 0.8125rem 0.8125rem 0 0;
+
+            /* Tab titles */
+            & button[role="tab"] {
+                height: fit-content;
+                padding: var(--spacing, 0.25rem) calc(var(--spacing, 0.25rem) * 2);
+                border-radius: var(--radius, 0.5rem);
+                background: transparent;
+                color: inherit;
+                font-family: inherit;
+                font-size: inherit;
+                cursor: pointer;
+                transition: var(--transition, all .05s ease-in-out);
+            
+                &:hover {
+                    color: var(--color-content-neutral, oklch(48.26% 0.0365 255.09));
+                    background-color: var(--color-surface-3, oklch(91.79% 0.0029 264.26))
+                }
+            
+                &.selected {
+                    position: relative;
+                    color: var(--color-brand-content, #de6618);
+                    background: transparent;
+
+                    &:hover {
+                        background-color: var(--color-surface-3, oklch(91.79% 0.0029 264.26))
+                    }
+            
+                    &::after {
+                        content: '';
+                        position: absolute;
+                        bottom: -0.5rem;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        width: calc(100% - var(--spacing, 0.25rem) * 4);
+                        height: 2px;
+                        background: color-mix(in oklch, var(--color-brand-content, #de6618) 50%, transparent);
+                        border-radius: 0.5rem
+                    }
+                }
+            }
+        }
+
+        & .lines {
+            display: flex;
+            flex-direction: column;
+            width: fit-content;
+            min-width: 2.5rem;
+            padding: calc(var(--spacing, 0.25rem) * 4) 0.5rem calc(var(--spacing, 0.25rem) * 4) 0.5rem;
+            font-family: inherit;
+            font-size: inherit;
+            line-height: inherit;
+            text-align: right;
+            color: var(--color-content-subtle, oklch(67.4% 0.0318 251.27));
+            background: var(--color-page, oklch(100% 0 0));
+            pointer-events: none;
+            user-select: none;
+        }
+
+        &:has(> header) .lines {
+            border-start-start-radius: 0.875rem;
+            border-end-start-radius: 0.875rem
+        }
+
+        & pre {
+            margin-top: 0;
+            border: 0 none
+        }
+
+        &:has(> header) pre {
+            border-radius: 0.875rem
+        }
+
+        &[numbers] pre {
+            border-start-start-radius: 0;
+            border-end-start-radius: 0
+        }
+
+        & .copy {
+            position: absolute;
+            top: 0.3rem;
+            right: 0.5rem;
+            width: 1.75rem;
+            min-width: 0;
+            height: 1.75rem;
+            padding: 0;
+
+            &::after {
+                content: '';
+                display: block;
+                width: 0.8125rem;
+                height: 0.8125rem;
+                background-color: var(--color-field-inverse, oklch(16.6% 0.026 267));
+                mask-image: var(--icon-copy-code);
+                mask-size: 1rem;
+                mask-size: contain;
+                mask-repeat: no-repeat;
+            }
+
+            &.copied::after {
+                mask-image: var(--icon-copied-code);
+            }
+
+            &.copied {
+                --color-field-surface: var(--color-accent-surface);
+                --color-field-surface-hover: var(--color-accent-surface-hover);
+                --color-field-inverse: var(--color-accent-inverse);
+            }
+        }
+
+        :where(x-code-group x-code) {
+            width: 100%;
+            margin-top: 0;
+            border: 0 none;
+            overflow: visible;
+
+            & .copy {
+                top: -2.25rem
+            }
+        }
+    }
+
+    [dir="rtl"] :where(x-code-group, x-code, [x-code]) .copy {
+        right: auto;
+        left: 0.5rem
+    }
+}
+
+/* Preview asides to visualize code examples */
+@layer utilities {
+
+    .prose aside.frame {
+        display: flex;
+        gap: calc(var(--spacing, 0.25rem) * 4);
+        background: color-mix(in oklch, var(--color-field-surface, oklch(91.79% 0.0029 264.26)) 35%, transparent);
+        border: 1px solid var(--color-field-surface, oklch(91.79% 0.0029 264.26));
+        border-radius: calc(var(--radius, 0.5rem) * 2)
+    }
+
+    .prose aside.frame:has(+ x-code-group, + x-code) {
+        border-bottom: 0 none;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0
+    }
+
+    .prose aside.frame + x-code-group, .prose aside.frame + x-code {
+        margin-top: 0;
+        border-top-left-radius: 0;
+        border-top-right-radius: 0
+    }
+
+    .prose aside.frame + x-code pre {
+        border-top-left-radius: 0;
+        border-top-right-radius: 0
+    }
+}
