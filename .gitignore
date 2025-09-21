@@ -63,6 +63,8 @@ jspm_packages/
 # Output of 'npm pack'
 *.tgz
 
+# Note: package-lock.json should be committed for reproducible builds
+
 # Yarn Integrity file
 .yarn-integrity
 
