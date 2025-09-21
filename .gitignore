@@ -32,7 +32,7 @@ temp.plugin.js
 rollup.alpine.tailwind.temp.js
 
 # Config files (if they contain sensitive data)
-bs-config.js
+# bs-config.js - keep this for browser-sync development server
 rollup.config.js
 
 # Logs
