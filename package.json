@@ -1,5 +1,5 @@
 {
-    "name": "indux-monorepo",
+    "name": "indux",
     "version": "1.5.9",
     "private": false,
     "workspaces": [
