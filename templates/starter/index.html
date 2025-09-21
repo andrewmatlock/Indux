@@ -7,14 +7,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- Styles -->
-    <link rel="stylesheet" href="/styles/styles.css">
+    <!-- Indux CSS Framework -->
+    <link href="https://cdn.jsdelivr.net/gh/andrewmatlock/indux@latest/src/styles/indux.css" rel="stylesheet">
 
-    <!-- Scripts -->
-    <script src="/scripts/tailwind.v3.4.js"></script>
-    <script src="/scripts/tailwind.config.js"></script>
+    <!-- Tailwind CSS (optional - for utility classes) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#64748b',
+                        accent: '#f59e0b'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script defer src="/scripts/indux.min.js"></script>
+    
+    <!-- Indux JavaScript Framework -->
+    <script defer src="https://cdn.jsdelivr.net/gh/andrewmatlock/indux@latest/src/scripts/indux.quickstart.js"></script>
 
 </head>
 

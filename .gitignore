@@ -8,6 +8,9 @@ yarn-error.log*
 dist/
 build/
 *.tgz
+src/scripts/indux.js
+src/scripts/indux.quickstart.js
+src/styles/indux.css
 
 # Development files
 .vscode/

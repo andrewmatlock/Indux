@@ -1,16 +1,29 @@
 {
-    "name": "@indux/create-starter",
-    "version": "1.5.9",
-    "description": "Create Indux starter application",
-    "bin": {
-        "create-indux-starter": "./bin/create-app.js"
-    },
-    "files": [
-        "template",
-        "bin"
-    ],
-    "dependencies": {
-        "fs-extra": "^11.2.0",
-        "prompts": "^2.4.2"
-    }
+  "name": "@indux/create-starter",
+  "version": "1.5.9",
+  "description": "Create a new Indux project with a single command",
+  "main": "index.js",
+  "bin": {
+    "create-indux-starter": "./bin/create-indux-starter.js"
+  },
+  "files": [
+    "template",
+    "bin"
+  ],
+  "keywords": [
+    "indux",
+    "framework",
+    "starter",
+    "template",
+    "scaffold"
+  ],
+  "author": "Andrew Matlock",
+  "license": "MIT",
+  "dependencies": {
+    "fs-extra": "^11.2.0",
+    "prompts": "^2.4.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
 }
