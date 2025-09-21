@@ -15,6 +15,19 @@
   <meta name="googlebot" content="index, follow">
   <meta name="google" content="notranslate">
 
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-touch-fullscreen" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Project Name" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <script src="https://unpkg.com/ios-pwa-splash@1.0.0/cdn.min.js"></script>
+  <script>iosPWASplash('/apple-touch-icon.png', '#FFFFFF');</script>
+  <link rel="manifest" href="/site.webmanifest">
+
   <!-- Web App & Manifest -->
   <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
@@ -32,8 +45,67 @@
 
   <x-header></x-header>
 
-  <main>
-    <!-- Content -->
+  <main class="container mx-auto px-4 py-8">
+    <div class="text-center mb-8">
+      <h1 class="text-4xl font-bold text-content-stark mb-4">
+        Welcome to Your Indux Project
+      </h1>
+      <p class="text-lg text-content-subtle mb-6">
+        A modern web application built with the Indux framework, Alpine.js, and Tailwind CSS.
+      </p>
+      <div class="flex gap-4 justify-center">
+        <button class="btn btn-primary" @click="alert('Hello from Indux!')">
+          Get Started
+        </button>
+        <button class="btn btn-secondary" @click="$theme.toggle()">
+          Toggle Theme
+        </button>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="text-xl font-semibold">🚀 Fast Development</h3>
+        </div>
+        <div class="card-body">
+          <p>Build modern web applications with Indux's component system and Alpine.js reactivity.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="text-xl font-semibold">🎨 Beautiful Design</h3>
+        </div>
+        <div class="card-body">
+          <p>Create stunning interfaces with Tailwind CSS utilities and Indux's component library.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="text-xl font-semibold">📱 Responsive</h3>
+        </div>
+        <div class="card-body">
+          <p>Mobile-first design that works perfectly on all devices and screen sizes.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-12 text-center">
+      <h2 class="text-2xl font-bold text-content-stark mb-4">Ready to Build?</h2>
+      <p class="text-content-subtle mb-6">
+        Check out the <a href="https://indux.dev" class="link">Indux documentation</a> to learn more.
+      </p>
+      <div class="flex gap-4 justify-center">
+        <a href="https://indux.dev" class="btn btn-outline" target="_blank">
+          View Documentation
+        </a>
+        <a href="https://github.com/yourusername/my-indux-project" class="btn btn-outline" target="_blank">
+          View on GitHub
+        </a>
+      </div>
+    </div>
   </main>
 
   <x-footer></x-footer>

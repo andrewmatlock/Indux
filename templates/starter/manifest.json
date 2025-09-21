@@ -1,0 +1,34 @@
+{
+  "name": "My Project",
+  "short_name": "App",
+  "description": "Lorem ipsum dolor sit amet.",
+  "image": "/images/default-og-image.jpg",
+  "start_url": "/",
+  "scope": "/",
+  "display": "browser",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
+  "icons": [
+      {
+      "src": "/favicon.ico",
+      "sizes": "16x16 32x32 48x48",
+      "type": "image/x-icon"
+      }
+  ],
+  "defaultMeta": {
+      "title": "My Project",
+      "author": "Me",
+      "description": "Lorem ipsum dolor sit amet.",
+      "image": "/images/default-og-image.jpg",
+      "ogType": "website"
+  },
+  "components": [
+  ],
+  "preloadedComponents": [
+      "components/footer.html",
+      "components/header.html",
+      "components/logo.html"
+  ],
+  "data": {
+  }
+}

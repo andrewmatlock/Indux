@@ -1,9 +1,16 @@
-<header class="border-b border-line">
-    <nav>
-        <a href="/"> <x-logo /></a>
-        <div>
-            <a href="/docs" x-text="$x.core.docs.name">Docs</a>
-            <button @click="$theme.toggle()" x-icon="">X</button>
+<header class="border-b border-line bg-surface">
+    <nav class="container mx-auto px-4 py-4 flex justify-between items-center">
+        <a href="/" class="flex items-center gap-2">
+            <x-logo />
+        </a>
+        <div class="flex items-center gap-4">
+            <a href="/" class="link">Home</a>
+            <a href="/about" class="link">About</a>
+            <a href="/contact" class="link">Contact</a>
+            <button @click="$theme.toggle()" class="btn btn-ghost btn-sm" title="Toggle theme">
+                <i icon="ion:sunny" x-show="!$theme.isDark()"></i>
+                <i icon="ion:moon" x-show="$theme.isDark()"></i>
+            </button>
         </div>
     </nav>
 </header>
