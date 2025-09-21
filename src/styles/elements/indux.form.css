@@ -9,6 +9,7 @@
         width: 100%;
     }
 
+    /* Form element wrapper */
     :where(fieldset) {
         display: flex;
         flex-direction: column;
@@ -30,6 +31,7 @@
         }
     }
 
+    /* Label wrapper */
     :where(label:has(input:not([role=button], [type=checkbox], [type=radio], [type=file]), textarea)) {
         display: flex;
         flex-direction: column;
@@ -42,6 +44,7 @@
         }
     }
 
+    /* Label wrapper for radios and checkboxes */
     :where(label:has([type=radio], [type=checkbox])) {
         display: flex;
         flex-flow: row;
@@ -55,6 +58,7 @@
         }
     }
 
+    /* Group wrapper */
     :where([role=group]:has(button, input, select)) {
         display: flex;
         flex-flow: row nowrap;

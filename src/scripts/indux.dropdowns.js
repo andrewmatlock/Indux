@@ -1,4 +1,4 @@
-/*! Indux Dropdowns 1.0.0 - MIT License */
+/* Indux Dropdowns */
 
 // Initialize plugin when either DOM is ready or Alpine is ready
 function initializeDropdownPlugin() {

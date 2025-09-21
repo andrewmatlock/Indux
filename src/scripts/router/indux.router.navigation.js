@@ -1,4 +1,4 @@
-/*! Indux Routing Navigation 1.0.0 - MIT License */
+// Router navigation
 
 // Current route state
 let currentRoute = '/';

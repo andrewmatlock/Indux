@@ -1,4 +1,4 @@
-/*! Indux Resize 1.0.0 - MIT License */
+/* Resize Handles */
 
 :root { 
     --spacing-resize-handle: 1rem;
@@ -20,7 +20,7 @@
             border: none;
             outline: none;
 
-            /* Visual feedback */
+            /* Visible handle */
             &::before {    
                 content: '';
                 position: absolute;
@@ -40,7 +40,7 @@
             }
         }
 
-        /* Edge handles - full width/height */
+        /* Edge handles */
         .resize-handle-top,
         .resize-handle-bottom {
             width: 100%;
@@ -118,7 +118,6 @@
         }
 
         /* Logical direction handles */
-
         .resize-handle-top-start {
             width: var(--spacing-resize-handle, 1rem);
             height: var(--spacing-resize-handle, 1rem);
@@ -151,8 +150,7 @@
             cursor: se-resize;
         }
 
-
-        /* RTL adjustments for logical directions */
+        /* RTL overrides */
         [dir="rtl"] .resize-handle-top-start {
             cursor: ne-resize
         }
@@ -169,7 +167,7 @@
             cursor: sw-resize
         }
 
-        /* Resize overlay */
+        /* Screen overlay to get mouse coordinates */
         .resize-overlay {
             position: fixed;
             top: 0;

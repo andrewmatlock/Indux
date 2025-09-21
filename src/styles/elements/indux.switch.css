@@ -26,7 +26,7 @@
             transition: var(--transition, all .05s ease-in-out)
         }
 
-        /* On */
+        /* Checked */
         &:checked {
             background-color: var(--color-field-surface, oklch(91.79% 0.0029 264.26));
 
@@ -41,5 +41,4 @@
             }
         }
     }
-
 }

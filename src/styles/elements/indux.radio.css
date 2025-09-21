@@ -24,27 +24,17 @@
             transform-origin: center;
             transition: var(--transition, all .05s ease-in-out);
 
-            /* Notch off */
+            /* Notch unchecked */
             opacity: 0;
             -webkit-transform: translateX(-50%) translateY(-50%) scale(0);
             transform: translateX(-50%) translateY(-50%) scale(0)
         }
 
-        /* Notch on */
+        /* Notch checked */
         &:checked::after {
             opacity: 1;
             -webkit-transform: translateX(-50%) translateY(-50%) scale(1);
             transform: translateX(-50%) translateY(-50%) scale(1)
         }
     }
-
-    /* .dark input[type=radio] {
-        &:checked {
-            border: 1.5px solid var(--color-brand-surface);
-        }
-
-        &::after {
-            background-color: var(--color-brand-surface);
-        }
-    } */
 }

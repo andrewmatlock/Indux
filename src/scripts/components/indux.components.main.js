@@ -1,5 +1,3 @@
-/*! Indux Components Main 1.0.0 - MIT License */
-
 // Main initialization for Indux Components
 function initializeComponents() {
     if (window.InduxComponentsRegistry) window.InduxComponentsRegistry.initialize();

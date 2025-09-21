@@ -1,4 +1,4 @@
-/*! Indux Routing Position 1.0.0 - MIT License */
+// Router position
 
 // Capture initial body order from index.html
 function captureBodyOrder() {

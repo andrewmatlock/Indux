@@ -6,6 +6,7 @@
 
 @layer components {
 
+
     :where(details):not(.unset) {
         width: 100%;
         transition: var(--transition, all .05s ease-in-out);
@@ -15,15 +16,16 @@
             transform: rotate(90deg)
         }
 
+        /* Content spacing */
         & [open] summary {
             margin-bottom: calc(var(--spacing, 0.25rem) * 4)
         }
 
-        /* Content padding */
         &> :not(summary) {
             padding: var(--spacing-field-padding, 0.625rem) 0
         }
 
+        /* Content */
         :where(summary) {
             position: relative;
             display: flex;
@@ -69,6 +71,7 @@
         }
     }
 
+    /* RTL support */
     [dir="rtl"] :where(details):not(.unset) {
     
         & summary::before {

@@ -1,4 +1,4 @@
-/*! Indux Code 1.0.0 - MIT License */
+/* Indux Code */
 
 // Cache for highlight.js loading
 let hljsPromise = null;

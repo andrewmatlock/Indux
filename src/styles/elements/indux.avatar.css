@@ -53,6 +53,7 @@
         }
     }
 
+    /* Button version */
     :where(button.avatar) {
         padding: 0;
         background-blend-mode: normal;
@@ -67,6 +68,7 @@
         }
     }
 
+    /* Wide version */
     :where(.avatar-wide) {
         display: flex;
         flex-flow: row;
@@ -85,6 +87,7 @@
         }
     }
 
+    /* Wide button version */
     :where(button.avatar-wide) {
         height: fit-content;
         padding: var(--spacing, 0.25rem);
@@ -96,6 +99,7 @@
         }
     }
 
+    /* Group wrapper */
     :where([role=group]:has(.avatar, button.avatar)) {
         display: flex;
         flex-flow: row nowrap;

@@ -10,23 +10,28 @@
         border-spacing: 0;
         border-radius: var(--radius, 0.5rem);
 
+        /* Grid utility classes */
         :where(.grid-header, .grid-row, .grid-footer) {
             display: contents
         }
 
+        /* Header row */
         :where(thead, .grid-header > *) {
             background-color: var(--color-surface-1, oklch(98.17% 0.0005 95.87));
             border-bottom: 1px solid var(--color-line, oklch(48.3% 0.006422 17.4 / 0.15))
         }
 
+        /* Header cell */
         :where(th,.grid-header > *) {
             font-weight: bold
         }
 
+        /* Row */
         :where(tr, .grid-row > *) {
             border-bottom: 1px solid var(--color-line, oklch(48.3% 0.006422 17.4 / 0.15))
         }
 
+        /* Cell */
         :where(td, th, .grid-header > *, .grid-row > *, .grid-footer > *) {
             padding: calc(var(--spacing, 0.25rem) * 2.5) calc(var(--spacing, 0.25rem) * 4);
             font-size: 0.875rem;
@@ -46,10 +51,12 @@
             }
         }
         
+        /* Footer row */
         :where(:not(:has(tfoot)) tbody tr:last-child, tfoot tr:last-child, .grid-footer > *) {
             border-bottom: 0
         }
 
+        /* Striped utility class */
         &.striped {
             :where(tr:nth-child(even), .grid-row:nth-child(even)) {
                 background-color: var(--color-surface-1, oklch(98.17% 0.0005 95.87))

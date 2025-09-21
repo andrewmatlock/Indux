@@ -1,4 +1,4 @@
-/*! Indux Routing Visibility 1.0.0 - MIT License */
+// Router visibility
 
 // Process visibility for all elements with x-route
 function processRouteVisibility(normalizedPath) {

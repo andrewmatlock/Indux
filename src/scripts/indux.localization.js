@@ -1,4 +1,4 @@
-/*! Indux Localization 1.0.0 - MIT License */
+/* Indux Localization */
 
 function initializeLocalizationPlugin() {
     // Environment detection for debug logging

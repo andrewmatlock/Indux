@@ -1,4 +1,4 @@
-/*! Indux Components Processor 1.0.0 - MIT License */
+// Components processor
 window.InduxComponentsProcessor = {
     async processComponent(element, instanceId) {
         const name = element.tagName.toLowerCase().replace('x-', '');

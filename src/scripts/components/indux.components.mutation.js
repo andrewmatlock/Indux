@@ -1,4 +1,4 @@
-/*! Indux Components Mutation Observer 1.0.0 - MIT License */
+// Components mutation observer
 window.InduxComponentsMutation = {
     async processAllPlaceholders() {
         const processor = window.InduxComponentsProcessor;

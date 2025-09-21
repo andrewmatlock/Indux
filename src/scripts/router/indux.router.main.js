@@ -1,4 +1,4 @@
-/*! Indux Routing Main 1.0.0 - MIT License */
+/* Indux Router */
 
 // Main routing initialization
 function initializeRouting() {

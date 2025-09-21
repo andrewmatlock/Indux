@@ -1,4 +1,4 @@
-/*! Indux Routing Head 1.0.0 - MIT License */
+// Router head
 
 // Track injected head content to prevent duplicates
 const injectedHeadContent = new Set();

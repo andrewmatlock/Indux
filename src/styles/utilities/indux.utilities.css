@@ -7,31 +7,38 @@
 
 @layer utilities {
 
+    /* Center in flex parent */
     :where(.center) {
         justify-content: center;
         align-items: center
     }
 
-    :where(.col) {
-        flex-flow: column nowrap
-    }
-
-    :where(.col-wrap) {
-        flex-flow: column wrap
-    }
-
-    :where(.row) {
-        flex-flow: row nowrap
-    }
-
-    :where(.row-wrap) {
-        flex-flow: row wrap
-    }
-
+    /* Flex utilities */
     :where(.row, .row-wrap, .col, .col-wrap) {
         display: flex
     }
 
+    /* Flex column */
+    :where(.col) {
+        flex-flow: column nowrap
+    }
+
+    /* Wrapping flex column */
+    :where(.col-wrap) {
+        flex-flow: column wrap
+    }
+
+    /* Flex row */
+    :where(.row) {
+        flex-flow: row nowrap
+    }
+
+    /* Wrapping flex row */
+    :where(.row-wrap) {
+        flex-flow: row wrap
+    }
+
+    /* Content width & horizontal centering */
     :where(.content) {
         width: var(--spacing-content-width, 68.75rem);
         max-width: 100%;
@@ -39,6 +46,7 @@
         margin-inline-end: auto
     }
 
+    /* Ghost */
     :where(.ghost) {
         color: var(--color-content-stark, oklch(16.6% 0.026 267));
         background-color: transparent;
@@ -60,6 +68,7 @@
         }
     }
 
+    /* Hug */
     :where(.hug) {
         min-width: 0;
         width: fit-content;
@@ -67,26 +76,31 @@
         padding: 0
     }
 
+    /* Outlined */
     :where(.outlined) {
         border-width: 1.5px;
         border-style: solid;
         border-color: color-mix(in oklch, var(--color-field-surface, oklch(91.79% 0.0029 264.26)) 80%, var(--color-field-inverse, oklch(16.6% 0.026 267)))
     }
 
+    /* Selected */
     :where(.selected) {
         background-color: color-mix(in oklch, var(--color-field-surface, oklch(91.79% 0.0029 264.26)) 25%, transparent);
     }
 
+    /* Transparent */
     :where(.transparent) {
         background-color: transparent !important
     }
 
+    /* Large */
     :where(.lg) {
         --spacing-field-height: 2.5rem;
         --spacing-field-padding: 0.78rem;
         font-size: 125%
     }
 
+    /* Small */
     :where(.sm) {
         --spacing-field-height: 1.5rem;
         --spacing-field-padding: 0.49rem;
@@ -98,13 +112,14 @@
         }
     }
 
+    /* Page content layout */
     :where(body.page) {
         min-height: 100vh
     }
 
     .page {
 
-        /* Overlay if fixed */
+        /* Overlay header & footer if fixed */
         & > header, & > footer {
             z-index: 30
         }
@@ -115,7 +130,7 @@
             padding-inline-end: var(--spacing-viewport-padding)
         }
 
-        /* Set nav elements and sections for page content */
+        /* Width and horizontal centering for content wrappers */
         & > header nav, & > footer nav, & > main > section:not(.banner, .overlay-dark, .overlay-light) {
             width: var(--spacing-content-width);
             max-width: 100%;
@@ -129,10 +144,12 @@
         }
     }
 
+    /* No focus */
     .no-focus:focus-visible {
         outline: 0 none
     }
 
+    /* No scrollbar */
     :where(.no-scrollbar) {
         -ms-overflow-style: none;
         scrollbar-width: none;
@@ -142,6 +159,7 @@
         }
     }
 
+    /* Banner overlays */
     :where(.overlay-dark, .overlay-light) {
         position: relative;
 
@@ -161,6 +179,7 @@
         }
     }
 
+    /* Dark overlay */
     :where(.overlay-dark) {
         color: white !important;
 
@@ -169,6 +188,7 @@
         }
     }
 
+    /* Light overlay */
     :where(.overlay-light) {
         color: black !important;
 
@@ -177,6 +197,7 @@
         }
     }
 
+    /* Prose styles for long-form content */
     :where(.prose) {
         width: 65ch;
         max-width: 100%;
@@ -296,12 +317,14 @@
         }
     }
 
+    /* Inline trailing content */
     :where(.trailing) {
         display: inline-block;
         margin-inline-start: auto;
         color: var(--color-content-neutral, oklch(48.26% 0.0365 255.09))
     }
 
+    /* Brand colors */
     :where(.brand) {
         --color-field-surface: var(--color-brand-surface, #f6c07b);
         --color-field-surface-hover: var(--color-brand-surface-hover, #f19b46);
@@ -311,6 +334,7 @@
         --color-content-subtle: color-mix(in oklch, var(--color-brand-content, #de6618) 70%, transparent);
     }
 
+    /* Accent colors */
     :where(.accent) {
         --color-field-surface: var(--color-accent-surface, oklch(16.6% 0.026 267));
         --color-field-surface-hover: var(--color-accent-surface-hover, oklch(28.7% 0.030787 270.1));
@@ -320,6 +344,7 @@
         --color-content-subtle: color-mix(in oklch, var(--color-accent-content, oklch(16.6% 0.026 267)) 70%, transparent);
     }
 
+    /* Negative colors */
     :where(.negative) {
         --color-field-surface: var(--color-negative-surface, #ef4444);
         --color-field-surface-hover: var(--color-negative-surface-hover, #dc2626);
@@ -329,6 +354,7 @@
         --color-content-subtle: color-mix(in oklch, var(--color-negative-content, #ef4444) 70%, transparent);
     }
 
+    /* Positive colors */
     :where(.positive) {
         --color-field-surface: var(--color-positive-surface, #16a34a);
         --color-field-surface-hover: var(--color-positive-surface-hover, #166534);

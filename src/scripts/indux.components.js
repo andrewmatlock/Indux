@@ -1,7 +1,6 @@
-/*! Indux Components 1.0.0 - MIT License */
+/* Indux Components */
 
-
-
+// Components registry
 window.InduxComponentsRegistry = {
     manifest: null,
     registered: new Set(),
@@ -36,6 +35,7 @@ window.InduxComponentsRegistry = {
     }
 }; 
 
+// Components loader
 window.InduxComponentsLoader = {
     cache: {},
     initialize() {
@@ -81,6 +81,7 @@ window.InduxComponentsLoader = {
     }
 }; 
 
+// Components processor
 window.InduxComponentsProcessor = {
     async processComponent(element, instanceId) {
         const name = element.tagName.toLowerCase().replace('x-', '');
@@ -258,6 +259,7 @@ window.InduxComponentsProcessor = {
     }
 }; 
 
+// Components swapping
 (function () {
     let componentInstanceCounters = {};
     const swappedInstances = new Set();
@@ -415,6 +417,7 @@ window.InduxComponentsProcessor = {
     };
 })(); 
 
+// Components mutation observer
 window.InduxComponentsMutation = {
     async processAllPlaceholders() {
         const processor = window.InduxComponentsProcessor;
@@ -492,7 +495,6 @@ window.InduxComponentsMutation = {
         }
     }
 }; 
-
 
 // Main initialization for Indux Components
 function initializeComponents() {

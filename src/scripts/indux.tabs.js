@@ -1,4 +1,4 @@
-/*! Indux Tabs 1.0.0 - MIT License */
+/* Indux Tabs */
 
 function initializeTabsPlugin() {   
     

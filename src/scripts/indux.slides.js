@@ -1,4 +1,4 @@
-/*! Indux Carousels 1.0.0 - MIT License */
+/* Indux Slides */
 
 function initializeCarouselPlugin() {
 

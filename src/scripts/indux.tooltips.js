@@ -1,4 +1,4 @@
-/*! Indux Tooltips 1.0.0 - MIT License */
+/* Indux Tooltips */
 
 // Get tooltip hover delay from CSS variable
 function getTooltipHoverDelay(element) {

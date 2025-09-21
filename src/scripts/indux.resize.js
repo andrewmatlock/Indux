@@ -1,4 +1,4 @@
-/*! Indux Resizer 1.0.0 - MIT License */
+/* Indux Resizer */
 
 function initializeResizablePlugin() {
     // Cache for unit conversions to avoid repeated DOM manipulation

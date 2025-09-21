@@ -1,20 +1,4 @@
-/*! Indux Data Sources 1.1.0 - MIT License */
-
-/*
- * Indux Data Sources Plugin
- * 
- * Supports both local files (JSON/YAML) and cloud APIs:
- * 
- * Local Sources:
- * - String paths: "team": "/data/team.json"
- * - Localized: "features": {"en": "/data/features/en.yaml", "fr": "/data/features/fr.yaml"}
- * 
- * Cloud Sources:
- * - API endpoints: "users": {"url": "${API_BASE_URL}/users", "headers": {"Authorization": "Bearer ${API_TOKEN}"}}
- * - Localized APIs: "products": {"en": {"url": "${API_BASE_URL}/products/en"}, "fr": {"url": "${API_BASE_URL}/products/fr"}}
- * 
- * Environment variables are interpolated using ${VARIABLE_NAME} syntax.
- */
+/* Indux Data Sources */
 
 // Dynamic js-yaml loader
 let jsyaml = null;

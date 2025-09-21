@@ -1,4 +1,4 @@
-/* Browser Reset / Normalize */
+/* Browser reset / normalizer */
 
 @layer base {
 
@@ -267,6 +267,7 @@
         }
     }
 
+    /* Base popover styles */
     :where([popover]) {
         display: none;
         transition: opacity .15s ease-in, scale .15s ease-in, display .15s ease-in;

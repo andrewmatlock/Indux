@@ -1,7 +1,4 @@
-/*! Indux Router 1.0.0 - MIT License */
-
-
-
+/* Indux Router */
 
 // Main routing initialization
 function initializeRouting() {
@@ -49,6 +46,7 @@ window.InduxRouting = {
 };
 
 
+// Router position
 
 // Capture initial body order from index.html
 function captureBodyOrder() {
@@ -119,6 +117,7 @@ window.InduxRoutingPosition = {
     assignDataPositions
 }; 
 
+// Router navigation
 
 // Current route state
 let currentRoute = '/';
@@ -210,6 +209,7 @@ window.InduxRoutingNavigation = {
     getCurrentRoute: () => currentRoute
 }; 
 
+// Router visibility
 
 // Process visibility for all elements with x-route
 function processRouteVisibility(normalizedPath) {
@@ -272,6 +272,7 @@ window.InduxRoutingVisibility = {
     processRouteVisibility
 }; 
 
+// Router head
 
 // Track injected head content to prevent duplicates
 const injectedHeadContent = new Set();

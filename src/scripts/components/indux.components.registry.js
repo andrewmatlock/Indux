@@ -1,4 +1,6 @@
-/*! Indux Components Registry 1.0.0 - MIT License */
+/* Indux Components */
+
+// Components registry
 window.InduxComponentsRegistry = {
     manifest: null,
     registered: new Set(),

@@ -66,6 +66,7 @@
         }
     }
 
+    /* Selects */
     :where(select) {
         appearance: base-select;
 

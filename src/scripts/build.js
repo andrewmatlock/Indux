@@ -54,7 +54,7 @@ const CONFIG = {
         coreFiles: ['indux.theme.css', 'indux.reset.css'],
 
         // Files that need popover.css appended
-        popoverDependent: ['indux.dropdown.css', 'indux.modal.css', 'indux.tooltip.css'],
+        popoverDependent: ['indux.dropdown.css', 'indux.modal.css', 'indux.sidebar.css', 'indux.tooltip.css'],
 
         // Files that need group.css appended
         groupDependent: [],
@@ -84,42 +84,19 @@ function buildSubscripts() {
 function buildStylesheets() {
     console.log('Building stylesheets...\n');
 
-    // Step 1: Duplicate all files from source directories
-    duplicateStylesheets();
-
-    // Step 2: Build the main indux.css file
+    // Step 1: Build the main indux.css file
     buildMainStylesheet();
 
-    // Step 3: Handle special popover-dependent files
+    // Step 2: Handle special popover-dependent files
     handlePopoverDependentFiles();
 
-    // Step 4: Handle special group-dependent files
+    // Step 3: Handle special group-dependent files
     handleGroupDependentFiles();
+
+    // Step 4: Copy indux.css to docs and starter template
+    copyInduxCssToTargets();
 }
 
-// Duplicate all stylesheet files from source directories to output directory
-function duplicateStylesheets() {
-    console.log('Duplicating stylesheet files...');
-
-    for (const sourceDir of CONFIG.stylesheets.sourceDirs) {
-        const files = glob.sync(`${sourceDir}/*.css`);
-
-        for (const file of files) {
-            const filename = path.basename(file);
-            const outputPath = path.join(CONFIG.stylesheets.outputDir, filename);
-
-            // Skip if it's a popover-dependent or group-dependent file (will be handled separately)
-            if (CONFIG.stylesheets.popoverDependent.includes(filename) ||
-                CONFIG.stylesheets.groupDependent.includes(filename)) {
-                continue;
-            }
-
-            fs.copyFileSync(file, outputPath);
-            console.log(`  ✓ Duplicated ${filename}`);
-        }
-    }
-    console.log('');
-}
 
 // Build the main indux.css file
 function buildMainStylesheet() {
@@ -128,7 +105,7 @@ function buildMainStylesheet() {
     const mainContent = [];
 
     // Add header comment
-    mainContent.push('/*! Indux CSS 1.0.0 - MIT License */');
+    mainContent.push('/*  Indux CSS\n/*  By Andrew Matlock under MIT license\n/*  https://github.com/andrewmatlock/Indux\n*/');
 
     // Step 1: Add core files in order
     for (const coreFile of CONFIG.stylesheets.coreFiles) {
@@ -147,7 +124,13 @@ function buildMainStylesheet() {
 
     for (const elementFile of elementFiles) {
         const elementPath = path.join('styles/elements', elementFile);
-        const content = fs.readFileSync(elementPath, 'utf8').trim();
+        let content = fs.readFileSync(elementPath, 'utf8').trim();
+        
+        // Strip base layer popover styles from popover-dependent files when compiling into main indux.css
+        if (CONFIG.stylesheets.popoverDependent.includes(elementFile)) {
+            content = stripBaseLayerPopoverStyles(content);
+        }
+        
         mainContent.push(content);
         console.log(`  ✓ Added element: ${elementFile}`);
     }
@@ -171,32 +154,138 @@ function buildMainStylesheet() {
     console.log('');
 }
 
+// Strip base layer popover styles from content (used when compiling into main indux.css)
+function stripBaseLayerPopoverStyles(content) {
+    // Remove the base layer popover styles that are already included in indux.reset.css
+    // This function finds @layer base blocks that contain :where([popover]) and removes them
+    
+    const lines = content.split('\n');
+    const result = [];
+    let inBaseLayer = false;
+    let braceCount = 0;
+    let foundPopover = false;
+    let baseLayerStart = -1;
+    
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        
+        // Check if this line contains @layer base
+        if (line.includes('@layer base')) {
+            inBaseLayer = true;
+            braceCount = 0;
+            foundPopover = false;
+            baseLayerStart = i;
+        }
+        
+        if (inBaseLayer) {
+            // Count braces to track nesting
+            for (const char of line) {
+                if (char === '{') braceCount++;
+                if (char === '}') braceCount--;
+            }
+            
+            // Check if this line contains :where([popover])
+            if (line.includes(':where([popover])')) {
+                foundPopover = true;
+            }
+            
+            // If we've closed all braces and found popover styles, skip this block
+            if (braceCount === 0 && foundPopover) {
+                inBaseLayer = false;
+                foundPopover = false;
+                baseLayerStart = -1;
+                continue; // Skip adding this line
+            }
+            
+            // If we've closed all braces but didn't find popover styles, add the block
+            if (braceCount === 0 && !foundPopover) {
+                // Add all lines from baseLayerStart to current line
+                for (let j = baseLayerStart; j <= i; j++) {
+                    result.push(lines[j]);
+                }
+                inBaseLayer = false;
+                foundPopover = false;
+                baseLayerStart = -1;
+                continue;
+            }
+            
+            // If we're still inside the block, continue without adding
+            if (braceCount > 0) {
+                continue;
+            }
+        }
+        
+        // Add line if we're not in a base layer block
+        if (!inBaseLayer) {
+            result.push(line);
+        }
+    }
+    
+    // Clean up extra blank lines that might have been left after removing @layer base blocks
+    const cleanedResult = [];
+    for (let i = 0; i < result.length; i++) {
+        const line = result[i];
+        const nextLine = result[i + 1];
+        const prevLine = result[i - 1];
+        
+        // Skip blank lines that are followed by another blank line
+        if (line.trim() === '' && nextLine && nextLine.trim() === '') {
+            continue;
+        }
+        
+        // Skip blank lines that are at the start of a file
+        if (line.trim() === '' && cleanedResult.length === 0) {
+            continue;
+        }
+        
+        // Skip blank lines that come right after a comment (like /* Dropdowns */)
+        if (line.trim() === '' && prevLine && prevLine.trim().startsWith('/*') && prevLine.trim().endsWith('*/')) {
+            continue;
+        }
+        
+        cleanedResult.push(line);
+    }
+    
+    return cleanedResult.join('\n');
+}
+
 // Handle files that need popover.css appended
 function handlePopoverDependentFiles() {
     console.log('Processing popover-dependent files...');
+    console.log('  ✓ Popover-dependent files are handled in main indux.css build');
+    console.log('  ✓ Individual files available in styles/elements/ for standalone use');
+    console.log('');
+}
 
-    const popoverPath = path.join('styles/snippets', 'popover.css');
-    if (!fs.existsSync(popoverPath)) {
-        console.warn('  ⚠ Warning: popover.css not found, skipping dependent files');
+// Copy indux.css to docs and starter template directories
+function copyInduxCssToTargets() {
+    console.log('Copying indux.css to target directories...');
+
+    const cssSource = path.join('styles', 'indux.css');
+    
+    if (!fs.existsSync(cssSource)) {
+        console.warn('  ⚠ Warning: indux.css not found, skipping copy');
         return;
     }
 
-    const popoverContent = fs.readFileSync(popoverPath, 'utf8');
-
-    for (const dependentFile of CONFIG.stylesheets.popoverDependent) {
-        const sourcePath = path.join('styles/elements', dependentFile);
-        const outputPath = path.join(CONFIG.stylesheets.outputDir, dependentFile);
-
-        if (fs.existsSync(sourcePath)) {
-            const originalContent = fs.readFileSync(sourcePath, 'utf8');
-            const combinedContent = originalContent + '\n\n' + popoverContent;
-
-            fs.writeFileSync(outputPath, combinedContent);
-            console.log(`  ✓ Processed ${dependentFile} with popover.css`);
-        } else {
-            console.warn(`  ⚠ Warning: ${dependentFile} not found`);
-        }
+    // Copy to docs/styles
+    const docsStylesDir = path.join('..', 'docs', 'styles');
+    if (!fs.existsSync(docsStylesDir)) {
+        fs.mkdirSync(docsStylesDir, { recursive: true });
     }
+    const cssDocsDest = path.join(docsStylesDir, 'indux.css');
+    fs.copyFileSync(cssSource, cssDocsDest);
+    console.log('  ✓ Copied indux.css to docs/styles');
+
+    // Copy to templates/starter/styles
+    const starterStylesDir = path.join('..', 'templates', 'starter', 'styles');
+    if (!fs.existsSync(starterStylesDir)) {
+        fs.mkdirSync(starterStylesDir, { recursive: true });
+    }
+    const cssStarterDest = path.join(starterStylesDir, 'indux.css');
+    fs.copyFileSync(cssSource, cssStarterDest);
+    console.log('  ✓ Copied indux.css to templates/starter/styles');
+
     console.log('');
 }
 
@@ -232,8 +321,6 @@ function handleGroupDependentFiles() {
     console.log('');
 }
 
-
-
 // Combine subscripts into a single file
 function combineSubscripts(subscriptFiles, outputFile, systemName) {
     console.log(`Building ${systemName} monolith...`);
@@ -241,20 +328,13 @@ function combineSubscripts(subscriptFiles, outputFile, systemName) {
     const combinedContent = [];
     const componentDir = path.join('scripts', systemName);
 
-    // Add header comment
-    combinedContent.push(`/*! Indux ${systemName.charAt(0).toUpperCase() + systemName.slice(1)} 1.0.0 - MIT License */`);
-    combinedContent.push('');
-
     // Combine all subscripts
     let filesFound = 0;
     for (const file of subscriptFiles) {
         const filePath = path.join(componentDir, file);
         if (fs.existsSync(filePath)) {
             const content = fs.readFileSync(filePath, 'utf8');
-            // Remove the header comment from each file (first line)
-            const lines = content.split('\n');
-            const contentWithoutHeader = lines.slice(1).join('\n');
-            combinedContent.push(contentWithoutHeader);
+            combinedContent.push(content);
             console.log(`  ✓ Added ${file}`);
             filesFound++;
         } else {
@@ -284,26 +364,11 @@ function buildRollupFiles() {
 
     const pluginFiles = [...CONFIG.corePlugins, ...otherPluginFiles];
 
-    // Handle markdown plugin specially - extract raw CDN script and custom plugin code
-    const markdownPluginPath = 'scripts/indux.markdown.js';
-    const markdownContent = fs.readFileSync(markdownPluginPath, 'utf8');
-    const lines = markdownContent.split('\n');
 
-    // First 2 lines contain the raw Marked CDN script (must stay at root level)
-    const markedScript = lines.slice(0, 2).join('\n');
-
-    // Remaining lines are our custom plugin code (can be wrapped in function)
-    const pluginCode = lines.slice(2).join('\n');
-
-    // Write temporary plugin file with just the custom code
-    const tempPluginPath = path.join('scripts', 'temp.plugin.js');
-    fs.writeFileSync(tempPluginPath, pluginCode);
-
-    // Create main rollup entry (excluding markdown plugin since it's handled specially)
+    // Create main rollup entry
     const entryContent = pluginFiles
-        .filter(file => file !== 'scripts/indux.markdown.js')
         .map(file => `import './${path.basename(file)}';`)
-        .join('\n') + '\nimport "./temp.plugin.js";';
+        .join('\n');
 
     // Add dependency exports
     const exportConstants = `// Additional dependencies for Alpine+Tailwind build
@@ -322,11 +387,8 @@ export const ALPINE_FILE = '${CONFIG.dependencies.ALPINE_FILE}';`;
     const alpineTailwindEntryContent = [
         `import './${CONFIG.dependencies.TAILWIND_V4_FILE}';`,
         `import './indux.utilities.js';`,
-        // Import all Indux plugins (excluding markdown since it's handled specially)
-        ...pluginFiles
-            .filter(file => file !== 'scripts/indux.markdown.js')
-            .map(file => `import './${path.basename(file)}';`),
-        `import "./temp.plugin.js";`,
+        // Import all Indux plugins
+        ...pluginFiles.map(file => `import './${path.basename(file)}';`),
         `import './${CONFIG.dependencies.ALPINE_FILE}';`
     ].join('\n');
 
@@ -334,8 +396,6 @@ export const ALPINE_FILE = '${CONFIG.dependencies.ALPINE_FILE}';`;
     fs.writeFileSync(alpineTailwindEntryPath, alpineTailwindEntryContent);
     console.log('  ✓ Created rollup.quickstart.temp.js');
 
-    // Store marked script for rollup config
-    global.markedScript = markedScript;
 
     console.log('✓ Rollup files built successfully!\n');
 }
@@ -344,11 +404,6 @@ export const ALPINE_FILE = '${CONFIG.dependencies.ALPINE_FILE}';`;
 function createRollupConfig() {
     console.log('Creating rollup configuration...\n');
 
-    // Escape the marked script for safe embedding
-    const escapedMarkedScript = global.markedScript
-        .replace(/\\/g, '\\\\')
-        .replace(/`/g, '\\`')
-        .replace(/\$/g, '\\$');
 
     const rollupConfig = `import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
@@ -363,18 +418,6 @@ const baseConfig = {
     ]
 };
 
-// Cleanup plugin
-const cleanupPlugin = {
-    name: 'cleanup',
-    writeBundle() {
-        // Clean up temporary files
-        try {
-            fs.unlinkSync('scripts/temp.plugin.js');
-        } catch (e) {
-            // Files may already be cleaned up
-        }
-    }
-};
 
 // Cleanup plugin for quickstart (cleans up after both builds)
 const quickstartCleanupPlugin = {
@@ -457,7 +500,7 @@ export default [
             file: 'scripts/indux.js',
             format: 'iife',
             name: 'Indux',
-            intro: \`${escapedMarkedScript}\` // Add Marked script at the very beginning
+            banner: \`/*  Indux JS\n/*  By Andrew Matlock under MIT license\n/*  https://github.com/andrewmatlock/Indux\n/*\n/*  Contains all Indux plugins bundled with Iconify (iconify.design)\n/*\n/*  With on-demand reference to:\n/*  - highlight.js (https://highlightjs.org)\n/*  - js-yaml (https://nodeca.github.io/js-yaml)\n/*  - Marked JS (https://marked.js.org)\n/*\n/*  Requires Alpine JS (alpinejs.dev) to operate.\n*/\n\n\` // Add header
         },
         plugins: [
             ...baseConfig.plugins
@@ -471,11 +514,10 @@ export default [
             file: 'scripts/indux.quickstart.js',
             format: 'iife',
             name: 'InduxAlpineTailwind',
-            intro: \`${escapedMarkedScript}\` // Add Marked script at the very beginning
+            banner: \`/*  Indux JS - Quickstart\n/*  By Andrew Matlock under MIT license\n/*  https://github.com/andrewmatlock/Indux\n/*\n/*  Contains all Indux plugins bundled with:\n/*  - Alpine JS (alpinejs.dev)\n/*  - Iconify (iconify.design)\n/*  - Tailwind CSS (modified Play CDN script) (tailwindcss.com)\n/*\n/*  With on-demand reference to:\n/*  - highlight.js (https://highlightjs.org)\n/*  - js-yaml (https://nodeca.github.io/js-yaml)\n/*  - Marked JS (https://marked.js.org)\n*/\n\n\` // Add header
         },
         plugins: [
             ...baseConfig.plugins,
-            cleanupPlugin,
             quickstartCleanupPlugin,
             copyToDocsPlugin
         ]

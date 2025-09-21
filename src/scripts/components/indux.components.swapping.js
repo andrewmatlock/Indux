@@ -1,4 +1,4 @@
-/*! Indux Components Swapping 1.0.0 - MIT License */
+// Components swapping
 (function () {
     let componentInstanceCounters = {};
     const swappedInstances = new Set();

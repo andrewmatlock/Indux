@@ -1,5 +1,34 @@
 /* Modals */
 
+@layer base {
+
+    /* Base popover styles */
+    :where([popover]) {
+        display: none;
+        transition: opacity .15s ease-in, scale .15s ease-in, display .15s ease-in;
+        transition-behavior: allow-discrete;
+
+        &:popover-open {
+            display: flex
+        }
+
+        /* Opening state */
+        @starting-style {
+            scale: .9;
+            opacity: 0
+        }
+
+        /* Closing state */
+        &:not(:popover-open) {
+            display: none !important;
+            scale: 1;
+            opacity: 0;
+            transition-duration: .15s;
+            transition-timing-function: ease-out
+        }
+    }
+}
+
 @layer components {
 
     :where(dialog[popover]) {
@@ -57,12 +86,14 @@
         }
     }
 
+    /* Dark mode override */
     .dark :where(dialog)::backdrop {
         background-color: rgba(0, 0, 0, 0.35)
     }
 
     /* Hide dropdowns when modals are open */
     html:has(dialog:popover-open) {
+
         /* Hide dropdowns outside of any modal */
         & menu[popover]:not(dialog *) {
             opacity: 0;
@@ -76,9 +107,8 @@
         }
     }
 
-    /* When multiple modals are open, hide dropdowns in non-topmost modals */
+    /* When multiple modals are open, hide dropdowns in all but closest modal */
     html:has(dialog:popover-open ~ dialog:popover-open) {
-        /* Hide dropdowns in all but the last modal */
         & dialog:popover-open:not(:last-of-type) menu[popover] {
             opacity: 0;
             scale: .9;
@@ -90,5 +120,4 @@
             }
         }
     }
-
 }

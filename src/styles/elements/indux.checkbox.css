@@ -16,7 +16,7 @@
         border-radius: 0.4rem;
         cursor: pointer;
 
-        /* On */
+        /* Checked */
         &:checked {
 
             &:hover {
@@ -48,13 +48,13 @@
             transform-origin: center;
             transition: var(--transition, all .05s ease-in-out);
 
-            /* Icon off */
+            /* Icon unchecked */
             opacity: 0;
             -webkit-transform: translateX(-50%) translateY(-50%) scale(0);
             transform: translateX(-50%) translateY(-50%) scale(0)
         }
 
-        /* Icon on */
+        /* Icon checked */
         &:checked::after {
             opacity: 1;
             -webkit-transform: translateX(-50%) translateY(-50%) scale(1);

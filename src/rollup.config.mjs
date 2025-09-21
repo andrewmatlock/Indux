@@ -11,18 +11,6 @@ const baseConfig = {
     ]
 };
 
-// Cleanup plugin
-const cleanupPlugin = {
-    name: 'cleanup',
-    writeBundle() {
-        // Clean up temporary files
-        try {
-            fs.unlinkSync('scripts/temp.plugin.js');
-        } catch (e) {
-            // Files may already be cleaned up
-        }
-    }
-};
 
 // Cleanup plugin for quickstart (cleans up after both builds)
 const quickstartCleanupPlugin = {
@@ -105,8 +93,21 @@ export default [
             file: 'scripts/indux.js',
             format: 'iife',
             name: 'Indux',
-            intro: `/*! Indux Markdown 1.0.0 - MIT License */
-` // Add Marked script at the very beginning
+            banner: `/*  Indux JS
+/*  By Andrew Matlock under MIT license
+/*  https://github.com/andrewmatlock/Indux
+/*
+/*  Contains all Indux plugins bundled with Iconify (iconify.design)
+/*
+/*  With on-demand reference to:
+/*  - highlight.js (https://highlightjs.org)
+/*  - js-yaml (https://nodeca.github.io/js-yaml)
+/*  - Marked JS (https://marked.js.org)
+/*
+/*  Requires Alpine JS (alpinejs.dev) to operate.
+*/
+
+` // Add header
         },
         plugins: [
             ...baseConfig.plugins
@@ -120,12 +121,25 @@ export default [
             file: 'scripts/indux.quickstart.js',
             format: 'iife',
             name: 'InduxAlpineTailwind',
-            intro: `/*! Indux Markdown 1.0.0 - MIT License */
-` // Add Marked script at the very beginning
+            banner: `/*  Indux JS - Quickstart
+/*  By Andrew Matlock under MIT license
+/*  https://github.com/andrewmatlock/Indux
+/*
+/*  Contains all Indux plugins bundled with:
+/*  - Alpine JS (alpinejs.dev)
+/*  - Iconify (iconify.design)
+/*  - Tailwind CSS (modified Play CDN script) (tailwindcss.com)
+/*
+/*  With on-demand reference to:
+/*  - highlight.js (https://highlightjs.org)
+/*  - js-yaml (https://nodeca.github.io/js-yaml)
+/*  - Marked JS (https://marked.js.org)
+*/
+
+` // Add header
         },
         plugins: [
             ...baseConfig.plugins,
-            cleanupPlugin,
             quickstartCleanupPlugin,
             copyToDocsPlugin
         ]

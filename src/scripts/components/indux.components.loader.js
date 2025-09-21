@@ -1,4 +1,4 @@
-/*! Indux Components Loader 1.0.0 - MIT License */
+// Components loader
 window.InduxComponentsLoader = {
     cache: {},
     initialize() {

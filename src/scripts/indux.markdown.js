@@ -1,4 +1,4 @@
-/*! Indux Markdown 1.0.0 - MIT License */
+/* Indux Markdown */
 
 // Cache for marked.js loading
 let markedPromise = null;

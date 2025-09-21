@@ -1,3 +1,5 @@
+/* Indux Utilities */
+
 // Browser runtime compiler
 class TailwindCompiler {
     constructor(options = {}) {

@@ -1,4 +1,4 @@
-/*! Indux URL Parameters 1.0.0 - MIT License */
+/* Indux URL Parameters */
 
 function initializeUrlParametersPlugin() {
     // Initialize empty parameters store
