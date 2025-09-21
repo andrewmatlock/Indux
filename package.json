@@ -10,6 +10,7 @@
         "build": "cd src && node scripts/build.js && rollup -c rollup.config.mjs",
         "build:docs": "echo 'Docs is a static website - no build needed'",
         "start:docs": "cd docs && browser-sync start --config bs-config.js",
+        "start:starter": "cd templates/starter && browser-sync start --config bs-config.js --port 3001",
         "publish:starter": "cd templates/starter && npm publish",
         "test": "echo 'No tests configured'",
         "lint": "echo 'No linting configured'"

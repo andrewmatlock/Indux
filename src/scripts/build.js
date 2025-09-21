@@ -389,11 +389,11 @@ const quickstartCleanupPlugin = {
     }
 };
 
-// Copy to docs plugin (runs after quickstart build)
+// Copy to docs and starter template plugin (runs after quickstart build)
 const copyToDocsPlugin = {
     name: 'copy-to-docs',
     writeBundle() {
-        // Copy files to docs directory after build
+        // Copy files to docs and starter template directories after build
         try {
             // Ensure docs directories exist
             const docsScriptsDir = path.join('..', 'docs', 'scripts');
@@ -406,29 +406,44 @@ const copyToDocsPlugin = {
                 fs.mkdirSync(docsStylesDir, { recursive: true });
             }
 
-            // Copy indux.quickstart.js to docs/scripts
+            // Ensure starter template directories exist
+            const starterScriptsDir = path.join('..', 'templates', 'starter', 'scripts');
+            const starterStylesDir = path.join('..', 'templates', 'starter', 'styles');
+            
+            if (!fs.existsSync(starterScriptsDir)) {
+                fs.mkdirSync(starterScriptsDir, { recursive: true });
+            }
+            if (!fs.existsSync(starterStylesDir)) {
+                fs.mkdirSync(starterStylesDir, { recursive: true });
+            }
+
+            // Copy indux.quickstart.js to both docs and starter
             const quickstartSource = path.join('scripts', 'indux.quickstart.js');
-            const quickstartDest = path.join(docsScriptsDir, 'indux.quickstart.js');
+            const quickstartDocsDest = path.join(docsScriptsDir, 'indux.quickstart.js');
+            const quickstartStarterDest = path.join(starterScriptsDir, 'indux.quickstart.js');
 
             if (fs.existsSync(quickstartSource)) {
-                fs.copyFileSync(quickstartSource, quickstartDest);
-                console.log('  ✓ Copied indux.quickstart.js to docs/scripts');
+                fs.copyFileSync(quickstartSource, quickstartDocsDest);
+                fs.copyFileSync(quickstartSource, quickstartStarterDest);
+                console.log('  ✓ Copied indux.quickstart.js to docs/scripts and templates/starter/scripts');
             } else {
                 console.warn('  ⚠ Warning: indux.quickstart.js not found');
             }
 
-            // Copy indux.css to docs/styles
+            // Copy indux.css to both docs and starter
             const cssSource = path.join('styles', 'indux.css');
-            const cssDest = path.join(docsStylesDir, 'indux.css');
+            const cssDocsDest = path.join(docsStylesDir, 'indux.css');
+            const cssStarterDest = path.join(starterStylesDir, 'indux.css');
 
             if (fs.existsSync(cssSource)) {
-                fs.copyFileSync(cssSource, cssDest);
-                console.log('  ✓ Copied indux.css to docs/styles');
+                fs.copyFileSync(cssSource, cssDocsDest);
+                fs.copyFileSync(cssSource, cssStarterDest);
+                console.log('  ✓ Copied indux.css to docs/styles and templates/starter/styles');
             } else {
                 console.warn('  ⚠ Warning: indux.css not found');
             }
         } catch (e) {
-            console.warn('  ⚠ Warning: Failed to copy files to docs:', e.message);
+            console.warn('  ⚠ Warning: Failed to copy files to docs and starter:', e.message);
         }
     }
 };
