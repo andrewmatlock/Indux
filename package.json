@@ -6,12 +6,11 @@
         "packages/*"
     ],
     "scripts": {
-        "clean": "rimraf @indux/*/dist/* dist/ development/scripts/indux.min.js",
-        "build:core": "cd development && npm run build",
-        "build:styles": "node development/scripts/package-styles.js",
-        "build:templates": "node development/scripts/package-templates.js",
-        "build": "npm run build --workspaces",
-        "publish-packages": "node development/scripts/publish-packages.js",
+        "clean": "rimraf packages/*/dist/* dist/ src/scripts/indux.min.js",
+        "build:core": "cd src && npm run build",
+        "build": "npm run build:core",
+        "build:packages": "npm run build --workspaces",
+        "publish-packages": "node src/scripts/publish-packages.js",
         "test": "npm run test --workspaces",
         "lint": "npm run lint --workspaces"
     },

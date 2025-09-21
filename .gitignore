@@ -3,3 +3,4 @@ bs-config.js
 rollup.config.js
 rollup.alpine.tailwind.temp.js
 temp.plugin.js
+.vscode/

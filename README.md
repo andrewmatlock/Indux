@@ -5,11 +5,11 @@ A lightweight JavaScript framework for building interactive web applications.
 
 ## Project Structure
 indux-monorepo/
-├── @indux/ # NPM packages
+├── packages/ # NPM packages
 │ ├── core/ # Core framework
 │ ├── styles/ # CSS utilities
 │ └── create-/ # Template generators
-├── development/ # Source files
+├── src/ # Source files
 │ └── scripts/ # Framework source
 ├── templates/ # Project templates
 └── package.json # Root configuration
@@ -58,9 +58,9 @@ Build and publish latest packages to NPM:
 
 ## Package Descriptions
 
-- **@indux/core**: Core framework functionality (indux.min.js)
-- **@indux/styles**: CSS utilities and baseline styles (baseline.css, elements.css, styles.css)
-- **@indux/create-starter**: Project generator for basic startertemplate
+- **packages/core**: Core framework functionality (indux.min.js)
+- **packages/styles**: CSS utilities and baseline styles (baseline.css, elements.css, styles.css)
+- **packages/create-starter**: Project generator for basic startertemplate
 
 
 ## Using Templates
@@ -68,17 +68,17 @@ Build and publish latest packages to NPM:
 ### Create New Project
 Using npx:
 
-    npx @indux/create-starter my-app
+    npx packages/create-starter my-app
 
 Or install globally:
 
-    npm install -g @indux/create-starter
+    npm install -g packages/create-starter
     create-indux-starter my-app
 
 ### Install/Update Specific Files
 Install core framework:
 
-    npm install @indux/core
+    npm install packages/core
 
 This creates scripts/indux.min.js.
 Add to your HTML:
@@ -88,7 +88,7 @@ Add to your HTML:
 ### Install/Update Styles Only
 Install CSS files:
 
-    npm install @indux/styles
+    npm install packages/styles
 
 This creates or updates styles/baseline.css, elements.css, and styles.css.
 If updating, your old styles.css is backed up as styles.old.css since that's where your custom CSS should go.
@@ -101,5 +101,5 @@ If an update is not coming through, it may be due to npm caching on your system.
 Try running:
 
     npm cache clean --force
-    npm install @indux/core
-    npm install @indux/styles
+    npm install packages/core
+    npm install packages/styles
