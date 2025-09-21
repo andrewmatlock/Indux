@@ -7,7 +7,6 @@
     "create-indux-starter": "./bin/create-indux-starter.js"
   },
   "files": [
-    "template",
     "bin"
   ],
   "keywords": [

@@ -42,8 +42,8 @@ async function init() {
         fs.removeSync(projectPath);
     }
 
-    // Copy template
-    const templatePath = path.join(__dirname, '../template');
+    // Copy template from root templates directory
+    const templatePath = path.join(__dirname, '../../templates/starter');
     fs.copySync(templatePath, projectPath);
 
     // Create package.json

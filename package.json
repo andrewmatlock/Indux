@@ -3,14 +3,14 @@
     "version": "1.5.9",
     "private": false,
     "workspaces": [
-        "packages/*"
+        "create-starter"
     ],
     "scripts": {
         "clean": "rimraf src/scripts/indux.js src/scripts/indux.quickstart.js src/styles/indux.css",
         "build": "cd src && node scripts/build.js && rollup -c rollup.config.mjs",
         "build:docs": "echo 'Docs is a static website - no build needed'",
         "start:docs": "cd docs && browser-sync start --config bs-config.js",
-        "publish:starter": "cd packages/create-starter && npm publish",
+        "publish:starter": "cd create-starter && npm publish",
         "test": "echo 'No tests configured'",
         "lint": "echo 'No linting configured'"
     },
