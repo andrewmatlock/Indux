@@ -33,10 +33,17 @@ const findJsFiles = (dir, fileName) => {
 async function install() {
     try {
         const packageJson = require('../package.json');
-        console.log(`Force installing packages/core version: ${packageJson.version}`);
+        console.log(`Force installing @indux/core version: ${packageJson.version}`);
 
         const projectRoot = path.resolve(__dirname, '../../../../');
         const sourcePath = path.resolve(__dirname, '../indux.min.js');
+
+        // Check if source file exists
+        if (!fs.existsSync(sourcePath)) {
+            console.log('indux.min.js not found in dist. Skipping installation.');
+            console.log('Run "npm run build" to generate the required files.');
+            return;
+        }
 
         // Find existing indux.min.js files
         const existingLocations = findJsFiles(projectRoot, 'indux.min.js');

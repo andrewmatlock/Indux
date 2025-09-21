@@ -1,5 +1,5 @@
 {
-    "name": "packages/styles",
+    "name": "@indux/styles",
     "version": "1.5.9",
     "description": "CSS framework for Indux",
     "main": "baseline.css",

@@ -53,11 +53,11 @@ async function init() {
             "start": "npm run dev",
             "dev": "lite-server",
             "build": "npm run update",
-            "update": "npx packages/core@latest update && npx packages/styles@latest update"
+            "update": "npx @indux/core@latest update && npx @indux/styles@latest update"
         },
         dependencies: {
-            "packages/core": "latest",
-            "packages/styles": "latest"
+            "@indux/core": "latest",
+            "@indux/styles": "latest"
         },
         devDependencies: {
             "lite-server": "^2.6.1"

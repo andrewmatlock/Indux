@@ -58,6 +58,13 @@ async function install() {
         // Update files in their existing locations or default to styles/
         for (const file of filesToUpdate) {
             const sourcePath = path.join(sourceDir, file);
+            
+            // Check if source file exists
+            if (!fs.existsSync(sourcePath)) {
+                console.log(`${file} not found in source. Skipping ${file}.`);
+                continue;
+            }
+            
             const existingLocations = existingFiles[file.replace('.css', '')] || [];
 
             if (existingLocations.length > 0) {

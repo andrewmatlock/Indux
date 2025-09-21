@@ -1,5 +1,5 @@
 {
-    "name": "packages/core",
+    "name": "@indux/core",
     "version": "1.5.9",
     "description": "Core JavaScript functionality for the Indux framework",
     "main": "dist/index.js",

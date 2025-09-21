@@ -1,6 +1,6 @@
 {
-    "name": "indux",
-    "version": "0.1.0",
+    "name": "indux-monorepo",
+    "version": "1.5.9",
     "private": false,
     "workspaces": [
         "packages/*"
@@ -15,15 +15,12 @@
         "lint": "npm run lint --workspaces"
     },
     "devDependencies": {
-        "@types/jest": "^29.5.14",
-        "fs-extra": "^11.2.0",
-        "jest": "^29.7.0",
-        "mock-fs": "^5.4.1",
-        "prompts": "^2.4.2",
-        "rimraf": "^5.0.0",
         "@rollup/plugin-commonjs": "^25.0.0",
         "@rollup/plugin-node-resolve": "^15.0.0",
         "@rollup/plugin-terser": "^0.4.0",
+        "fs-extra": "^11.2.0",
+        "prompts": "^2.4.2",
+        "rimraf": "^5.0.0",
         "rollup": "^4.0.0"
     },
     "main": "index.js",
@@ -31,16 +28,8 @@
     "author": "",
     "license": "ISC",
     "description": "",
-    "jest": {
-        "testEnvironment": "node",
-        "testMatch": [
-            "**/__tests__/**/*.test.js"
-        ],
-        "modulePathIgnorePatterns": [
-            "<rootDir>/dist/"
-        ]
-    },
     "dependencies": {
+        "commander": "^14.0.1",
         "glob": "^11.0.2"
     }
 }

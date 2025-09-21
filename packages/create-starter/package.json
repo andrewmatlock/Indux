@@ -1,5 +1,5 @@
 {
-    "name": "packages/create-starter",
+    "name": "@indux/create-starter",
     "version": "1.5.9",
     "description": "Create Indux starter application",
     "bin": {
