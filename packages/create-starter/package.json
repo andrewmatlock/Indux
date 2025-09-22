@@ -1,0 +1,32 @@
+{
+  "name": "@indux/starter",
+  "version": "1.5.12",
+  "description": "Create Indux starter application",
+  "main": "index.html",
+  "bin": {
+    "starter": "create-starter.js"
+  },
+  "scripts": {
+    "start": "browser-sync start --config bs-config.js",
+    "build": "echo 'Starter template - no build needed'"
+  },
+  "keywords": [
+    "indux",
+    "framework",
+    "starter",
+    "template",
+    "html",
+    "css",
+    "javascript"
+  ],
+  "author": "Andrew Matlock",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andrewmatlock/Indux.git",
+    "directory": "packages/create-starter"
+  },
+  "files": [
+    "create-starter.js"
+  ]
+}

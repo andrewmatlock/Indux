@@ -95,6 +95,7 @@ function buildStylesheets() {
 
     // Step 4: Copy indux.css to docs and starter template
     copyInduxCssToTargets();
+
 }
 
 
@@ -288,6 +289,7 @@ function copyInduxCssToTargets() {
 
     console.log('');
 }
+
 
 // Handle files that need group.css appended
 function handleGroupDependentFiles() {
