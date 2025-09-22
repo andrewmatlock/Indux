@@ -33,8 +33,8 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 Auto-publishes to npm and jsdelivr CDN via GitHub Actions. Files available at:
-- `https://cdn.jsdelivr.net/npm/indux@v1.0.0/src/scripts/indux.js`
-- `https://cdn.jsdelivr.net/npm/indux@v1.0.0/src/styles/indux.css`
+- `https://cdn.jsdelivr.net/npm/@andrewmatlock/indux@0.2.0/src/scripts/indux.js`
+- `https://cdn.jsdelivr.net/npm/@andrewmatlock/indux@0.2.0/src/styles/indux.css`
 
 
 ---
