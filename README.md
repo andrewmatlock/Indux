@@ -2,7 +2,7 @@
 
 Indux extends HTML for rapid, feature-rich website and web app development, without the overhead of complex frameworks and dependencies.
 
-- Built on Alpine JS
+- Collection of plugins on Alpine JS
 - Compatible with Tailwind CSS
 - No build steps
 - Use only what you need
