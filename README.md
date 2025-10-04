@@ -8,49 +8,50 @@ Indux extends HTML for rapid, feature-rich website and web app development, with
 - Use only what you need
 - Stack with other frameworks & libraries
 
----
 
 ## 🏁 Setup
 
 Get <a href="https://indux.build/getting-started/setup" target="_blank">CDN links</a> for existing projects or try the <a href="https://indux.build/getting-started/starter-project" target="_blank">starter project</a> for new ones.
 
----
 
 ## ✅ Features
 
-**Alpine Plugins:**
-- Color Themes
-- Components
-- Data Sources
-- Localization
-- SPA Routing
+<div style="display: flex; flex-wrap: row wrap; gap: 2rem;">
+    <div>
+    **Alpine Plugins:**
+    - Color Themes
+    - Components
+    - Data Sources
+    - Localization
+    - SPA Routing
+    </div>
+    <div>
+    **UX/UI:**
+    - Global Theme
+    - Utility Classes
+    - 20+ Elements
+    </div>
+    <div>
+    **...and more**
+    </div>
+</div>
 
-**UX/UI:**
-- Global Theme
-- Utility Classes
-- 20+ Elements
-
-**...and more**
-
----
 
 ## 📚 Documentation
 
 For full documentation visit <a href="https://indux.build" target="_blank">indux.build</a>.
 
----
 
 ## 📄 License
 
-Indux is provided with an [MIT License](/blob/main/LICENSE.md).
+Indux is provided under [MIT License](/blob/main/LICENSE.md).
 
----
 
 ## 🙏 Acknowledgments
 
-- [Alpine.js](https://alpinejs.dev) - Lightweight reactive framework, bundled with `indux.quickstart.js`
-- [Tailwind CSS](https://tailwindcss.com) - Utility-first CSS framework, with its Play CDN script bundled with `indux.quickstart.js`
-- [Iconify](https://iconify.design) - Collection of all major icon libraries, bundled with Indux
+- [Alpine.js](https://alpinejs.dev) - Lightweight reactive framework, powering Indux plugins and bundled in `indux.quickstart.js`
+- [Tailwind CSS](https://tailwindcss.com) - Utility-first CSS framework, with its Play CDN script bundled in `indux.quickstart.js`
+- [Iconify](https://iconify.design) - Collection of all major icon libraries, bundled in Indux
 - [highlight.js](https://highlightjs.org) - Syntax highlighter, referenced as needed by Indux
 - [js-yaml](https://nodeca.github.io/js-yaml) - YAML parser, references as needed by Indux
 - [Marked JS](https://marked.js.org) - Markdown parser, referenced as needed by Indux
