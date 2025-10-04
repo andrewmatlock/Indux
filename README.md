@@ -1,11 +1,11 @@
 # Indux
 
-Indux is a frontend framework extending HTML for rapid, feature-rich website and web app development. The framework consists of:
+Indux is a frontend framework extending HTML for rapid, feature-rich website and web app development, consisting of:
 
 - A collection of plugins built on Alpine JS
 - A CSS library, compatible with Tailwind CSS
 
-With Indux:
+**With Indux:**
 - Skip the build steps
 - Use only what you need
 - Stack with other frameworks & libraries
