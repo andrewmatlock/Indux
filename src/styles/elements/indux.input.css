@@ -59,6 +59,7 @@
         flex-flow: row;
         justify-content: start;
         align-items: center;
+        padding-inline-start: 0;
 
         /* Search icon */
         & [x-icon] {
@@ -67,13 +68,14 @@
             align-items: center;
             width: var(--spacing-field-height, 2.25rem);
             height: 100%;
+            margin-inline-end: 0;
             color: var(--color-content-subtle, oklch(67.4% 0.0318 251.27))
         }
 
         /* Input element overrides */
         & :where(input) {
-            padding-left: 0;
-            padding-right: 0;
+            padding-inline-start: 0;
+            padding-inline-end: 0;
             background: transparent;
 
             &:hover,

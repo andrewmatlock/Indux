@@ -1,6 +1,5 @@
 # Indux Development
 
-
 ## Quick Start
 
 ```bash
@@ -9,7 +8,6 @@ npm run start
 Runs any website directory in this repo with live reload.
 
 ---
-
 
 ## Build
 
@@ -22,9 +20,7 @@ npm run build
 - Copies indux.css and indux.quickstart.js to docs and starter template
 - Generates release assets
 
-
 ---
-
 
 ## Publish to jsdelivr
 
@@ -32,13 +28,16 @@ npm run build
 git tag v1.0.0
 git push origin v1.0.0
 ```
-Auto-publishes to npm and jsdelivr CDN via GitHub Actions. Files available at:
-- `https://cdn.jsdelivr.net/npm/@andrewmatlock/indux@0.2.0/src/scripts/indux.js`
-- `https://cdn.jsdelivr.net/npm/@andrewmatlock/indux@0.2.0/src/styles/indux.css`
+Auto-publishes to npm and jsdelivr CDN via GitHub Actions. Files available at URLs like:
+- `https://cdn.jsdelivr.net/npm/@indux/indux@0.2.3/dist/indux.js`
+- `https://cdn.jsdelivr.net/npm/@indux/indux@0.2.3/dist/indux.css`
 
+And distributed publically like:
+
+- `https://cdn.jsdelivr.net/npm/@indux/indux@latest/dist/indux.js`
+- `https://cdn.jsdelivr.net/npm/@indux/indux@latest/dist/indux.css`
 
 ---
-
 
 ## Publish Starter Template
 
@@ -47,9 +46,7 @@ npm run publish:starter
 ```
 Publishes starter template to npm as @indux/starter.
 
-
 ---
-
 
 ## Install Starter Template
 

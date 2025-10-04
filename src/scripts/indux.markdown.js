@@ -184,6 +184,21 @@ function renderXCodeGroup(markdown) {
     });
 }
 
+// Post-process HTML to enable checkboxes by removing disabled attribute
+function enableCheckboxes(html) {
+    // Create a temporary DOM element to parse the HTML
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    
+    // Find all checkbox inputs and remove disabled attribute
+    const checkboxes = temp.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.removeAttribute('disabled');
+    });
+    
+    return temp.innerHTML;
+}
+
 // Check if highlight.js is available
 function isHighlightJsAvailable() {
     return typeof window.hljs !== 'undefined';
@@ -342,7 +357,10 @@ async function initializeMarkdownPlugin() {
                 // Load marked.js and parse markdown
                 const marked = await loadMarkedJS();
                 const processedMarkdown = renderXCodeGroup(markdownSource);
-                const html = marked.parse(processedMarkdown);
+                let html = marked.parse(processedMarkdown);
+
+                // Post-process HTML to enable checkboxes (remove disabled attribute)
+                html = enableCheckboxes(html);
 
                 // Only update if content has changed and isn't empty
                 if (element.innerHTML !== html && html.trim() !== '') {
@@ -408,7 +426,14 @@ async function initializeMarkdownPlugin() {
         }
 
         // Handle expressions (file paths, inline strings, content references)
-        const getMarkdownContent = evaluateLater(expression);
+        // Check if this is a simple string literal that needs to be quoted
+        let processedExpression = expression;
+        if (!expression.includes('+') && !expression.includes('`') && !expression.includes('${') && 
+            !expression.startsWith('$') && !expression.startsWith("'") && !expression.startsWith('"')) {
+            // Wrap simple string literals in quotes to prevent Alpine from treating them as expressions
+            processedExpression = `'${expression.replace(/'/g, "\\'")}'`;
+        }
+        const getMarkdownContent = evaluateLater(processedExpression);
 
         effect(() => {
             getMarkdownContent(async (pathOrContent) => {
@@ -435,12 +460,20 @@ async function initializeMarkdownPlugin() {
                 // If it's a file path, fetch the content
                 if (isFilePath) {
                     try {
-                        const response = await fetch(pathOrContent);
+                        // Ensure the path is absolute from project root
+                        let resolvedPath = pathOrContent;
+                        
+                        // If it's a relative path (doesn't start with /), make it absolute from root
+                        if (!pathOrContent.startsWith('/')) {
+                            resolvedPath = '/' + pathOrContent;
+                        }
+                        
+                        const response = await fetch(resolvedPath);
                         if (response.ok) {
                             markdownContent = await response.text();
                         } else {
-                            console.warn(`[Indux] Failed to fetch markdown file: ${pathOrContent}`);
-                            markdownContent = `# Error Loading Content\n\nCould not load: ${pathOrContent}`;
+                            console.warn(`[Indux] Failed to fetch markdown file: ${resolvedPath}`);
+                            markdownContent = `# Error Loading Content\n\nCould not load: ${resolvedPath}`;
                         }
                     } catch (error) {
                         console.error(`[Indux] Error fetching markdown file: ${pathOrContent}`, error);
@@ -456,7 +489,10 @@ async function initializeMarkdownPlugin() {
                 }
 
                 const marked = await loadMarkedJS();
-                const html = marked.parse(markdownContent);
+                let html = marked.parse(markdownContent);
+                
+                // Post-process HTML to enable checkboxes (remove disabled attribute)
+                html = enableCheckboxes(html);
                 
                 // Create temporary container
                 const temp = document.createElement('div');
@@ -519,7 +555,10 @@ async function initializeMarkdownPlugin() {
                     // Load marked.js and parse markdown
                     const marked = await loadMarkedJS();
                     const processedMarkdown = renderXCodeGroup(newContent);
-                    const html = marked.parse(processedMarkdown);
+                    let html = marked.parse(processedMarkdown);
+                    
+                    // Post-process HTML to enable checkboxes (remove disabled attribute)
+                    html = html.replace(/<input type="checkbox"([^>]*?)disabled([^>]*?)>/g, '<input type="checkbox"$1$2>');
                     
                     // Create temporary container
                     const temp = document.createElement('div');

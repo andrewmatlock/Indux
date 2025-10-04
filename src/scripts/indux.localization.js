@@ -171,16 +171,16 @@ function initializeLocalizationPlugin() {
             return pathParts[0];
         }
 
-        // 2. Check HTML lang attribute
-        const htmlLang = document.documentElement.lang;
-        if (htmlLang && isValidLanguageCode(htmlLang) && availableLocales.includes(htmlLang)) {
-            return htmlLang;
-        }
-
-        // 3. Check localStorage
+        // 2. Check localStorage (user preference from UI toggles)
         const storedLang = safeStorage.get('lang');
         if (storedLang && isValidLanguageCode(storedLang) && availableLocales.includes(storedLang)) {
             return storedLang;
+        }
+
+        // 3. Check HTML lang attribute
+        const htmlLang = document.documentElement.lang;
+        if (htmlLang && isValidLanguageCode(htmlLang) && availableLocales.includes(htmlLang)) {
+            return htmlLang;
         }
 
         // 4. Check browser language

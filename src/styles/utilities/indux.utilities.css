@@ -80,6 +80,11 @@
     :where(.outlined) {
         border-width: 1.5px;
         border-style: solid;
+        border-color: color-mix(in oklch, var(--color-field-surface, oklch(91.79% 0.0029 264.26)) 90%, var(--color-field-inverse, oklch(16.6% 0.026 267)))
+    }
+
+    /* Dark theme override */
+    .dark :where(.outlined) {
         border-color: color-mix(in oklch, var(--color-field-surface, oklch(91.79% 0.0029 264.26)) 80%, var(--color-field-inverse, oklch(16.6% 0.026 267)))
     }
 
@@ -114,6 +119,8 @@
 
     /* Page content layout */
     :where(body.page) {
+        display: flex;
+        flex-direction: column;
         min-height: 100vh
     }
 
@@ -145,8 +152,8 @@
     }
 
     /* No focus */
-    .no-focus:focus-visible {
-        outline: 0 none
+    .no-focus:focus, .no-focus:focus-visible, .no-focus:focus-within {
+        box-shadow: 0 0 0 0 transparent
     }
 
     /* No scrollbar */

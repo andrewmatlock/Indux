@@ -205,7 +205,7 @@
         font-weight: 500;
         font-size: 0.75rem;
         line-height: 1;
-        color: var(--color-content-stark, oklch(16.6% 0.026 267));
+        color: var(--color-field-inverse, oklch(16.6% 0.026 267));
         background-color: var(--color-field-surface, oklch(91.79% 0.0029 264.26));
         border-radius: 100px;
 
@@ -226,7 +226,10 @@
 
     :where(ol):not(nav ol):not(menu ol),
     :where(ul):not(nav ul):not(menu ul) {
-        padding-inline-start: 1.5ch;
+
+        &:not(:has(input[type="checkbox"])) {
+            padding-inline-start: 1.75ch;
+        }
 
         /* Offset items so markers align inside the element frame  */
         & li {
@@ -249,6 +252,19 @@
                     left: -1.75ch
                 }
             }
+
+            /* Checklist items */
+            &:has(input[type="checkbox"]) {
+                position: relative;
+                display: inherit;
+                list-style: none;
+
+                & input[type="checkbox"] {
+                    position: absolute;
+                    top: 0.45ch;
+                    left: -1ch
+                }
+            }
         }
     }
 
@@ -261,12 +277,24 @@
                 right: -1.75ch
             }
         }
+
+        & li:has(input[type="checkbox"]) {
+            & input[type="checkbox"] {
+                left: auto;
+                right: -1.25ch
+            }
+        }
     }
 
     /* Nested list spacing */
     :where(ol, ul):not(nav ol):not(menu ol) ul,
     :where(ol, ul):not(nav ul):not(menu ul) ol {
-        margin-top: 1ch
+        margin-top: 1ch;
+        padding-inline-start: 2.75ch;
+
+        & + li {
+            margin-top: 1.5ch
+        }
     }
 
     /* Spans */

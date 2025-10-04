@@ -21,27 +21,57 @@ window.InduxRouting = {
     initialize: initializeRouting,
     // Route matching utility
     matchesCondition: (path, condition) => {
-        const normalizedPath = path.replace(/^\/+|\/+$/g, '') || '/';
+        // Normalize path consistently - keep '/' as '/' for home route
+        const normalizedPath = path === '/' ? '/' : path.replace(/^\/+|\/+$/g, '') || '/';
+
+        // Get localization codes from manifest
+        const localizationCodes = [];
+        try {
+            const manifest = window.InduxComponentsRegistry?.manifest || window.manifest;
+            if (manifest && manifest.data) {
+                Object.values(manifest.data).forEach(dataSource => {
+                    if (typeof dataSource === 'object' && dataSource !== null) {
+                        Object.keys(dataSource).forEach(key => {
+                            if (key.match(/^[a-z]{2}(-[A-Z]{2})?$/)) {
+                                localizationCodes.push(key);
+                            }
+                        });
+                    }
+                });
+            }
+        } catch (e) {
+            // Ignore errors if manifest is not available
+        }
+
+        // Check if path starts with a localization code
+        let pathToCheck = normalizedPath;
+        if (localizationCodes.length > 0) {
+            const pathSegments = normalizedPath.split('/').filter(segment => segment);
+            if (pathSegments.length > 0 && localizationCodes.includes(pathSegments[0])) {
+                // Remove the localization code and check the remaining path
+                pathToCheck = pathSegments.slice(1).join('/') || '/';
+            }
+        }
 
         // Handle wildcards
         if (condition.includes('*')) {
             if (condition === '*') return true;
             const wildcardPattern = condition.replace('*', '');
             const normalizedPattern = wildcardPattern.replace(/^\/+|\/+$/g, '');
-            return normalizedPath.startsWith(normalizedPattern + '/');
+            return pathToCheck.startsWith(normalizedPattern + '/');
         }
 
         // Handle exact paths (starting with /)
         if (condition.startsWith('/')) {
             if (condition === '/') {
-                return normalizedPath === '/' || normalizedPath === '';
+                return pathToCheck === '/' || pathToCheck === '';
             }
             const routePath = condition.replace(/^\//, '');
-            return normalizedPath === routePath || normalizedPath.startsWith(routePath + '/');
+            return pathToCheck === routePath || pathToCheck.startsWith(routePath + '/');
         }
 
         // Handle substring matching (default behavior)
-        return normalizedPath.includes(condition);
+        return pathToCheck.includes(condition);
     }
 };
 
@@ -130,6 +160,41 @@ async function handleRouteChange() {
 
     currentRoute = newRoute;
 
+    // Handle scrolling based on whether this is an anchor link or route change
+    if (!window.location.hash) {
+        // This is a route change - scroll to top
+        // Use a small delay to ensure content has loaded
+        setTimeout(() => {
+            // Scroll main page to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            
+            // Find and scroll scrollable containers to top
+            // Use a generic approach that works with any CSS framework
+            // Only check elements that are likely to be scrollable containers
+            const potentialContainers = document.querySelectorAll('div, main, section, article, aside, nav, header, footer, .prose');
+            potentialContainers.forEach(element => {
+                const computedStyle = window.getComputedStyle(element);
+                const isScrollable = (
+                    computedStyle.overflowY === 'auto' || 
+                    computedStyle.overflowY === 'scroll' ||
+                    computedStyle.overflow === 'auto' || 
+                    computedStyle.overflow === 'scroll'
+                ) && element.scrollHeight > element.clientHeight;
+                
+                if (isScrollable) {
+                    element.scrollTop = 0;
+                }
+            });
+        }, 50);
+    } else {
+        // This is an anchor link - let the browser handle the scroll naturally
+        // Use a small delay to ensure content has loaded, then let browser scroll to anchor
+        setTimeout(() => {
+            // The browser will automatically scroll to the anchor
+            // We just need to ensure the content is loaded first
+        }, 50);
+    }
+
     // Emit route change event
     window.dispatchEvent(new CustomEvent('indux:route-change', {
         detail: {
@@ -148,14 +213,56 @@ function interceptLinkClicks() {
         if (!link) return;
 
         const href = link.getAttribute('href');
-        if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
-
-        // Check if it's a relative link
+        if (!href || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+        
+        // Handle pure anchor links normally - don't intercept them
+        if (href.startsWith('#')) return;
+        
+        // Check if it's an external link FIRST (before any other processing)
+        let isExternalLink = false;
         try {
             const url = new URL(href, window.location.origin);
-            if (url.origin !== window.location.origin) return; // External link
+            if (url.origin !== window.location.origin) {
+                isExternalLink = true; // External link
+            }
         } catch (e) {
             // Invalid URL, treat as relative
+        }
+
+        // If it's an external link, don't intercept it
+        if (isExternalLink) {
+            return;
+        }
+        
+        // Handle links with both route and anchor (e.g., /page#section)
+        if (href.includes('#')) {
+            const [path, hash] = href.split('#');
+            
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+
+            // Set flag to prevent recursive calls
+            isInternalNavigation = true;
+
+            // Update URL without page reload
+            history.pushState(null, '', href);
+
+            // Handle route change (but don't scroll to top since there's an anchor)
+            handleRouteChange();
+
+            // Reset flag
+            isInternalNavigation = false;
+            
+            // After route change, scroll to the anchor
+            setTimeout(() => {
+                const targetElement = document.getElementById(hash);
+                if (targetElement) {
+                    targetElement.scrollIntoView({ behavior: 'smooth' });
+                }
+            }, 100);
+            
+            return;
         }
 
         event.preventDefault();
@@ -216,6 +323,72 @@ function processRouteVisibility(normalizedPath) {
 
     const routeElements = document.querySelectorAll('[x-route]');
 
+    // First pass: collect all defined routes (excluding !* and other negative conditions)
+    const definedRoutes = [];
+    routeElements.forEach(element => {
+        const routeCondition = element.getAttribute('x-route');
+        if (!routeCondition) return;
+
+        const conditions = routeCondition.split(',').map(cond => cond.trim());
+        conditions.forEach(cond => {
+            // Only collect positive conditions and wildcards (not negative ones)
+            if (!cond.startsWith('!') && cond !== '!*') {
+                definedRoutes.push(cond);
+            }
+        });
+    });
+
+    // Extract localization codes from manifest.json data sources
+    const localizationCodes = [];
+    try {
+        // Check if manifest is available and has data sources
+        const manifest = window.InduxComponentsRegistry?.manifest || window.manifest;
+        if (manifest && manifest.data) {
+            Object.values(manifest.data).forEach(dataSource => {
+                if (typeof dataSource === 'object' && dataSource !== null) {
+                    Object.keys(dataSource).forEach(key => {
+                        // Check if this looks like a localization key (common language codes)
+                        if (key.match(/^[a-z]{2}(-[A-Z]{2})?$/)) {
+                            localizationCodes.push(key);
+                        }
+                    });
+                }
+            });
+        }
+    } catch (e) {
+        // Ignore errors if manifest is not available
+    }
+
+    // Check if current route is defined by any route
+    let isRouteDefined = definedRoutes.some(route => 
+        window.InduxRouting.matchesCondition(normalizedPath, route)
+    );
+
+    // Also check if the route starts with a localization code
+    if (!isRouteDefined && localizationCodes.length > 0) {
+        const pathSegments = normalizedPath.split('/').filter(segment => segment);
+        if (pathSegments.length > 0) {
+            const firstSegment = pathSegments[0];
+            if (localizationCodes.includes(firstSegment)) {
+                // This is a localized route - check if the remaining path is defined
+                const remainingPath = pathSegments.slice(1).join('/');
+                
+                // If no remaining path, treat as root route
+                if (remainingPath === '') {
+                    isRouteDefined = definedRoutes.some(route => 
+                        window.InduxRouting.matchesCondition('/', route) || 
+                        window.InduxRouting.matchesCondition('', route)
+                    );
+                } else {
+                    // Check if the remaining path matches any defined route
+                    isRouteDefined = definedRoutes.some(route => 
+                        window.InduxRouting.matchesCondition(remainingPath, route)
+                    );
+                }
+            }
+        }
+    }
+
     routeElements.forEach(element => {
         const routeCondition = element.getAttribute('x-route');
         if (!routeCondition) return;
@@ -226,6 +399,19 @@ function processRouteVisibility(normalizedPath) {
         const negativeConditions = conditions
             .filter(cond => cond.startsWith('!'))
             .map(cond => cond.slice(1));
+
+        // Special handling for !* (undefined routes)
+        if (conditions.includes('!*')) {
+            const shouldShow = !isRouteDefined;
+            if (shouldShow) {
+                element.removeAttribute('hidden');
+                element.style.display = '';
+            } else {
+                element.setAttribute('hidden', '');
+                element.style.display = 'none';
+            }
+            return;
+        }
 
         // Check conditions
         const hasNegativeMatch = negativeConditions.some(cond =>
@@ -240,8 +426,10 @@ function processRouteVisibility(normalizedPath) {
         // Show/hide element
         if (shouldShow) {
             element.removeAttribute('hidden');
+            element.style.display = '';
         } else {
             element.setAttribute('hidden', '');
+            element.style.display = 'none';
         }
     });
 }
@@ -256,6 +444,13 @@ function initializeVisibility() {
     // Listen for route changes
     window.addEventListener('indux:route-change', (event) => {
         processRouteVisibility(event.detail.normalizedPath);
+    });
+
+    // Listen for component processing to ensure visibility is applied after components load
+    window.addEventListener('indux:components-processed', () => {
+        const currentPath = window.location.pathname;
+        const normalizedPath = currentPath === '/' ? '/' : currentPath.replace(/^\/|\/$/g, '');
+        processRouteVisibility(normalizedPath);
     });
 }
 
@@ -547,3 +742,346 @@ window.InduxRoutingHead = {
     processElementHeadContent,
     processAllHeadContent
 }; 
+
+// Router anchors
+
+// Anchors functionality
+function initializeAnchors() {
+    
+    // Register anchors directive  
+    Alpine.directive('anchors', (el, { expression, modifiers }, { effect, evaluateLater, Alpine }) => {
+
+        
+        try {
+            // Parse pipeline syntax: 'scope | targets'
+            const parseExpression = (expr) => {
+                if (!expr || expr.trim() === '') {
+                    return { scope: '', targets: 'h1, h2, h3, h4, h5, h6' };
+                }
+                
+                if (expr.includes('|')) {
+                    const parts = expr.split('|').map(p => p.trim());
+                    return {
+                        scope: parts[0] || '',
+                        targets: parts[1] || 'h1, h2, h3, h4, h5, h6'
+                    };
+                } else {
+                    return { scope: '', targets: expr };
+                }
+            };
+            
+            // Extract anchors function
+            const extractAnchors = (expr) => {
+                const parsed = parseExpression(expr);
+                
+                let containers = [];
+                if (!parsed.scope) {
+                    containers = [document.body];
+                } else {
+                    containers = Array.from(document.querySelectorAll(parsed.scope));
+                }
+                
+                let elements = [];
+                const targets = parsed.targets.split(',').map(t => t.trim());
+                
+                containers.forEach(container => {
+                    // Query all targets at once, then filter and sort by DOM order
+                    const allMatches = [];
+                    targets.forEach(target => {
+                        const matches = container.querySelectorAll(target);
+                        allMatches.push(...Array.from(matches));
+                    });
+                    
+                    // Remove duplicates and sort by DOM order
+                    const uniqueMatches = [...new Set(allMatches)];
+                    uniqueMatches.sort((a, b) => {
+                        const position = a.compareDocumentPosition(b);
+                        if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+                        if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+                        return 0;
+                    });
+                    
+                    elements.push(...uniqueMatches);
+                });
+                
+                return elements.map((element, index) => {
+                    // Generate simple ID
+                    let id = element.id;
+                    if (!id) {
+                        id = element.textContent.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+                        if (id) element.id = id;
+                    }
+
+                    // Selected state will be managed by intersection observer
+
+                    return {
+                        id: id,
+                        text: element.textContent,
+                        link: `#${id}`,
+                        tag: element.tagName.toLowerCase(),
+                        class: element.className.split(' ')[0] || '',
+                        classes: Array.from(element.classList),
+                        index: index,
+                        element: element,
+
+                    };
+                });
+            };
+            
+            // Track rendered elements to prevent duplicates
+            let renderedElements = [];
+            
+            // Update Alpine data with anchors
+            const updateAnchors = (anchors) => {
+                // Remove existing rendered elements if they exist
+                renderedElements.forEach(element => {
+                    if (element.parentElement) {
+                        element.remove();
+                    }
+                });
+                renderedElements = [];
+                
+                // Set Alpine reactive property for anchor count
+                Alpine.store('anchors', { count: anchors.length });
+                
+                // Render using the template element's structure and classes
+                if (anchors.length > 0) {
+                    // Find the container div inside the template
+                    const templateContent = el.content || el;
+                    const containerTemplate = templateContent.querySelector('div') || el.querySelector('div');
+                    
+                    if (containerTemplate) {
+                        // Clone the container div from the template
+                        const containerElement = containerTemplate.cloneNode(false); // Don't clone children
+                        
+                        // Remove Alpine directives from the container
+                        containerElement.removeAttribute('x-show');
+                        
+                        anchors.forEach(anchor => {
+                            // Find the <a> element inside the template
+                            const anchorTemplate = templateContent.querySelector('a') || el.querySelector('a');
+                            
+                            if (anchorTemplate) {
+                                // Clone the <a> element from inside the template
+                                const linkElement = anchorTemplate.cloneNode(true);
+                                
+                                // Remove Alpine directives
+                                linkElement.removeAttribute('x-text');
+                                linkElement.removeAttribute(':href');
+                                
+                                // Set the actual href and text content
+                                linkElement.href = anchor.link;
+                                linkElement.textContent = anchor.text;
+                                
+                                // Evaluate :class binding if present
+                                if (linkElement.hasAttribute(':class')) {
+                                    const classBinding = linkElement.getAttribute(':class');
+                                    linkElement.removeAttribute(':class');
+                                    
+                                    try {
+                                        // Create a simple evaluator for class bindings
+                                        const evaluateClassBinding = (binding, anchor) => {
+                                            // Replace anchor.property references with actual values
+                                            let evaluated = binding
+                                                .replace(/anchor\.tag/g, `'${anchor.tag}'`)
+                                                .replace(/anchor\.selected/g, anchor.selected ? 'true' : 'false')
+                                                .replace(/anchor\.index/g, anchor.index)
+                                                .replace(/anchor\.id/g, `'${anchor.id}'`)
+                                                .replace(/anchor\.text/g, `'${anchor.text.replace(/'/g, "\\'")}'`)
+                                                .replace(/anchor\.link/g, `'${anchor.link}'`)
+                                                .replace(/anchor\.class/g, `'${anchor.class}'`);
+                                            
+                                            // Simple object evaluation for class bindings
+                                            if (evaluated.includes('{') && evaluated.includes('}')) {
+                                                // Extract the object part
+                                                const objectMatch = evaluated.match(/\{([^}]+)\}/);
+                                                if (objectMatch) {
+                                                    const objectContent = objectMatch[1];
+                                                    const classPairs = objectContent.split(',').map(pair => pair.trim());
+                                                    
+                                                    classPairs.forEach(pair => {
+                                                        const [className, condition] = pair.split(':').map(s => s.trim());
+                                                        if (condition && eval(condition)) {
+                                                            linkElement.classList.add(className.replace(/['"]/g, ''));
+                                                        }
+                                                    });
+                                                }
+                                            }
+                                        };
+                                        
+                                        evaluateClassBinding(classBinding, anchor);
+                                    } catch (error) {
+                                        console.warn('[Indux Anchors] Could not evaluate class binding:', classBinding, error);
+                                    }
+                                }
+                                
+                                containerElement.appendChild(linkElement);
+                            }
+                        });
+                        
+                        // Insert the container before the template element
+                        el.parentElement.insertBefore(containerElement, el);
+                        renderedElements.push(containerElement);
+                    } else {
+                        // Fallback: insert links directly if no container found
+                        anchors.forEach(anchor => {
+                            const templateContent = el.content || el;
+                            const anchorTemplate = templateContent.querySelector('a') || el.querySelector('a');
+                            
+                            if (anchorTemplate) {
+                                const linkElement = anchorTemplate.cloneNode(true);
+                                linkElement.removeAttribute('x-text');
+                                linkElement.removeAttribute(':href');
+                                linkElement.href = anchor.link;
+                                linkElement.textContent = anchor.text;
+                                
+                                // Evaluate :class binding if present
+                                if (linkElement.hasAttribute(':class')) {
+                                    const classBinding = linkElement.getAttribute(':class');
+                                    linkElement.removeAttribute(':class');
+                                    
+                                    try {
+                                        // Create a simple evaluator for class bindings
+                                        const evaluateClassBinding = (binding, anchor) => {
+                                            // Replace anchor.property references with actual values
+                                            let evaluated = binding
+                                                .replace(/anchor\.tag/g, `'${anchor.tag}'`)
+                                                .replace(/anchor\.selected/g, anchor.selected ? 'true' : 'false')
+                                                .replace(/anchor\.index/g, anchor.index)
+                                                .replace(/anchor\.id/g, `'${anchor.id}'`)
+                                                .replace(/anchor\.text/g, `'${anchor.text.replace(/'/g, "\\'")}'`)
+                                                .replace(/anchor\.link/g, `'${anchor.link}'`)
+                                                .replace(/anchor\.class/g, `'${anchor.class}'`);
+                                            
+                                            // Simple object evaluation for class bindings
+                                            if (evaluated.includes('{') && evaluated.includes('}')) {
+                                                // Extract the object part
+                                                const objectMatch = evaluated.match(/\{([^}]+)\}/);
+                                                if (objectMatch) {
+                                                    const objectContent = objectMatch[1];
+                                                    const classPairs = objectContent.split(',').map(pair => pair.trim());
+                                                    
+                                                    classPairs.forEach(pair => {
+                                                        const [className, condition] = pair.split(':').map(s => s.trim());
+                                                        if (condition && eval(condition)) {
+                                                            linkElement.classList.add(className.replace(/['"]/g, ''));
+                                                        }
+                                                    });
+                                                }
+                                            }
+                                        };
+                                        
+                                        evaluateClassBinding(classBinding, anchor);
+                                    } catch (error) {
+                                        console.warn('[Indux Anchors] Could not evaluate class binding:', classBinding, error);
+                                    }
+                                }
+                                
+                                el.parentElement.insertBefore(linkElement, el);
+                                renderedElements.push(linkElement);
+                            }
+                        });
+                    }
+                    
+                    el.style.display = 'none'; // Hide template
+                } else {
+                    // No anchors - ensure template is visible and elements are cleared
+                    el.style.display = '';
+                }
+            };
+            
+            // Try extraction and update data
+            const tryExtraction = () => {
+                const anchors = extractAnchors(expression);
+                updateAnchors(anchors);
+                return anchors;
+            };
+            
+            // Try extraction with progressive delays and content detection
+            const attemptExtraction = (attempt = 1, maxAttempts = 10) => {
+                const anchors = extractAnchors(expression);
+                
+                if (anchors.length > 0) {
+                    updateAnchors(anchors);
+                    return true;
+                } else if (attempt < maxAttempts) {
+                    setTimeout(() => {
+                        attemptExtraction(attempt + 1, maxAttempts);
+                    }, attempt * 200); // Progressive delay: 200ms, 400ms, 600ms, etc.
+                } else {
+                    // No anchors found after all attempts, update store to clear previous state
+                    updateAnchors([]);
+                }
+                return false;
+            };
+            
+            // Store refresh function on element for route changes
+            el._x_anchorRefresh = () => {
+                attemptExtraction();
+            };
+            
+            // Start extraction attempts
+            attemptExtraction();
+            
+            
+        } catch (error) {
+            console.error('[Indux Anchors] Error in directive:', error);
+        }
+    });
+}
+
+// Initialize anchors when Alpine is ready
+document.addEventListener('alpine:init', () => {
+
+    try {
+        initializeAnchors();
+
+    } catch (error) {
+        console.error('[Indux Anchors] Failed to initialize:', error);
+    }
+});
+
+// Refresh anchors when route changes
+window.addEventListener('indux:route-change', () => {
+    // Immediately clear the store to hide the h5 element
+    Alpine.store('anchors', { count: 0 });
+    
+    // Wait longer for content to load after route change
+    setTimeout(() => {
+        const anchorElements = document.querySelectorAll('[x-anchors]');
+        anchorElements.forEach(el => {
+            const expression = el.getAttribute('x-anchors');
+            if (expression && el._x_anchorRefresh) {
+                el._x_anchorRefresh();
+            }
+        });
+    }, 200);
+});
+
+// Refresh anchors when hash changes (for active state updates)
+window.addEventListener('hashchange', () => {
+    const anchorElements = document.querySelectorAll('[x-anchors]');
+    anchorElements.forEach(el => {
+        if (el._x_anchorRefresh) {
+            el._x_anchorRefresh();
+        }
+    });
+});
+
+// Also refresh anchors when components are processed
+window.addEventListener('indux:components-processed', () => {
+    setTimeout(() => {
+        const anchorElements = document.querySelectorAll('[x-anchors]');
+        anchorElements.forEach(el => {
+            const expression = el.getAttribute('x-anchors');
+            if (expression && el._x_anchorRefresh) {
+                el._x_anchorRefresh();
+            }
+        });
+    }, 100);
+}); 
+
+// Export anchors interface
+window.InduxRoutingAnchors = {
+    initialize: initializeAnchors
+};

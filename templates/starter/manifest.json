@@ -1,6 +1,8 @@
 {
   "name": "My Project",
-  "short_name": "Project",
+  "short_name": "Project name",
+  "author": "Universal Exports",
+  "email": "universal@exports.com",
   "description": "Lorem ipsum dolor sit amet.",
   "start_url": "/",
   "scope": "/",
@@ -19,12 +21,6 @@
             "type": "image/png"
         }
     ],
-  "defaultMeta": {
-      "title": "My Project",
-      "author": "Me",
-      "description": "Lorem ipsum dolor sit amet.",
-      "ogType": "website"
-  },
   "components": [
   ],
   "preloadedComponents": [
@@ -33,5 +29,11 @@
       "components/logo.html"
   ],
   "data": {
+    "manifest": "/manifest.json",
+    "content": {
+        "ar": "/data/content.ar.yaml",
+        "en": "/data/content.en.yaml",
+        "zh": "/data/content.zh.yaml"
+    }
   }
 }

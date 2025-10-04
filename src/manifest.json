@@ -1,8 +1,7 @@
 {
     "name": "Project Name",
-    "short_name": "App",
+    "short_name": "Project Name",
     "description": "",
-    "image": "/images/default-og-image.jpg",
     "start_url": "/",
     "scope": "/",
     "display": "browser",
@@ -20,13 +19,6 @@
             "type": "image/png"
         }
     ],
-    "defaultMeta": {
-        "title": "Project Name",
-        "author": "",
-        "description": "",
-        "image": "/images/default-og-image.jpg",
-        "ogType": "website"
-    },
     "components": [
     ],
     "preloadedComponents": [

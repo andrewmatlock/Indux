@@ -108,6 +108,25 @@ window.InduxComponentsProcessor = {
             element.replaceWith(document.createComment(` Empty component: ${name} `));
             return;
         }
+
+        // Extract and prepare scripts for execution
+        const scripts = [];
+        const processScripts = (el) => {
+            if (el.tagName.toLowerCase() === 'script') {
+                scripts.push({
+                    content: el.textContent,
+                    type: el.getAttribute('type') || 'text/javascript',
+                    src: el.getAttribute('src'),
+                    async: el.hasAttribute('async'),
+                    defer: el.hasAttribute('defer')
+                });
+                // Remove script from DOM to avoid duplication
+                el.remove();
+            } else {
+                Array.from(el.children).forEach(processScripts);
+            }
+        };
+        topLevelElements.forEach(processScripts);
         // Collect properties from placeholder attributes
         const props = {};
         Array.from(element.attributes).forEach(attr => {
@@ -254,6 +273,33 @@ window.InduxComponentsProcessor = {
         const fragment = document.createDocumentFragment();
         topLevelElements.forEach(el => fragment.appendChild(el));
         parent.replaceChild(fragment, element);
+
+        // Execute scripts after component is rendered
+        if (scripts.length > 0) {
+            // Use a small delay to ensure DOM is updated
+            setTimeout(() => {
+                scripts.forEach(script => {
+                    if (script.src) {
+                        // External script - create and append to head
+                        const scriptEl = document.createElement('script');
+                        scriptEl.src = script.src;
+                        scriptEl.type = script.type;
+                        if (script.async) scriptEl.async = true;
+                        if (script.defer) scriptEl.defer = true;
+                        document.head.appendChild(scriptEl);
+                    } else if (script.content) {
+                        // Inline script - execute directly
+                        try {
+                            // Create a function to execute the script in the global scope
+                            const executeScript = new Function(script.content);
+                            executeScript();
+                        } catch (error) {
+                            console.error(`[Indux] Error executing script in component ${name}:`, error);
+                        }
+                    }
+                });
+            }, 0);
+        }
     },
     initialize() {
     }

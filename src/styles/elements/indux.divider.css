@@ -51,6 +51,7 @@
 
     /* Vertical modifier */
     .divider.vertical {
+        align-self: stretch;
         flex-flow: column nowrap;
         width: fit-content;
         min-width: 1px;

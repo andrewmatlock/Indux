@@ -33,10 +33,10 @@
     --color-brand-surface-hover: #f19b46;
     --color-brand-inverse: #763518;
     --color-brand-content: #de6618;
-    --color-accent-surface: var(--color-900);
-    --color-accent-surface-hover: var(--color-700);
-    --color-accent-inverse: var(--color-page);
-    --color-accent-content: var(--color-content-stark);
+    --color-accent-surface: #ffccd3;
+    --color-accent-surface-hover: #ffa1ad;
+    --color-accent-inverse: #a50036;
+    --color-accent-content: #ff637e;
     --color-positive-surface: #16a34a;
     --color-positive-surface-hover: #166534;
     --color-positive-inverse: white;
@@ -73,8 +73,7 @@
     --color-content-neutral: var(--color-400);
     --color-content-subtle: var(--color-500);
     --color-brand-content: #f6c07b;
-    --color-accent-surface: var(--color-50);
-    --color-accent-surface-hover: var(--color-100);
+    --color-accent-content: #ffa1ad;
 }
 
 @layer base {

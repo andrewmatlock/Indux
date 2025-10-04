@@ -95,4 +95,9 @@
             }
         }
     }
+
+    /* Dark mode override */
+    .dark :where(aside[popover]) {
+        background-color: var(--color-surface-1, oklch(98.17% 0.0005 95.87))
+    }
 }

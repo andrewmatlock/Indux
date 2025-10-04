@@ -1,4 +1,4 @@
 User-agent: *
 Disallow:
 
-Sitemap: https://www.acme.com/sitemap.xml
+Sitemap: https://www.universalexports.com/sitemap.xml

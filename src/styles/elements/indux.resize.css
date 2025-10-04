@@ -150,23 +150,6 @@
             cursor: se-resize;
         }
 
-        /* RTL overrides */
-        [dir="rtl"] .resize-handle-top-start {
-            cursor: ne-resize
-        }
-
-        [dir="rtl"] .resize-handle-top-end {
-            cursor: nw-resize
-        }
-
-        [dir="rtl"] .resize-handle-bottom-start {
-            cursor: se-resize
-        }
-
-        [dir="rtl"] .resize-handle-bottom-end {
-            cursor: sw-resize
-        }
-
         /* Screen overlay to get mouse coordinates */
         .resize-overlay {
             position: fixed;
@@ -214,5 +197,40 @@
                 transition: none
             }
         }
+    }
+
+    /* RTL overrides - more specific than :where([x-resize]) */
+    [dir="rtl"] :where([x-resize]) .resize-handle-start {
+        left: auto;
+        right: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+    }
+
+    [dir="rtl"] :where([x-resize]) .resize-handle-end {
+        right: auto;
+        left: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+    }
+
+    [dir="rtl"] :where([x-resize]) .resize-handle-top-start {
+        left: auto;
+        right: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+        cursor: ne-resize;
+    }
+
+    [dir="rtl"] :where([x-resize]) .resize-handle-top-end {
+        right: auto;
+        left: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+        cursor: nw-resize;
+    }
+
+    [dir="rtl"] :where([x-resize]) .resize-handle-bottom-start {
+        left: auto;
+        right: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+        cursor: se-resize;
+    }
+
+    [dir="rtl"] :where([x-resize]) .resize-handle-bottom-end {
+        right: auto;
+        left: calc(var(--spacing-resize-handle, 1rem) * -0.5);
+        cursor: sw-resize;
     }
 }

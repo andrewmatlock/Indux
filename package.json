@@ -1,23 +1,20 @@
 {
-    "name": "@andrewmatlock/indux",
-    "version": "0.2.0",
+    "name": "@indux/indux",
+    "version": "0.2.3",
     "private": false,
     "workspaces": [
         "templates/starter"
     ],
-    "main": "src/scripts/indux.js",
-    "style": "src/styles/indux.css",
+    "main": "dist/indux.js",
+    "style": "dist/indux.css",
     "files": [
-        "src/scripts/indux*.js",
-        "src/styles/indux*.css",
-        "src/styles/core/",
-        "src/styles/elements/",
-        "src/styles/utilities/",
+        "dist/",
         "README.md"
     ],
     "scripts": {
         "clean": "rimraf src/scripts/indux.js src/scripts/indux.quickstart.js src/styles/indux.css",
-        "build": "cd src && node scripts/build.js && rollup -c rollup.config.mjs",
+        "build": "cd src && node scripts/build.js && rollup -c rollup.config.mjs && cd .. && npm run copy-to-dist",
+        "copy-to-dist": "mkdir -p dist && cp src/scripts/indux*.js dist/ && cp src/styles/*.css dist/ && cp src/styles/core/*.css dist/ && cp src/styles/elements/*.css dist/ && cp src/styles/utilities/*.css dist/",
         "build:docs": "echo 'Docs is a static website - no build needed'",
         "start:docs": "cd docs && browser-sync start --config bs-config.js",
         "start:starter": "cd templates/starter && browser-sync start --config bs-config.js --port 3001",

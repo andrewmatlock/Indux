@@ -66,6 +66,9 @@ class TailwindCompiler {
         // Pre-define pseudo classes
         this.pseudoClasses = ['hover', 'focus', 'active', 'disabled', 'dark'];
 
+        // Cache for discovered custom utility classes
+        this.customUtilities = new Map();
+
         // Pre-define utility generators
         this.utilityGenerators = {
             'color-': (suffix, value) => {
@@ -322,6 +325,8 @@ class TailwindCompiler {
             'forced-colors': '@media (forced-colors: active)',
             'rtl': '&:where(:dir(rtl), [dir="rtl"], [dir="rtl"] *)',
             'ltr': '&:where(:dir(ltr), [dir="ltr"], [dir="ltr"] *)',
+            '[dir=rtl]': '[dir="rtl"] &',
+            '[dir=ltr]': '[dir="ltr"] &',
             'pointer-fine': '@media (pointer: fine)',
             'pointer-coarse': '@media (pointer: coarse)',
             'pointer-none': '@media (pointer: none)',
@@ -672,7 +677,6 @@ class TailwindCompiler {
             // Set a timeout to prevent infinite waiting
             setTimeout(() => {
                 clearInterval(checkInterval);
-                console.warn('[TailwindCompiler] Tailwind not found after 5 seconds, proceeding anyway');
                 resolve();
             }, 5000);
         });
@@ -880,16 +884,22 @@ class TailwindCompiler {
                 const htmlContent = document.documentElement.outerHTML;
                 this.extractClassesFromHTML(htmlContent, staticClasses);
 
-                // 2. Scan component files that are likely to be loaded
-                const componentUrls = [
-                    '/components/navigation/header.html',
-                    '/components/navigation/logo.html',
-                    '/components/navigation/doc-footer.html'
-                ];
+                // 2. Scan component files from manifest
+                const registry = window.InduxComponentsRegistry;
+                const componentUrls = [];
+                
+                if (registry && registry.manifest) {
+                    // Get all component paths from manifest
+                    const allComponents = [
+                        ...(registry.manifest.preloadedComponents || []),
+                        ...(registry.manifest.components || [])
+                    ];
+                    componentUrls.push(...allComponents);
+                }
 
                 const componentPromises = componentUrls.map(async (url) => {
                     try {
-                        const response = await fetch(url);
+                        const response = await fetch('/' + url);
                         if (response.ok) {
                             const html = await response.text();
                             this.extractClassesFromHTML(html, staticClasses);
@@ -1181,6 +1191,77 @@ class TailwindCompiler {
         return variables;
     }
 
+    extractCustomUtilities(cssText) {
+        const utilities = new Map();
+
+        // Extract custom utility classes from CSS
+        // This regex finds .class-name { ... } patterns in @layer utilities or standalone
+        const utilityRegex = /(?:@layer\s+utilities\s*{[^}]*}|^)(?:[^{}]*?)(?:^|\s)(\.[\w-]+)\s*{([^}]+)}/gm;
+
+        let match;
+        while ((match = utilityRegex.exec(cssText)) !== null) {
+            const className = match[1].substring(1); // Remove the leading dot
+            const cssRules = match[2].trim();
+            
+            // Skip if it's a Tailwind-generated class (starts with common prefixes)
+            if (this.isTailwindGeneratedClass(className)) {
+                continue;
+            }
+
+            // Store the utility class and its CSS (combine if already exists)
+            if (utilities.has(className)) {
+                const existingRules = utilities.get(className);
+                utilities.set(className, `${existingRules}; ${cssRules}`);
+            } else {
+                utilities.set(className, cssRules);
+            }
+        }
+
+        // Also look for :where() selectors which are common in Indux utilities
+        // Handle both single class and multiple class selectors
+        const whereRegex = /:where\(([^)]+)\)\s*{([^}]+)}/g;
+        while ((match = whereRegex.exec(cssText)) !== null) {
+            const selectorContent = match[1];
+            const cssRules = match[2].trim();
+            
+            // Extract individual class names from the selector
+            const classMatches = selectorContent.match(/\.([\w-]+)/g);
+            if (classMatches) {
+                for (const classMatch of classMatches) {
+                    const className = classMatch.substring(1); // Remove the leading dot
+                    
+                    if (!this.isTailwindGeneratedClass(className)) {
+                        // Combine CSS rules if the class already exists
+                        if (utilities.has(className)) {
+                            const existingRules = utilities.get(className);
+                            utilities.set(className, `${existingRules}; ${cssRules}`);
+                        } else {
+                            utilities.set(className, cssRules);
+                        }
+                    }
+                }
+            }
+        }
+
+        return utilities;
+    }
+
+    isTailwindGeneratedClass(className) {
+        // Check if this looks like a Tailwind-generated class
+        const tailwindPatterns = [
+            /^[a-z]+-\d+$/, // spacing, sizing classes like p-4, w-10
+            /^[a-z]+-\[/, // arbitrary values like w-[100px]
+            /^(text|bg|border|ring|shadow|opacity|scale|rotate|translate|skew|origin|transform|transition|duration|delay|ease|animate|backdrop|blur|brightness|contrast|drop-shadow|grayscale|hue-rotate|invert|saturate|sepia|filter|backdrop-)/, // common Tailwind prefixes
+            /^(sm|md|lg|xl|2xl):/, // responsive prefixes
+            /^(hover|focus|active|disabled|group-hover|group-focus|peer-hover|peer-focus):/, // state prefixes
+            /^(dark|light):/, // theme prefixes
+            /^!/, // important modifier
+            /^\[/, // arbitrary selectors
+        ];
+
+        return tailwindPatterns.some(pattern => pattern.test(className));
+    }
+
     parseClassName(className) {
         // Check cache first
         if (this.classCache.has(className)) {
@@ -1253,6 +1334,135 @@ class TailwindCompiler {
         // Cache the result
         this.classCache.set(className, result);
         return result;
+    }
+
+    generateCustomUtilities(usedData) {
+        try {
+            const utilities = [];
+            const generatedRules = new Set();
+            const { classes: usedClasses } = usedData;
+
+
+            if (this.customUtilities.size === 0) {
+                return '';
+            }
+
+            // Helper to escape special characters in class names
+            const escapeClassName = (className) => {
+                return className.replace(/[^a-zA-Z0-9-]/g, '\\$&');
+            };
+
+            // Helper to generate a single utility with its variants
+            const generateUtility = (baseClass, css) => {
+                // Find all variants of this base class that are actually used
+                const usedVariants = usedClasses
+                    .filter(cls => {
+                        const parts = cls.split(':');
+                        const basePart = parts[parts.length - 1];
+                        const isMatch = basePart === baseClass || (basePart.startsWith('!') && basePart.slice(1) === baseClass);
+                        return isMatch;
+                    });
+
+                // Skip generating base utility - it already exists in the CSS
+                // Only generate variants and important versions
+                
+                // Generate important version if used
+                if (usedClasses.includes('!' + baseClass)) {
+                    const importantCss = css.includes(';') ? 
+                        css.replace(/;/g, ' !important;') : 
+                        css + ' !important';
+                    const rule = `.${escapeClassName('!' + baseClass)} { ${importantCss} }`;
+                    if (!generatedRules.has(rule)) {
+                        utilities.push(rule);
+                        generatedRules.add(rule);
+                    }
+                }
+
+                // Generate each variant as a separate class
+                for (const variantClass of usedVariants) {
+                    if (variantClass === baseClass) continue;
+
+                    const parsed = this.parseClassName(variantClass);
+
+                    // Check if this is an important variant
+                    const isImportant = parsed.important;
+                    const cssContent = isImportant ? 
+                        (css.includes(';') ? css.replace(/;/g, ' !important;') : css + ' !important') : 
+                        css;
+
+                    // Build selector by applying variants
+                    let selector = `.${escapeClassName(variantClass)}`;
+                    let hasMediaQuery = false;
+                    let mediaQueryRule = '';
+
+                    for (const variant of parsed.variants) {
+                        if (variant.isArbitrary) {
+                            // Handle arbitrary selectors like [&_figure] or [&_fieldset:has(legend):not(.whatever)]
+                            let arbitrarySelector = variant.selector;
+                            
+                            // Replace underscores with spaces, but preserve them inside parentheses
+                            arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
+                            
+                            selector = { baseClass: selector, arbitrarySelector };
+                        } else if (variant.selector.startsWith(':')) {
+                            // For pseudo-classes, append to selector
+                            selector = `${selector}${variant.selector}`;
+                        } else if (variant.selector.startsWith('@')) {
+                            // For media queries, wrap the whole rule
+                            hasMediaQuery = true;
+                            mediaQueryRule = variant.selector;
+                        } else if (variant.selector.includes('&')) {
+                            // For contextual selectors (like dark mode)
+                            selector = variant.selector.replace('&', selector);
+                        }
+                    }
+
+                    // Generate the final rule
+                    let rule;
+                    if (typeof selector === 'object' && selector.arbitrarySelector) {
+                        // Handle arbitrary selectors with nested CSS
+                        rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContent}\n    }\n}`;
+                    } else {
+                        // Regular selector
+                        rule = `${selector} { ${cssContent} }`;
+                    }
+                    
+                    const finalRule = hasMediaQuery ? 
+                        `${mediaQueryRule} { ${rule} }` : 
+                        rule;
+
+
+                    if (!generatedRules.has(finalRule)) {
+                        utilities.push(finalRule);
+                        generatedRules.add(finalRule);
+                    }
+                }
+            };
+
+            // Generate utilities for each custom class that's actually used
+            for (const [className, css] of this.customUtilities.entries()) {
+                // Check if this specific utility class is actually used (including variants and important)
+                const isUsed = usedClasses.some(cls => {
+                    // Parse the class to extract the base utility name
+                    const parsed = this.parseClassName(cls);
+                    const baseClass = parsed.baseClass;
+                    
+                    // Check both normal and important versions
+                    return baseClass === className || 
+                           baseClass === '!' + className ||
+                           (baseClass.startsWith('!') && baseClass.slice(1) === className);
+                });
+
+                if (isUsed) {
+                    generateUtility(className, css);
+                }
+            }
+
+            return utilities.join('\n');
+        } catch (error) {
+            console.error('Error generating custom utilities:', error);
+            return '';
+        }
     }
 
     generateUtilitiesFromVars(cssText, usedData) {
@@ -1447,6 +1657,12 @@ class TailwindCompiler {
                 // Fetch CSS content once for initial compilation
                 const themeCss = await this.fetchThemeContent();
                 if (themeCss) {
+                    // Extract and cache custom utilities
+                const discoveredCustomUtilities = this.extractCustomUtilities(themeCss);
+                    for (const [name, value] of discoveredCustomUtilities.entries()) {
+                        this.customUtilities.set(name, value);
+                    }
+
                     const variables = this.extractThemeVariables(themeCss);
                     for (const [name, value] of variables.entries()) {
                         this.currentThemeVars.set(name, value);
@@ -1467,9 +1683,13 @@ class TailwindCompiler {
                         }
                     }
                     
-                    const utilities = this.generateUtilitiesFromVars(themeCss, staticUsedData);
-                    if (utilities) {
-                        const finalCss = `@layer utilities {\n${utilities}\n}`;
+                    // Generate both variable-based and custom utilities
+                    const varUtilities = this.generateUtilitiesFromVars(themeCss, staticUsedData);
+                    const customUtilitiesGenerated = this.generateCustomUtilities(staticUsedData);
+                    
+                    const allUtilities = [varUtilities, customUtilitiesGenerated].filter(Boolean).join('\n\n');
+                    if (allUtilities) {
+                        const finalCss = `@layer utilities {\n${allUtilities}\n}`;
                         this.styleElement.textContent = finalCss;
                         this.lastClassesHash = staticUsedData.classes.sort().join(',');
                     }
@@ -1480,7 +1700,7 @@ class TailwindCompiler {
                 return;
             }
 
-            // For subsequent compilations, only check for new dynamic classes
+            // For subsequent compilations, check for new dynamic classes
             const usedData = this.getUsedClasses();
             const dynamicClasses = Array.from(this.dynamicClassCache);
             
@@ -1488,37 +1708,43 @@ class TailwindCompiler {
             const dynamicClassesHash = dynamicClasses.sort().join(',');
             
             // Check if dynamic classes have actually changed
-            if (dynamicClassesHash === this.lastClassesHash && this.hasInitialized) {
-                // No new dynamic classes, skip compilation
-                this.isCompiling = false;
-                return;
-            }
-
-            // Only fetch CSS if we have new dynamic classes
-            if (dynamicClasses.length > 0) {
-            const themeCss = await this.fetchThemeContent();
+            if (dynamicClassesHash !== this.lastClassesHash || !this.hasInitialized) {
+                // Fetch CSS content for dynamic compilation
+                const themeCss = await this.fetchThemeContent();
                 if (!themeCss) {
                     this.isCompiling = false;
                     return;
                 }
 
-                // Check for variable changes
-            const variables = this.extractThemeVariables(themeCss);
-                let hasVariableChanges = false;
-            for (const [name, value] of variables.entries()) {
-                const currentValue = this.currentThemeVars.get(name);
-                if (currentValue !== value) {
-                        hasVariableChanges = true;
-                    this.currentThemeVars.set(name, value);
+                // Update custom utilities cache if needed
+                const discoveredCustomUtilities = this.extractCustomUtilities(themeCss);
+                for (const [name, value] of discoveredCustomUtilities.entries()) {
+                    this.customUtilities.set(name, value);
                 }
-            }
+
+                // Check for variable changes
+                const variables = this.extractThemeVariables(themeCss);
+                let hasVariableChanges = false;
+                for (const [name, value] of variables.entries()) {
+                    const currentValue = this.currentThemeVars.get(name);
+                    if (currentValue !== value) {
+                        hasVariableChanges = true;
+                        this.currentThemeVars.set(name, value);
+                    }
+                }
 
                 // Generate utilities for all classes (static + dynamic) if needed
                 if (hasVariableChanges || dynamicClassesHash !== this.lastClassesHash) {
-                const utilities = this.generateUtilitiesFromVars(themeCss, usedData);
-                    if (utilities) {
-                const finalCss = `@layer utilities {\n${utilities}\n}`;
-                this.styleElement.textContent = finalCss;
+                    
+                    // Generate both variable-based and custom utilities
+                    const varUtilities = this.generateUtilitiesFromVars(themeCss, usedData);
+                    const customUtilitiesGenerated = this.generateCustomUtilities(usedData);
+                    
+                    
+                    const allUtilities = [varUtilities, customUtilitiesGenerated].filter(Boolean).join('\n\n');
+                    if (allUtilities) {
+                        const finalCss = `@layer utilities {\n${allUtilities}\n}`;
+                        this.styleElement.textContent = finalCss;
                         this.lastClassesHash = dynamicClassesHash;
                     }
                 }

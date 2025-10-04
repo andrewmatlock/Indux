@@ -22,7 +22,8 @@ const CONFIG = {
         'indux.router.position.js',
         'indux.router.navigation.js',
         'indux.router.visibility.js',
-        'indux.router.head.js'
+        'indux.router.head.js',
+        'indux.router.anchors.js'
     ],
 
     // Core plugins that should load first

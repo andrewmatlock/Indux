@@ -497,34 +497,38 @@ async function initializeDataSourcesPlugin() {
 
     // Create proxy for route-specific lookups
     function createRouteProxy(dataSourceData, pathKey, dataSourceName) {
+        // First check if we have a valid route
+        let foundItem = null;
+        try {
+            const store = Alpine.store('data');
+            const currentPath = store?._currentUrl || window.location.pathname;
+            let pathSegments = currentPath.split('/').filter(segment => segment);
+            
+            // Filter out language codes from path segments for route matching
+            const localeStore = Alpine.store('locale');
+            if (localeStore && localeStore.available && pathSegments.length > 0) {
+                const firstSegment = pathSegments[0];
+                if (localeStore.available.includes(firstSegment)) {
+                    pathSegments = pathSegments.slice(1);
+                }
+            }
+            
+            if (dataSourceData && typeof dataSourceData === 'object') {
+                foundItem = findItemByPath(dataSourceData, pathKey, pathSegments);
+            }
+        } catch (error) {
+            // Error finding route
+        }
+        
+        // If no route found, return null to make the expression falsy
+        if (!foundItem) {
+            return null;
+        }
+        
+        // Return a proxy for the found item
         return new Proxy({}, {
             get(target, prop) {
                 try {
-                    // Get current URL from store (reactive)
-                    const store = Alpine.store('data');
-                    const currentPath = store?._currentUrl || window.location.pathname;
-                    let pathSegments = currentPath.split('/').filter(segment => segment);
-                    
-                    // Filter out language codes from path segments for route matching
-                    // Language codes are typically 2-3 characters or extended codes like 'az-Arab'
-                    const localeStore = Alpine.store('locale');
-                    if (localeStore && localeStore.available && pathSegments.length > 0) {
-                        const firstSegment = pathSegments[0];
-                        // Check if first segment is a language code
-                        if (localeStore.available.includes(firstSegment)) {
-                            // Remove the language code from path segments
-                            pathSegments = pathSegments.slice(1);
-                        }
-                    }
-                    
-                    // If dataSource data is not loaded yet, return empty string for string properties
-                    if (!dataSourceData || typeof dataSourceData !== 'object') {
-                        return typeof prop === 'string' ? '' : undefined;
-                    }
-                    
-                    // Search through dataSource data recursively
-                    const foundItem = findItemByPath(dataSourceData, pathKey, pathSegments);
-                    
                     if (foundItem && prop in foundItem) {
                         return foundItem[prop];
                     }
@@ -535,11 +539,9 @@ async function initializeDataSourcesPlugin() {
                         return groupItem?.group || '';
                     }
                     
-                    // Return empty string for string properties to prevent expression display
-                    return typeof prop === 'string' ? '' : undefined;
+                    return undefined;
                 } catch (error) {
-                    // Return empty string for string properties, undefined otherwise
-                    return typeof prop === 'string' ? '' : undefined;
+                    return undefined;
                 }
             }
         });
@@ -587,6 +589,10 @@ async function initializeDataSourcesPlugin() {
 
     // Recursively search for items with matching path
     function findItemByPath(data, pathKey, pathSegments) {
+        if (!pathSegments || pathSegments.length === 0) {
+            return null;
+        }
+        
         if (Array.isArray(data)) {
             for (const item of data) {
                 if (typeof item === 'object' && item !== null) {
