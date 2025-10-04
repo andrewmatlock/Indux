@@ -44,8 +44,7 @@ For full documentation visit [indux.build](https://indux.build).
 
 ## 📄 License
 
-Indux is provided under [MIT License]([/blob/main/LICENSE.md](https://github.com/andrewmatlock/Indux?tab=MIT-1-ov-file#readme)).
-
+Indux is provided under MIT license.
 <br>
 
 ## 🙏 Acknowledgments
