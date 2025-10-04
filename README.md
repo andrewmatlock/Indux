@@ -45,6 +45,7 @@ For full documentation visit [indux.build](https://indux.build).
 ## 📄 License
 
 Indux is provided under MIT license.
+
 <br>
 
 ## 🙏 Acknowledgments
