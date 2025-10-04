@@ -1,105 +1,56 @@
-# Indux Framework
+# Indux
 
-A lightweight JavaScript framework for building interactive web applications.
+Indux extends HTML for rapid, feature-rich website and web app development, without the overhead of complex frameworks and dependencies.
 
+- Built on Alpine JS
+- Compatible with Tailwind CSS
+- No build steps
+- Use only what you need
+- Stack with other frameworks & libraries
 
-## Project Structure
-indux-monorepo/
-├── packages/ # NPM packages
-│ ├── core/ # Core framework
-│ ├── styles/ # CSS utilities
-│ └── create-/ # Template generators
-├── src/ # Source files
-│ └── scripts/ # Framework source
-├── templates/ # Project templates
-└── package.json # Root configuration
+---
 
+## 🏁 Setup
 
-## Available Commands
+Get <a href="https://indux.build/getting-started/setup" target="_blank">CDN links</a> for existing projects or try the <a href="https://indux.build/getting-started/starter-project" target="_blank">starter project</a> for new ones.
 
-### Build Commands
-Rollup all Indux plugins into indux.js (in the /development directory):
+---
 
-    npx rollup -c
+## ✅ Features
 
-    
-Clean all build artifacts:
+**Alpine Plugins:**
+- Color Themes
+- Components
+- Data Sources
+- Localization
+- SPA Routing
 
-    npm run clean
+**UX/UI:**
+- Global Theme
+- Utility Classes
+- 20+ Elements
 
-Build core framework:
+**...and more**
 
-    npm run build:core
+---
 
-Build style utilities:
+## 📚 Documentation
 
-    npm run build:styles
+For full documentation visit <a href="https://indux.build" target="_blank">indux.build</a>.
 
-Build template packages:
+---
 
-    npm run build:templates
+## 📄 License
 
-Build everything:
+Indux is provided with an [MIT License](/blob/main/LICENSE.md).
 
-    npm run build
+---
 
+## 🙏 Acknowledgments
 
-
-### Test Commands
-Run all tests:
-
-    npm test
-
-### Publishing
-Build and publish latest packages to NPM:
-
-    npm run publish-packages
-
-
-## Package Descriptions
-
-- **packages/core**: Core framework functionality (indux.min.js)
-- **packages/styles**: CSS utilities and baseline styles (baseline.css, elements.css, styles.css)
-- **packages/create-starter**: Project generator for basic startertemplate
-
-
-## Using Templates
-
-### Create New Project
-Using npx:
-
-    npx packages/create-starter my-app
-
-Or install globally:
-
-    npm install -g packages/create-starter
-    create-indux-starter my-app
-
-### Install/Update Specific Files
-Install core framework:
-
-    npm install packages/core
-
-This creates scripts/indux.min.js.
-Add to your HTML:
-
-    <script src="scripts/indux.min.js"></script>
-
-### Install/Update Styles Only
-Install CSS files:
-
-    npm install packages/styles
-
-This creates or updates styles/baseline.css, elements.css, and styles.css.
-If updating, your old styles.css is backed up as styles.old.css since that's where your custom CSS should go.
-Add to your HTML:
-
-    <link rel="stylesheet" href="styles/styles.css">
-
-### Force Update
-If an update is not coming through, it may be due to npm caching on your system.
-Try running:
-
-    npm cache clean --force
-    npm install packages/core
-    npm install packages/styles
+- [Alpine.js](https://alpinejs.dev) - Lightweight reactive framework, bundled with `indux.quickstart.js`
+- [Tailwind CSS](https://tailwindcss.com) - Utility-first CSS framework, with its Play CDN script bundled with `indux.quickstart.js`
+- [Iconify](https://iconify.design) - Collection of all major icon libraries, bundled with Indux
+- [highlight.js](https://highlightjs.org) - Syntax highlighter, referenced as needed by Indux
+- [js-yaml](https://nodeca.github.io/js-yaml) - YAML parser, references as needed by Indux
+- [Marked JS](https://marked.js.org) - Markdown parser, referenced as needed by Indux
