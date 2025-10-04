@@ -1,10 +1,12 @@
 # Indux
 
-Indux extends HTML for rapid, feature-rich website and web app development, without the overhead of complex frameworks and dependencies.
+Indux extends HTML for rapid, feature-rich website and web app development, without the overhead of complex frameworks and dependencies. The framework consists of:
 
-- Collection of plugins built on Alpine JS
-- CSS framework compatible with Tailwind CSS
-- No build steps
+- A collection of plugins built on Alpine JS
+- A CSS library, compatible with Tailwind CSS
+
+With Indux:
+- Skip the build steps
 - Use only what you need
 - Stack with other frameworks & libraries
 
