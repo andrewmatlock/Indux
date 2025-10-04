@@ -10,13 +10,13 @@ Indux extends HTML for rapid, feature-rich website and web app development, with
 
 <br>
 
-### Setup
+## Setup
 
 Get [CDN links](https://indux.build/getting-started/setup) for existing projects or try the [starter project](https://indux.build/getting-started/starter-project) for new ones.
 
 <br>
 
-### Features
+## Features
 
 **Alpine Plugins:**
 - Color Themes
@@ -34,19 +34,19 @@ Get [CDN links](https://indux.build/getting-started/setup) for existing projects
 
 <br>
 
-### Documentation
+## Documentation
 
 For full documentation visit [indux.build](https://indux.build).
 
 <br>
 
-### License
+## License
 
 Indux is provided under [MIT License](/blob/main/LICENSE.md).
 
 <br>
 
-### Acknowledgments
+## Acknowledgments
 
 - [Alpine.js](https://alpinejs.dev) - Lightweight reactive framework, powering Indux plugins and bundled in `indux.quickstart.js`
 - [Tailwind CSS](https://tailwindcss.com) - Utility-first CSS framework, with its Play CDN script bundled in `indux.quickstart.js`
