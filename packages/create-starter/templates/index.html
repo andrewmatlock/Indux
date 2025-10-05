@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Web -->
+  <title>Project Name</title>
+  <meta name="description" content="Lorem ipsum dolor sit amet.">
+  <meta name="author" content="Your Name">
+  <meta name="keywords" content="lorem, ipsum, dolor, sit, amet">
+  <meta name="robots" content="index, follow">
+  <meta name="googlebot" content="index, follow">
+  <meta name="google" content="notranslate">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+
+  <!-- Web App & Manifest -->
+  <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="/styles/indux.css">
+  <link rel="stylesheet" href="/styles/custom.css">
+
+  <!-- Scripts -->
+  <script defer src="/scripts/indux.quickstart.js"></script>
+
+</head>
+
+<!-- Page class applies classic web/app layout -->
+<body class="page">
+
+  <!-- header.html component -->
+  <x-header></x-header>
+
+  <!-- Content area -->
+  <main class="[&>section]:py-10">
+
+    <!-- Home -->
+    <section x-route="/" class="prose w-full mb-40" x-markdown="README.md"></section>
+
+    <!-- Page 1 -->
+    <section x-route="/page-1">
+      <h1 x-text="$x.content.page1">Page 1</h1>
+    </section>
+
+    <!-- Page 2 -->
+    <section x-route="/page-2">
+      <h1 x-text="$x.content.page2">Page 2</h1>
+    </section>
+
+    <!-- License -->
+    <section x-route="/license" class="prose w-full mb-40" x-markdown="LICENSE.md"></section>
+
+    <!-- Privacy -->
+    <section x-route="/privacy" class="prose w-full mb-40" x-markdown="privacy.md"></section>
+
+    <!-- 404 -->
+    <section x-route="!*">
+      <h1 x-text="$x.content.notFound">404 Page Not Found</h1>
+    </section>
+    
+  </main>
+
+  <!-- footer.html component -->
+  <x-footer></x-footer>
+
+</body>
+
+</html>

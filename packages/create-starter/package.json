@@ -1,6 +1,6 @@
 {
   "name": "@indux/starter",
-  "version": "1.5.19",
+  "version": "1.5.24",
   "description": "Create Indux starter application",
   "main": "index.html",
   "bin": {
@@ -27,6 +27,7 @@
     "directory": "packages/create-starter"
   },
   "files": [
-    "create-starter.js"
+    "create-starter.js",
+    "templates"
   ]
 }

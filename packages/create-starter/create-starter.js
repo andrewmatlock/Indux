@@ -34,19 +34,23 @@ try {
   fs.mkdirSync(projectPath, { recursive: true });
 
   // Copy all files from starter template
-  const starterDir = path.join(__dirname, '..', '..', 'templates', 'starter');
+  const starterDir = path.join(__dirname, 'templates');
   const filesToCopy = [
     'index.html',
     'components',
+    'data',
     'scripts',
     'styles',
-    'assets',
     'icons',
     'manifest.json',
     'robots.txt',
     'sitemap.xml',
-    'LICENSE',
-    'README.md'
+    'LICENSE.md',
+    'privacy.md',
+    'README.md',
+    'favicon.ico',
+    '_redirects',
+    '.htaccess'
   ];
 
   filesToCopy.forEach(file => {
@@ -62,66 +66,104 @@ try {
     }
   });
 
-  // Create package.json for the new project
-  // Convert project name to valid npm package name (lowercase, no spaces, etc.)
-  const packageName = projectName.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-  
-  const packageJson = {
-    "name": packageName,
-    "version": "1.0.0",
-    "description": `Indux project: ${projectName}`,
-    "main": "index.html",
-    "scripts": {
-      "start": "browser-sync start --config bs-config.js",
-      "build": "echo 'No build needed for Indux projects'"
-    },
-    "keywords": ["indux", "framework", "html", "css", "javascript"],
-    "author": "",
-    "license": "MIT",
-    "devDependencies": {
-      "browser-sync": "^2.29.3"
-    }
-  };
-
-  fs.writeFileSync(
-    path.join(projectPath, 'package.json'),
-    JSON.stringify(packageJson, null, 2)
-  );
-
-  // Create bs-config.js for browser-sync
-  const bsConfig = `module.exports = {
-  server: {
-    baseDir: "./",
-    index: "index.html"
-  },
-  files: ["**/*.html", "**/*.css", "**/*.js"],
-  watchOptions: {
-    ignored: ["node_modules"]
-  },
-  port: 3000,
-  open: true,
-  notify: false
-};`;
-
-  fs.writeFileSync(path.join(projectPath, 'bs-config.js'), bsConfig);
-
   // Create .gitignore
-  const gitignore = `node_modules/
+  const gitignore = `# Dependencies (if you add them later)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs (if you add a build process)
+dist/
+build/
+*.tgz
+
+# Development files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+bs-config.js
+
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Logs
+logs
 *.log
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# next.js build output
+.next
+
+# nuxt.js build output
+.nuxt
+
+# vuepress build output
+.vuepress/dist
+
+# Serverless directories
+.serverless
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
 `;
 
   fs.writeFileSync(path.join(projectPath, '.gitignore'), gitignore);
 
   console.log(`✅ Project created successfully!`);
   console.log(`📁 Location: ${projectPath}`);
-  console.log(``);
-  console.log(`Next steps:`);
-  console.log(`  cd ${projectName}`);
-  console.log(`  npm install`);
-  console.log(`  npm start`);
-  console.log(``);
-  console.log(`Your Indux project will be available at http://localhost:3000`);
+  console.log(`See README.md for more details.`);
 
 } catch (error) {
   console.error('Error creating project:', error.message);
