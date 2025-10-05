@@ -9,13 +9,13 @@ const projectName = process.argv[2];
 
 if (!projectName) {
   console.log('Usage: npx @indux/create-starter <project-name>');
-  console.log('Example: npx @indux/create-starter my-indux-app');
+  console.log('Example: npx @indux/create-starter MyProject');
   process.exit(1);
 }
 
-// Validate project name
-if (!/^[a-z0-9-]+$/.test(projectName)) {
-  console.error('Error: Project name must contain only lowercase letters, numbers, and hyphens');
+// Validate project name - allow most characters but prevent problematic ones
+if (!/^[a-zA-Z0-9._-]+$/.test(projectName) || projectName.includes('..') || projectName.startsWith('.') || projectName.endsWith('.')) {
+  console.error('Error: Project name must contain only letters, numbers, dots, underscores, and hyphens. Cannot start/end with dots or contain consecutive dots.');
   process.exit(1);
 }
 
@@ -63,8 +63,11 @@ try {
   });
 
   // Create package.json for the new project
+  // Convert project name to valid npm package name (lowercase, no spaces, etc.)
+  const packageName = projectName.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  
   const packageJson = {
-    "name": projectName,
+    "name": packageName,
     "version": "1.0.0",
     "description": `Indux project: ${projectName}`,
     "main": "index.html",

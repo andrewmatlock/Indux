@@ -1,10 +1,10 @@
 {
   "name": "@indux/starter",
-  "version": "1.5.14",
+  "version": "1.5.19",
   "description": "Create Indux starter application",
   "main": "index.html",
   "bin": {
-    "starter": "create-starter.js"
+    "indux-starter": "create-starter.js"
   },
   "scripts": {
     "start": "browser-sync start --config bs-config.js",
