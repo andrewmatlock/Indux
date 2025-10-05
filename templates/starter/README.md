@@ -39,6 +39,8 @@ project-name/
 │   └── indux.css             # Project theme + Indux framework styles
 ├── scripts/                  # JavaScript files
 │   └── indux.quickstart.js   # Indux framework + Alpine + Tailwind
+├── _redirects                # SPA routing support for modern static hosts
+├── .htaccess                 # SPA routing support for Apache-based hosts
 ├── favicon.ico               # Browser tab icon
 ├── index.html                # Rendering entry point / main page
 ├── LICENSE.md                # MIT License
@@ -72,6 +74,7 @@ project-name/
 **Websites**
 - [ ] Replace `favicon.ico`
 - [ ] Update `robots.txt` and `sitemap.xml` for SEO
+- [ ] `_redirects` and `.htaccess` files are included for SPA routing support on most hosting services
 
 **Web apps**
 - [ ] Replace or remove `/icons` images referenced in manifest.json
