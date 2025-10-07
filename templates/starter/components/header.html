@@ -9,11 +9,16 @@
         </a>
 
         <!-- Right side -->
+        
         <!-- Desktop -->
         <div class="hidden md:row items-center gap-2">
-            <a href="/page-1" role="button" class="ghost" x-text="$x.content.page1"></a>
-            <a href="/page-2" role="button" class="ghost" x-text="$x.content.page2"></a>
-            <a href="https://indux.build" role="button" class="ghost brand"><span>Indux</span><span x-icon="lucide:arrow-up-right"></span></a>
+            <a href="/page-1" role="button" class="ghost" 
+               x-text="$x.content.page1"
+               :class="$route === '/page-1' ? 'text-brand-content' : ''"></a>
+            <a href="/page-2" role="button" class="ghost" 
+               x-text="$x.content.page2"
+               :class="$route === '/page-2' ? 'text-brand-content' : ''"></a>
+            <a href="https://indux.build" target="_blank" role="button" class="ghost"><span>Indux</span><span x-icon="lucide:arrow-up-right"></span></a>
             <div class="divider vertical"></div>
 
             <!-- Localization menu -->
@@ -37,8 +42,12 @@
         <!-- Mobile sidebar -->
         <button class="ghost flex md:hidden" popovertarget="sidebar" x-icon="lucide:menu" aria-label="Navigation Menu"></button>
         <aside popover id="sidebar" class="col gap-4 w-90 p-4 border-s border-line shadow-2xl [&_a]:w-full [&_a]:justify-start">
-            <a href="/page-1" role="button" class="ghost" x-text="$x.content.page1"></a>
-            <a href="/page-2" role="button" class="ghost" x-text="$x.content.page2"></a>
+            <a href="/page-1" role="button" class="ghost" 
+               x-text="$x.content.page1"
+               :class="$route === '/page-1' ? 'bg-primary text-primary-foreground' : ''"></a>
+            <a href="/page-2" role="button" class="ghost" 
+               x-text="$x.content.page2"
+               :class="$route === '/page-2' ? 'bg-primary text-primary-foreground' : ''"></a>
             <a href="https://indux.build" role="button" class="ghost brand"><span>Indux</span><span x-icon="lucide:arrow-up-right"></span></a>
             
             <div class="divider"></div>
