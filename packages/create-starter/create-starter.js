@@ -43,6 +43,7 @@ try {
     'styles',
     'icons',
     'manifest.json',
+    '.gitignore',
     'robots.txt',
     'sitemap.xml',
     'LICENSE.md',

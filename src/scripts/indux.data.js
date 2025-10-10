@@ -465,6 +465,27 @@ async function initializeDataSourcesPlugin() {
 
                 // Return empty string for most properties to prevent expression display
                 if (typeof key === 'string') {
+                    // For known array properties, return a special proxy with route() function
+                    // This prevents infinite recursion while providing route() functionality
+                    if (key === 'legal' || key === 'docs' || key === 'features' || key === 'items') {
+                        return new Proxy({}, {
+                            get(target, prop) {
+                                if (prop === 'route') {
+                                    return function(pathKey) {
+                                        // Return a safe fallback proxy that returns empty strings
+                                        return new Proxy({}, {
+                                            get() { return ''; }
+                                        });
+                                    };
+                                }
+                                if (prop === 'length') return 0;
+                                if (typeof prop === 'string' && !isNaN(Number(prop))) {
+                                    return createLoadingProxy();
+                                }
+                                return '';
+                            }
+                        });
+                    }
                     return '';
                 }
 
@@ -751,6 +772,32 @@ async function initializeDataSourcesPlugin() {
                                 if (Array.isArray(nestedValue)) {
                                     return new Proxy(nestedValue, {
                                         get(target, nestedKey) {
+                                            // Handle special keys
+                                            if (nestedKey === Symbol.iterator || nestedKey === 'then' || nestedKey === 'catch' || nestedKey === 'finally') {
+                                                return undefined;
+                                            }
+
+                                            // Handle route() function for route-specific lookups on arrays
+                                            if (nestedKey === 'route') {
+                                                return function(pathKey) {
+                                                    // Only create route proxy if we have valid data
+                                                    if (target && typeof target === 'object') {
+                                                        // Get data source name from the first item's contentType metadata
+                                                        return createRouteProxy(
+                                                            target, 
+                                                            pathKey, 
+                                                            (Array.isArray(target) && target.length > 0 && target[0] && target[0].contentType) 
+                                                                ? target[0].contentType 
+                                                                : undefined
+                                                        );
+                                                    }
+                                                    // Return a safe fallback proxy
+                                                    return new Proxy({}, {
+                                                        get() { return undefined; }
+                                                    });
+                                                };
+                                            }
+
                                             if (nestedKey === 'length') {
                                                 return target.length;
                                             }
@@ -773,17 +820,69 @@ async function initializeDataSourcesPlugin() {
                                 }
                                 // Only create proxy for objects, return primitives directly
                                 if (typeof nestedValue === 'object' && nestedValue !== null) {
-                                    return new Proxy(nestedValue, {
-                                        get(target, nestedKey) {
-                                            // Handle toPrimitive for text content
-                                            if (nestedKey === Symbol.toPrimitive) {
-                                                return function () {
-                                                    return target[nestedKey] || '';
-                                                };
+                                    if (Array.isArray(nestedValue)) {
+                                        // Handle nested arrays with route() function
+                                        return new Proxy(nestedValue, {
+                                            get(target, nestedKey) {
+                                                // Handle special keys
+                                                if (nestedKey === Symbol.iterator || nestedKey === 'then' || nestedKey === 'catch' || nestedKey === 'finally') {
+                                                    return undefined;
+                                                }
+
+                                                // Handle route() function for route-specific lookups on nested arrays
+                                                if (nestedKey === 'route') {
+                                                    return function(pathKey) {
+                                                        // Only create route proxy if we have valid data
+                                                        if (target && typeof target === 'object') {
+                                                            // Get data source name from the first item's contentType metadata
+                                                            return createRouteProxy(
+                                                                target, 
+                                                                pathKey, 
+                                                                (Array.isArray(target) && target.length > 0 && target[0] && target[0].contentType) 
+                                                                    ? target[0].contentType 
+                                                                    : undefined
+                                                            );
+                                                        }
+                                                        // Return a safe fallback proxy
+                                                        return new Proxy({}, {
+                                                            get() { return undefined; }
+                                                        });
+                                                    };
+                                                }
+
+                                                if (nestedKey === 'length') {
+                                                    return target.length;
+                                                }
+                                                if (typeof nestedKey === 'string' && !isNaN(Number(nestedKey))) {
+                                                    const index = Number(nestedKey);
+                                                    if (index >= 0 && index < target.length) {
+                                                        return createArrayItemProxy(target[index]);
+                                                    }
+                                                    return createLoadingProxy();
+                                                }
+                                                // Add essential array methods
+                                                if (nestedKey === 'filter' || nestedKey === 'map' || nestedKey === 'find' || 
+                                                    nestedKey === 'findIndex' || nestedKey === 'some' || nestedKey === 'every' ||
+                                                    nestedKey === 'reduce' || nestedKey === 'forEach' || nestedKey === 'slice') {
+                                                    return target[nestedKey].bind(target);
+                                                }
+                                                return createLoadingProxy();
                                             }
-                                            return target[nestedKey];
-                                        }
-                                    });
+                                        });
+                                    } else {
+                                        // Handle nested objects
+                                        return new Proxy(nestedValue, {
+                                            get(target, nestedKey) {
+                                                // Handle toPrimitive for text content
+                                                if (nestedKey === Symbol.toPrimitive) {
+                                                    return function () {
+                                                        return target[nestedKey] || '';
+                                                    };
+                                                }
+                                                return target[nestedKey];
+                                            }
+                                        });
+                                    }
                                 }
                                 // Return primitive values directly (strings, numbers, booleans)
                                 return nestedValue;

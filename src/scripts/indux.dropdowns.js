@@ -92,22 +92,75 @@ function initializeDropdownPlugin() {
                     // Original behavior for static dropdowns
                     menu = document.getElementById(dropdownId);
                     if (!menu) {
+                        // Check if this might be a component-based dropdown
+                        if (window.InduxComponentsRegistry && window.InduxComponentsLoader) {
+                            // Try to find the menu in components
+                            const componentName = dropdownId; // Assume the dropdownId is the component name
+                            const registry = window.InduxComponentsRegistry;
+                            
+                            if (registry.registered.has(componentName)) {
+                                // Component exists, wait for it to be loaded
+                                const waitForComponent = async () => {
+                                    const loader = window.InduxComponentsLoader;
+                                    const content = await loader.loadComponent(componentName);
+                                    if (content) {
+                                        // Create a temporary container to parse the component
+                                        const tempDiv = document.createElement('div');
+                                        tempDiv.innerHTML = content.trim();
+                                        const menuElement = tempDiv.querySelector(`#${dropdownId}`);
+                                        
+                                        if (menuElement) {
+                                            // Clone the menu and append to body
+                                            menu = menuElement.cloneNode(true);
+                                            menu.setAttribute('id', dropdownId);
+                                            document.body.appendChild(menu);
+                                            el.setAttribute('popovertarget', dropdownId);
+                                            
+                                            // Initialize Alpine on the menu
+                                            Alpine.initTree(menu);
+                                            
+                                            // Set up the dropdown after menu is ready
+                                            setupDropdown();
+                                        } else {
+                                            console.warn(`[Indux] Menu with id "${dropdownId}" not found in component "${componentName}"`);
+                                        }
+                                    } else {
+                                        console.warn(`[Indux] Failed to load component "${componentName}" for dropdown`);
+                                    }
+                                };
+                                
+                                // Wait for components to be ready, then try to load
+                                if (window.__induxComponentsInitialized) {
+                                    waitForComponent();
+                                } else {
+                                    window.addEventListener('indux:components-ready', waitForComponent);
+                                }
+                                return; // Exit early, setup will happen in waitForComponent
+                            }
+                        }
+                        
                         console.warn(`[Indux] Dropdown menu with id "${dropdownId}" not found`);
                         return;
                     }
                     el.setAttribute('popovertarget', dropdownId);
                 }
 
-                // Set up popover
-                menu.setAttribute('popover', '');
+                // Set up the dropdown
+                setupDropdown();
 
-                // Set up anchor positioning
-                const anchorName = `--dropdown-${anchorCode}`;
-                el.style.setProperty('anchor-name', anchorName);
-                menu.style.setProperty('position-anchor', anchorName);
+                function setupDropdown() {
+                    if (!menu) return;
+                    
+                    // Set up popover
+                    menu.setAttribute('popover', '');
 
-                // Set up hover functionality after menu is ready
-                if (modifiers.includes('hover')) {
+                    // Set up anchor positioning
+                    const anchorName = `--dropdown-${anchorCode}`;
+                    el.style.setProperty('anchor-name', anchorName);
+                    menu.style.setProperty('position-anchor', anchorName);
+
+                    // Set up hover functionality after menu is ready
+                    if (modifiers.includes('hover')) {
                     const handleShowPopover = () => {
                         if (menu && !menu.matches(':popover-open')) {
                             clearTimeout(hoverTimeout);
@@ -249,6 +302,7 @@ function initializeDropdownPlugin() {
                     // Setup listeners after a brief delay to ensure menu is rendered
                     setTimeout(setupMenuItemListeners, 10);
                 }
+                } // End of setupDropdown function
             });
         });
     });
