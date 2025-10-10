@@ -1,6 +1,6 @@
 {
   "name": "@indux/starter",
-  "version": "1.5.26",
+  "version": "1.5.27",
   "description": "Create Indux starter application",
   "main": "index.html",
   "bin": {
