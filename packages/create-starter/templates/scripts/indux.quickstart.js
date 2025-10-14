@@ -6971,23 +6971,6 @@ ${H}`)
 
   // Router visibility
 
-  // Add CSS to hide route-specific sections by default
-  function addRouteVisibilityCSS() {
-      if (document.getElementById('indux-route-visibility-css')) return;
-      
-      const style = document.createElement('style');
-      style.id = 'indux-route-visibility-css';
-      style.textContent = `
-        [x-route] {
-            display: none !important;
-        }
-        [x-route].route-visible {
-            display: block !important;
-        }
-    `;
-      document.head.appendChild(style);
-  }
-
   // Process visibility for all elements with x-route
   function processRouteVisibility(normalizedPath) {
 
@@ -7093,21 +7076,29 @@ ${H}`)
 
           const shouldShow = hasPositiveMatch && !hasNegativeMatch;
 
-          // Show/hide element using CSS classes
+          // Show/hide element
           if (shouldShow) {
-              element.classList.add('route-visible');
               element.removeAttribute('hidden');
+              element.style.display = '';
           } else {
-              element.classList.remove('route-visible');
               element.setAttribute('hidden', '');
+              element.style.display = 'none';
           }
+      });
+  }
+
+  // Add x-cloak to route elements that don't have it
+  function addXCloakToRouteElements() {
+      const routeElements = document.querySelectorAll('[x-route]:not([x-cloak])');
+      routeElements.forEach(element => {
+          element.setAttribute('x-cloak', '');
       });
   }
 
   // Initialize visibility management
   function initializeVisibility() {
-      // Add CSS to hide route-specific sections by default
-      addRouteVisibilityCSS();
+      // Add x-cloak to route elements to prevent flash
+      addXCloakToRouteElements();
       
       // Process initial visibility
       const currentPath = window.location.pathname;
@@ -7121,19 +7112,25 @@ ${H}`)
 
       // Listen for component processing to ensure visibility is applied after components load
       window.addEventListener('indux:components-processed', () => {
+          // Add x-cloak to any new route elements
+          addXCloakToRouteElements();
+          
           const currentPath = window.location.pathname;
           const normalizedPath = currentPath === '/' ? '/' : currentPath.replace(/^\/|\/$/g, '');
           processRouteVisibility(normalizedPath);
       });
   }
 
-  // Add CSS immediately to prevent flash
-  addRouteVisibilityCSS();
-
-  // Run immediately if DOM is ready, otherwise wait
+  // Add x-cloak immediately to prevent flash
   if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initializeVisibility);
+      // DOM is still loading, add x-cloak as soon as possible
+      document.addEventListener('DOMContentLoaded', () => {
+          addXCloakToRouteElements();
+          initializeVisibility();
+      });
   } else {
+      // DOM is ready, add x-cloak immediately
+      addXCloakToRouteElements();
       initializeVisibility();
   }
 
