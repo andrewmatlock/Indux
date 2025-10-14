@@ -5,11 +5,16 @@
     "workspaces": [
         "templates/starter"
     ],
-    "main": "dist/indux.js",
-    "style": "dist/indux.css",
+    "main": "src/scripts/indux.js",
+    "style": "src/styles/indux.css",
     "files": [
-        "dist/",
-        "README.md"
+        "src/scripts/indux.js",
+        "src/scripts/indux.quickstart.js",
+        "src/styles/indux.css",
+        "src/styles/indux.theme.css",
+        "src/styles/indux.code.css",
+        "README.md",
+        "LICENSE"
     ],
     "scripts": {
         "clean": "rimraf src/scripts/indux.js src/scripts/indux.quickstart.js src/styles/indux.css",
