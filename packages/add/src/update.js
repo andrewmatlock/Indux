@@ -1,7 +1,7 @@
 import { findInduxFiles, downloadFile, shouldPreserveFile } from './utils.js';
 
 export async function runUpdate(directory = '.') {
-    console.log('Scanning for Indux files...');
+    console.log(`Scanning for Indux files in ${directory}...`);
 
     const files = await findInduxFiles(directory);
 
@@ -10,6 +10,10 @@ export async function runUpdate(directory = '.') {
         return;
     }
 
+    console.log(`Found ${files.length} Indux file(s):`);
+    files.forEach(file => console.log(`  - ${file}`));
+    console.log('');
+
     let updatedCount = 0;
     let skippedCount = 0;
 
@@ -17,16 +21,17 @@ export async function runUpdate(directory = '.') {
         const filename = file.split('/').pop();
         
         if (shouldPreserveFile(file)) {
-            console.log(`⚠ Skipped ${filename} (preserved)`);
+            console.log(`⚠ Skipped ${file} (preserved)`);
             skippedCount++;
             continue;
         }
         
         try {
-            await downloadFile(filename);
+            // Pass the full file path to preserve directory structure
+            await downloadFile(filename, file);
             updatedCount++;
         } catch (error) {
-            console.error(`✗ Failed to update ${filename}:`, error.message);
+            console.error(`✗ Failed to update ${file}:`, error.message);
         }
     }
 

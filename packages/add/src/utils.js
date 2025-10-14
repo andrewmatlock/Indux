@@ -4,9 +4,10 @@ import path from 'path';
 
 const CDN_BASE_URL = 'https://cdn.jsdelivr.net/npm/@indux/indux@latest/dist';
 
-export async function downloadFile(filename) {
+export async function downloadFile(filename, targetPath = null) {
     try {
         const url = `${CDN_BASE_URL}/${filename}`;
+        const outputPath = targetPath || filename;
         console.log(`Downloading ${filename}...`);
         
         const response = await fetch(url);
@@ -17,14 +18,14 @@ export async function downloadFile(filename) {
         
         const content = await response.text();
         
-        // Write file to current directory
-        await fs.writeFile(filename, content);
+        // Write file to target path (preserves directory structure)
+        await fs.writeFile(outputPath, content);
         
         // Get file size
-        const stats = await fs.stat(filename);
+        const stats = await fs.stat(outputPath);
         const fileSize = (stats.size / 1024).toFixed(1);
         
-        console.log(`✓ Downloaded ${filename} (${fileSize}KB)`);
+        console.log(`✓ Downloaded ${filename} → ${outputPath} (${fileSize}KB)`);
         
     } catch (error) {
         console.error(`✗ Failed to download ${filename}:`, error.message);
