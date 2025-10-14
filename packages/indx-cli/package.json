@@ -1,0 +1,35 @@
+{
+  "name": "@indux/indx-cli",
+  "version": "1.0.0",
+  "description": "CLI tools for installing and updating Indux files",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "@indux/update": "./bin/indx-update",
+    "@indux/indux.quickstart.js": "./bin/indx-quickstart",
+    "@indux/indux.js": "./bin/indx-js",
+    "@indux/indux.css": "./bin/indx-css",
+    "@indux/indux.theme.css": "./bin/indx-theme",
+    "@indux/indux.code.css": "./bin/indx-code"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "indux",
+    "cli",
+    "css",
+    "javascript",
+    "framework"
+  ],
+  "author": "Andrew Matlock",
+  "license": "MIT",
+  "dependencies": {
+    "node-fetch": "^3.3.2",
+    "fs-extra": "^11.1.1",
+    "glob": "^10.3.10"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

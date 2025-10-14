@@ -1763,7 +1763,7 @@
     }
 }
 
-/* Modals */
+/* Dialogs */
 
 @layer components {
 
@@ -1814,7 +1814,7 @@
             margin-top: auto
         }
 
-        /* Turn modal into alert prompt on mobile */
+        /* Turn dialog into alert prompt on mobile */
         @media screen and (max-width: 768px) {
             width: calc(100vw - calc(var(--spacing, 0.25rem) * 4) - calc(var(--spacing, 0.25rem) * 4)) !important;
             max-height: calc(100vh - calc(var(--spacing, 0.25rem) * 4) - calc(var(--spacing, 0.25rem) * 4)) !important;
@@ -1827,10 +1827,10 @@
         background-color: rgba(0, 0, 0, 0.35)
     }
 
-    /* Hide dropdowns when modals are open */
+    /* Hide dropdowns when dialogs are open */
     html:has(dialog:popover-open) {
 
-        /* Hide dropdowns outside of any modal */
+        /* Hide dropdowns outside of any dialog */
         & menu[popover]:not(dialog *) {
             opacity: 0;
             scale: .9;
@@ -1843,7 +1843,7 @@
         }
     }
 
-    /* When multiple modals are open, hide dropdowns in all but closest modal */
+    /* When multiple dialogs are open, hide dropdowns in all but closest dialog */
     html:has(dialog:popover-open ~ dialog:popover-open) {
         & dialog:popover-open:not(:last-of-type) menu[popover] {
             opacity: 0;

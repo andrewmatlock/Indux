@@ -78,6 +78,28 @@ const copyToDocsPlugin = {
             } else {
                 console.warn('  ⚠ Warning: indux.css not found');
             }
+
+            // Copy standalone files to docs and starter (with docs-only handling)
+            for (const standaloneFile of CONFIG.stylesheets.standaloneFiles) {
+                const source = path.join('styles', standaloneFile);
+                const docsDest = path.join(docsStylesDir, standaloneFile);
+
+                if (fs.existsSync(source)) {
+                    // Always copy to docs
+                    fs.copyFileSync(source, docsDest);
+                    
+                    // Copy to starter only if not docs-only
+                    if (!CONFIG.stylesheets.docsOnlyFiles.includes(standaloneFile)) {
+                        const starterDest = path.join(starterStylesDir, standaloneFile);
+                        fs.copyFileSync(source, starterDest);
+                        console.log('  ✓ Copied ' + standaloneFile + ' to docs/styles and templates/starter/styles');
+                    } else {
+                        console.log('  ✓ Copied ' + standaloneFile + ' to docs/styles (docs-only)');
+                    }
+                } else {
+                    console.warn('  ⚠ Warning: ' + standaloneFile + ' not found');
+                }
+            }
         } catch (e) {
             console.warn('  ⚠ Warning: Failed to copy files to docs and starter:', e.message);
         }
@@ -105,6 +127,7 @@ export default [
 /*  - Marked JS (https://marked.js.org)
 /*
 /*  Requires Alpine JS (alpinejs.dev) to operate.
+/*  Some plugins use Indux CSS styles.
 */
 
 ` // Add header
@@ -123,7 +146,7 @@ export default [
             name: 'InduxAlpineTailwind',
             banner: `/*  Indux JS - Quickstart
 /*  By Andrew Matlock under MIT license
-/*  https://github.com/andrewmatlock/Indux
+/*  https://indux.build
 /*
 /*  Contains all Indux plugins bundled with:
 /*  - Alpine JS (alpinejs.dev)
@@ -134,6 +157,8 @@ export default [
 /*  - highlight.js (https://highlightjs.org)
 /*  - js-yaml (https://nodeca.github.io/js-yaml)
 /*  - Marked JS (https://marked.js.org)
+/*
+/*  Some plugins use Indux CSS styles.
 */
 
 ` // Add header

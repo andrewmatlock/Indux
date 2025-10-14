@@ -53,13 +53,19 @@ const CONFIG = {
     // Stylesheet configuration
     stylesheets: {
         // Core files that need special handling
-        coreFiles: ['indux.theme.css', 'indux.reset.css'],
+        coreFiles: ['indux.reset.css'],
 
         // Files that need popover.css appended
-        popoverDependent: ['indux.dropdown.css', 'indux.modal.css', 'indux.sidebar.css', 'indux.tooltip.css'],
+        popoverDependent: ['indux.dropdown.css', 'indux.dialog.css', 'indux.sidebar.css', 'indux.tooltip.css'],
 
         // Files that need group.css appended
         groupDependent: [],
+
+        // Files to distribute as standalone (excluded from main indux.css)
+        standaloneFiles: ['indux.theme.css', 'indux.code.css'],
+        
+        // Files that should only be copied to docs (not starter template)
+        docsOnlyFiles: ['indux.code.css'],
 
         // Directories to process
         sourceDirs: ['styles/core', 'styles/elements', 'styles/utilities'],
@@ -89,13 +95,16 @@ function buildStylesheets() {
     // Step 1: Build the main indux.css file
     buildMainStylesheet();
 
-    // Step 2: Handle special popover-dependent files
+    // Step 2: Distribute standalone files
+    distributeStandaloneFiles();
+
+    // Step 3: Handle special popover-dependent files
     handlePopoverDependentFiles();
 
-    // Step 3: Handle special group-dependent files
+    // Step 4: Handle special group-dependent files
     handleGroupDependentFiles();
 
-    // Step 4: Copy indux.css to docs and starter template
+    // Step 5: Copy indux.css to docs and starter template
     copyInduxCssToTargets();
 
 }
@@ -108,7 +117,7 @@ function buildMainStylesheet() {
     const mainContent = [];
 
     // Add header comment
-    mainContent.push('/*  Indux CSS\n/*  By Andrew Matlock under MIT license\n/*  https://github.com/andrewmatlock/Indux\n*/');
+    mainContent.push('/*  Indux CSS\n/*  By Andrew Matlock under MIT license\n/*  https://indux.build\n/*  Modify referenced variables in indux.theme.css\n*/');
 
     // Step 1: Add core files in order
     for (const coreFile of CONFIG.stylesheets.coreFiles) {
@@ -120,9 +129,10 @@ function buildMainStylesheet() {
         }
     }
 
-    // Step 2: Add elements files in alphabetical order
+    // Step 2: Add elements files in alphabetical order (excluding standalone files)
     const elementFiles = glob.sync('styles/elements/*.css')
         .map(file => path.basename(file))
+        .filter(file => !CONFIG.stylesheets.standaloneFiles.includes(file))
         .sort();
 
     for (const elementFile of elementFiles) {
@@ -292,6 +302,55 @@ function copyInduxCssToTargets() {
     console.log('');
 }
 
+
+// Distribute standalone files
+function distributeStandaloneFiles() {
+    console.log('Distributing standalone files...');
+
+    for (const standaloneFile of CONFIG.stylesheets.standaloneFiles) {
+        // Determine source directory based on file
+        let sourceDir = 'styles/elements';
+        if (standaloneFile === 'indux.theme.css') {
+            sourceDir = 'styles/core';
+        }
+        
+        const sourcePath = path.join(sourceDir, standaloneFile);
+        
+        if (!fs.existsSync(sourcePath)) {
+            console.warn(`  ⚠ Warning: ${standaloneFile} not found, skipping distribution`);
+            continue;
+        }
+
+        // Copy to main styles directory
+        const outputPath = path.join(CONFIG.stylesheets.outputDir, standaloneFile);
+        fs.copyFileSync(sourcePath, outputPath);
+        console.log(`  ✓ Copied ${standaloneFile} to styles/`);
+
+        // Copy to docs/styles
+        const docsStylesDir = path.join('..', 'docs', 'styles');
+        if (!fs.existsSync(docsStylesDir)) {
+            fs.mkdirSync(docsStylesDir, { recursive: true });
+        }
+        const docsDest = path.join(docsStylesDir, standaloneFile);
+        fs.copyFileSync(sourcePath, docsDest);
+        console.log(`  ✓ Copied ${standaloneFile} to docs/styles`);
+
+        // Copy to templates/starter/styles (skip if docs-only file)
+        if (!CONFIG.stylesheets.docsOnlyFiles.includes(standaloneFile)) {
+            const starterStylesDir = path.join('..', 'templates', 'starter', 'styles');
+            if (!fs.existsSync(starterStylesDir)) {
+                fs.mkdirSync(starterStylesDir, { recursive: true });
+            }
+            const starterDest = path.join(starterStylesDir, standaloneFile);
+            fs.copyFileSync(sourcePath, starterDest);
+            console.log(`  ✓ Copied ${standaloneFile} to templates/starter/styles`);
+        } else {
+            console.log(`  ✓ Skipped ${standaloneFile} for templates/starter/styles (docs-only)`);
+        }
+    }
+
+    console.log('');
+}
 
 // Handle files that need group.css appended
 function handleGroupDependentFiles() {
@@ -489,6 +548,28 @@ const copyToDocsPlugin = {
             } else {
                 console.warn('  ⚠ Warning: indux.css not found');
             }
+
+            // Copy standalone files to docs and starter (with docs-only handling)
+            for (const standaloneFile of CONFIG.stylesheets.standaloneFiles) {
+                const source = path.join('styles', standaloneFile);
+                const docsDest = path.join(docsStylesDir, standaloneFile);
+
+                if (fs.existsSync(source)) {
+                    // Always copy to docs
+                    fs.copyFileSync(source, docsDest);
+                    
+                    // Copy to starter only if not docs-only
+                    if (!CONFIG.stylesheets.docsOnlyFiles.includes(standaloneFile)) {
+                        const starterDest = path.join(starterStylesDir, standaloneFile);
+                        fs.copyFileSync(source, starterDest);
+                        console.log('  ✓ Copied ' + standaloneFile + ' to docs/styles and templates/starter/styles');
+                    } else {
+                        console.log('  ✓ Copied ' + standaloneFile + ' to docs/styles (docs-only)');
+                    }
+                } else {
+                    console.warn('  ⚠ Warning: ' + standaloneFile + ' not found');
+                }
+            }
         } catch (e) {
             console.warn('  ⚠ Warning: Failed to copy files to docs and starter:', e.message);
         }
@@ -504,7 +585,7 @@ export default [
             file: 'scripts/indux.js',
             format: 'iife',
             name: 'Indux',
-            banner: \`/*  Indux JS\n/*  By Andrew Matlock under MIT license\n/*  https://github.com/andrewmatlock/Indux\n/*\n/*  Contains all Indux plugins bundled with Iconify (iconify.design)\n/*\n/*  With on-demand reference to:\n/*  - highlight.js (https://highlightjs.org)\n/*  - js-yaml (https://nodeca.github.io/js-yaml)\n/*  - Marked JS (https://marked.js.org)\n/*\n/*  Requires Alpine JS (alpinejs.dev) to operate.\n*/\n\n\` // Add header
+            banner: \`/*  Indux JS\n/*  By Andrew Matlock under MIT license\n/*  https://github.com/andrewmatlock/Indux\n/*\n/*  Contains all Indux plugins bundled with Iconify (iconify.design)\n/*\n/*  With on-demand reference to:\n/*  - highlight.js (https://highlightjs.org)\n/*  - js-yaml (https://nodeca.github.io/js-yaml)\n/*  - Marked JS (https://marked.js.org)\n/*\n/*  Requires Alpine JS (alpinejs.dev) to operate.\n/*  Some plugins use Indux CSS styles.\n*/\n\n\` // Add header
         },
         plugins: [
             ...baseConfig.plugins
@@ -518,7 +599,7 @@ export default [
             file: 'scripts/indux.quickstart.js',
             format: 'iife',
             name: 'InduxAlpineTailwind',
-            banner: \`/*  Indux JS - Quickstart\n/*  By Andrew Matlock under MIT license\n/*  https://github.com/andrewmatlock/Indux\n/*\n/*  Contains all Indux plugins bundled with:\n/*  - Alpine JS (alpinejs.dev)\n/*  - Iconify (iconify.design)\n/*  - Tailwind CSS (modified Play CDN script) (tailwindcss.com)\n/*\n/*  With on-demand reference to:\n/*  - highlight.js (https://highlightjs.org)\n/*  - js-yaml (https://nodeca.github.io/js-yaml)\n/*  - Marked JS (https://marked.js.org)\n*/\n\n\` // Add header
+            banner: \`/*  Indux JS - Quickstart\n/*  By Andrew Matlock under MIT license\n/*  https://indux.build\n/*\n/*  Contains all Indux plugins bundled with:\n/*  - Alpine JS (alpinejs.dev)\n/*  - Iconify (iconify.design)\n/*  - Tailwind CSS (modified Play CDN script) (tailwindcss.com)\n/*\n/*  With on-demand reference to:\n/*  - highlight.js (https://highlightjs.org)\n/*  - js-yaml (https://nodeca.github.io/js-yaml)\n/*  - Marked JS (https://marked.js.org)\n/*\n/*  Some plugins use Indux CSS styles.\n*/\n\n\` // Add header
         },
         plugins: [
             ...baseConfig.plugins,
@@ -597,6 +678,19 @@ function copyToDocs() {
         console.log('  ✓ Copied indux.css to docs/styles');
     } else {
         console.warn('  ⚠ Warning: indux.css not found');
+    }
+
+    // Copy standalone files to docs/styles
+    for (const standaloneFile of CONFIG.stylesheets.standaloneFiles) {
+        const source = path.join('styles', standaloneFile);
+        const dest = path.join(docsStylesDir, standaloneFile);
+
+        if (fs.existsSync(source)) {
+            fs.copyFileSync(source, dest);
+            console.log(`  ✓ Copied ${standaloneFile} to docs/styles`);
+        } else {
+            console.warn(`  ⚠ Warning: ${standaloneFile} not found`);
+        }
     }
 
     console.log('');

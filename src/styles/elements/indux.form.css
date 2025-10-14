@@ -1,4 +1,4 @@
-/* Forms */
+/* Indux Forms */
 
 @layer components {
 
@@ -68,7 +68,7 @@
         max-width: 100%;
 
         &>* {
-            flex-shrink: 0;
+            flex-basis: auto;
 
             &:focus {
                 z-index: 1

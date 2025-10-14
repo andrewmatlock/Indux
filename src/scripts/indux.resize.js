@@ -294,6 +294,7 @@ function initializeResizablePlugin() {
 
                 // Handle snap-close behavior for width
                 if (pixelConstraints.closeX !== null) {
+                    // Close when element becomes smaller than threshold (dragging toward inside)
                     if (newWidth <= pixelConstraints.closeX) {
                         el.classList.add('resizable-closing');
                         currentSnap = 'closing';
@@ -305,8 +306,9 @@ function initializeResizablePlugin() {
                     }
                 }
 
-                // Handle snap-close behavior for height (always check, regardless of handle direction)
+                // Handle snap-close behavior for height
                 if (pixelConstraints.closeY !== null) {
+                    // Close when element becomes smaller than threshold (dragging toward inside)
                     if (newHeight <= pixelConstraints.closeY) {
                         el.classList.add('resizable-closing');
                         currentSnap = 'closing';

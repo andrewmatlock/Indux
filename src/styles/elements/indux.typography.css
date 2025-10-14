@@ -1,9 +1,9 @@
-/* Typography */
+/* Indux Typography */
 
 @layer base {
 
     /* All text elements */
-    :where(a, abbr, address, blockquote, code, del, figcaption, h1, h2, h3, h4, h5, h6, ins, label, legend, p, small, cite, q), .h1, .h2, .h3, .h4, .h5, .h6, .paragraph, .small, .caption {
+    :where(a, abbr, address, blockquote, code, del, figcaption, h1, h2, h3, h4, h5, h6, ins, label:not(.avatar), legend, p, small, cite, q), .h1, .h2, .h3, .h4, .h5, .h6, .paragraph, .small, .caption {
         color: var(--color-content-stark, oklch(16.6% 0.026 267));
 
         /* Support inline icons */

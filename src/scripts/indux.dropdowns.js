@@ -331,7 +331,7 @@ if (document.readyState === 'loading') {
 // Also listen for alpine:init as a backup
 document.addEventListener('alpine:init', initializeDropdownPlugin);
 
-// Handle modal interactions - close dropdowns when modals open
+// Handle dialog interactions - close dropdowns when dialogs open
 document.addEventListener('click', (event) => {
     const button = event.target.closest('button[popovertarget]');
     if (!button) return;
@@ -340,7 +340,7 @@ document.addEventListener('click', (event) => {
     const target = document.getElementById(targetId);
     
     if (target && target.tagName === 'DIALOG' && target.hasAttribute('popover')) {
-        // Close dropdowns BEFORE the modal opens to avoid conflicts
+        // Close dropdowns BEFORE the dialog opens to avoid conflicts
         const openDropdowns = document.querySelectorAll('menu[popover]:popover-open');
         
         openDropdowns.forEach(dropdown => {

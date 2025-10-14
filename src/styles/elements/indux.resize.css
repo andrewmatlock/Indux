@@ -1,8 +1,4 @@
-/* Resize Handles */
-
-:root { 
-    --spacing-resize-handle: 1rem;
-}
+/* Indux Resize Handles */
 
 @layer utilities {
 
@@ -27,10 +23,9 @@
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
-                width: 0.1875rem;
-                height: 0.1875rem;
+                width: 1px;
+                height: 1px;
                 background: transparent;
-                border-radius: var(--radius, 0.5rem);
                 transition: background-color 0.2s ease;
                 pointer-events: none
             }

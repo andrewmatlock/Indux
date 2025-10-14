@@ -1,4 +1,4 @@
-/* Avatars */
+/* Indux Avatars */
 
 @layer utilities {
 
@@ -53,8 +53,8 @@
         }
     }
 
-    /* Button version */
-    :where(button.avatar) {
+    /* Button & label versions */
+    :where(button.avatar, label.avatar) {
         padding: 0;
         background-blend-mode: normal;
 

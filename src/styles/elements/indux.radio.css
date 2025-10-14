@@ -1,4 +1,4 @@
-/* Radios */
+/* Indux Radios */
 
 @layer components {
 
@@ -26,14 +26,12 @@
 
             /* Notch unchecked */
             opacity: 0;
-            -webkit-transform: translateX(-50%) translateY(-50%) scale(0);
             transform: translateX(-50%) translateY(-50%) scale(0)
         }
 
         /* Notch checked */
         &:checked::after {
             opacity: 1;
-            -webkit-transform: translateX(-50%) translateY(-50%) scale(1);
             transform: translateX(-50%) translateY(-50%) scale(1)
         }
     }

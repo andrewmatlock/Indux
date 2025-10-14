@@ -1,8 +1,4 @@
-/* Checkboxes */
-
-:root {
-    --icon-checkbox: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='currentColor' d='m0 11l2-2l5 5L18 3l2 2L7 18z'/%3E%3C/svg%3E")
-}
+/* Indux Checkboxes */
 
 @layer components {
 
@@ -39,8 +35,8 @@
             width: 60%;
             height: 60%;
             background-color: var(--color-field-inverse, oklch(16.6% 0.026 267));
-            -webkit-mask-image: var(--icon-checkbox);
-            mask-image: var(--icon-checkbox);
+            -webkit-mask-image: var(--icon-checkbox,url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='currentColor' d='m0 11l2-2l5 5L18 3l2 2L7 18z'/%3E%3C/svg%3E"));
+            mask-image: var(--icon-checkbox, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='currentColor' d='m0 11l2-2l5 5L18 3l2 2L7 18z'/%3E%3C/svg%3E"));
             -webkit-mask-repeat: no-repeat;
             mask-repeat: no-repeat;
             -webkit-mask-size: 100% 100%;
@@ -50,14 +46,12 @@
 
             /* Icon unchecked */
             opacity: 0;
-            -webkit-transform: translateX(-50%) translateY(-50%) scale(0);
             transform: translateX(-50%) translateY(-50%) scale(0)
         }
 
         /* Icon checked */
         &:checked::after {
             opacity: 1;
-            -webkit-transform: translateX(-50%) translateY(-50%) scale(1);
             transform: translateX(-50%) translateY(-50%) scale(1)
         }
     }

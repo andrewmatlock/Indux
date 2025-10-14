@@ -26,9 +26,7 @@
   "preloadedComponents": [
       "components/footer.html",
       "components/header.html",
-      "components/logo.html",
-      "components/menu.html",
-      "components/page-2.html"
+      "components/logo.html"
   ],
   "data": {
     "manifest": "/manifest.json",

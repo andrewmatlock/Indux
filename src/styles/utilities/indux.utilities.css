@@ -1,9 +1,4 @@
-/* Utilities */
-
-:root {
-    --spacing-content-width: 68.75rem;
-    --spacing-viewport-padding: 5vw
-}
+/* Indux Utilities */
 
 @layer utilities {
 
@@ -95,7 +90,12 @@
 
     /* Transparent */
     :where(.transparent) {
-        background-color: transparent !important
+        color: var(--color-content-neutral, oklch(48.26% 0.0365 255.09));
+        background-color: transparent !important;
+
+        &:hover {
+            color: var(--color-content-stark, oklch(16.6% 0.026 267))
+        }
     }
 
     /* Large */
@@ -133,13 +133,13 @@
 
         /* Page margins */
         & > header, & > footer, & > main {
-            padding-inline-start: var(--spacing-viewport-padding);
-            padding-inline-end: var(--spacing-viewport-padding)
+            padding-inline-start: var(--spacing-viewport-padding, 5vw);
+            padding-inline-end: var(--spacing-viewport-padding, 5vw);
         }
 
         /* Width and horizontal centering for content wrappers */
         & > header nav, & > footer nav, & > main > section:not(.banner, .overlay-dark, .overlay-light) {
-            width: var(--spacing-content-width);
+            width: var(--spacing-content-width, 68.75rem);
             max-width: 100%;
             margin-inline-start: auto;
             margin-inline-end: auto
