@@ -23,6 +23,72 @@ function initializeTabsPlugin() {
             }
         }
         
+        // Check if target refers to a template element
+        if (target && document.getElementById(target)?.tagName === 'TEMPLATE') {
+            const template = document.getElementById(target);
+            const clonedPanel = template.content.cloneNode(true).firstElementChild;
+            if (clonedPanel && clonedPanel.hasAttribute('x-tabpanel')) {
+                const panelSetAttr = clonedPanel.getAttribute('x-tabpanel');
+                if (panelSetAttr === panelSet || (!panelSetAttr && !panelSet)) {
+                    // Generate unique ID for the cloned panel
+                    const uniqueId = `tabpanel-${Math.random().toString(36).substr(2, 9)}`;
+                    clonedPanel.setAttribute('id', uniqueId);
+                    document.body.appendChild(clonedPanel);
+                    
+                    // Initialize Alpine on the cloned panel
+                    if (window.Alpine) {
+                        Alpine.initTree(clonedPanel);
+                    }
+                    
+                    panels.push(clonedPanel);
+                }
+            }
+        }
+        
+        // Check if target refers to a component
+        if (!panels.length && window.InduxComponentsRegistry && window.InduxComponentsLoader) {
+            const componentName = target;
+            const registry = window.InduxComponentsRegistry;
+            
+            if (registry.registered.has(componentName)) {
+                // Component exists, wait for it to be loaded
+                const waitForComponent = async () => {
+                    const loader = window.InduxComponentsLoader;
+                    const content = await loader.loadComponent(componentName);
+                    if (content) {
+                        // Create a temporary container to parse the component
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = content.trim();
+                        const panelElement = tempDiv.querySelector(`#${target}[x-tabpanel]`);
+                        
+                        if (panelElement) {
+                            // Clone the panel and append to body
+                            const clonedPanel = panelElement.cloneNode(true);
+                            clonedPanel.setAttribute('id', target);
+                            document.body.appendChild(clonedPanel);
+                            
+                            // Initialize Alpine on the panel
+                            if (window.Alpine) {
+                                Alpine.initTree(clonedPanel);
+                            }
+                            
+                            const panelSetAttr = clonedPanel.getAttribute('x-tabpanel');
+                            if (panelSetAttr === panelSet || (!panelSetAttr && !panelSet)) {
+                                panels.push(clonedPanel);
+                            }
+                        }
+                    }
+                };
+                
+                // Wait for components to be ready, then try to load
+                if (window.__induxComponentsInitialized) {
+                    waitForComponent();
+                } else {
+                    window.addEventListener('indux:components-ready', waitForComponent);
+                }
+            }
+        }
+        
         // Check if target is a class - handle numeric class names
         try {
             const panelsByClass = document.querySelectorAll(`.${target}[x-tabpanel]`);
@@ -98,11 +164,12 @@ function initializeTabsPlugin() {
         // Reset flag after processing
         setTimeout(() => {
             window.induxTabsProcessing = false;
-        }, 100);
+        }, 200); // Increased timeout to prevent race conditions
         
         // Find all tab-related elements
         const tabButtons = document.querySelectorAll('[x-tab]');
         const panels = document.querySelectorAll('[x-tabpanel]');
+        
         
         if (tabButtons.length === 0 && panels.length === 0) {
             window.induxTabsProcessing = false;
@@ -147,18 +214,12 @@ function initializeTabsPlugin() {
                     // Only include if button is within 2 levels of the common ancestor
                     // This keeps tab groups properly isolated and prevents cross-contamination
                     if (commonAncestor && commonAncestor !== document.body && buttonDepth <= 2) {
-                        console.log('[Indux Tabs] Including button', tabValue, 'depth:', buttonDepth, 'ancestor:', commonAncestor.tagName, commonAncestor.className);
                         buttonsForThisSet.push(button);
-                    } else {
-                        console.log('[Indux Tabs] Excluding button', tabValue, 'depth:', buttonDepth, 'ancestor:', commonAncestor.tagName);
                     }
                 }
             });
             
-            console.log('[Indux Tabs] Panel set:', panelSet || 'default', 'Buttons found:', buttonsForThisSet.length, 'Panels:', panelsInSet.length);
-            
             if (buttonsForThisSet.length === 0) {
-                console.log('[Indux Tabs] No buttons found for panel set:', panelSet || 'default');
                 return;
             }
             
@@ -171,28 +232,15 @@ function initializeTabsPlugin() {
                 panelCommonParent.contains(button)
             );
             
-            console.log('[Indux Tabs] Panel set:', panelSet || 'default', 'Filtered buttons:', filteredButtons.length, 'within panel container:', panelCommonParent.tagName, panelCommonParent.className);
-            
             // If no buttons are within the panel container, skip this group
             if (filteredButtons.length === 0) {
-                console.log('[Indux Tabs] No buttons found within panel container for set:', panelSet || 'default');
                 return;
             }
             
             // Use the panel container as our common parent (buttons should be within it)
             const commonParent = panelCommonParent;
             
-            console.log('[Indux Tabs] Panel set:', panelSet || 'default', 'Common parent:', commonParent.tagName, commonParent.className || commonParent.id);
-            
-            
-            // Check if we've already processed this parent for this panel set
-            const processedKey = `data-tabs-processed-${panelSet}`;
-            if (commonParent.hasAttribute(processedKey)) {
-                return;
-            }
-            
-            // Mark as processed for this panel set
-            commonParent.setAttribute(processedKey, 'true');
+            // Note: Removed processed attribute check to allow re-processing when components load
             
             // Ensure the common parent has x-data
             if (!commonParent.hasAttribute('x-data')) {
@@ -253,7 +301,6 @@ function initializeTabsPlugin() {
                 }
                 
                 // Update the x-data attribute
-                console.log('[Indux Tabs] Setting x-data on', commonParent.tagName, commonParent.className, ':', newXData);
                 commonParent.setAttribute('x-data', newXData);
                 
                 // Force Alpine to re-initialize if it's already initialized
@@ -267,10 +314,11 @@ function initializeTabsPlugin() {
             panelsInSet.forEach(panel => {
                 const tabProp = getTabPropertyName(panelSet);
                 
-                // Add x-show directive
+                // Add x-show directive only if it doesn't already exist
                 const panelId = panel.id || panel.className.split(' ')[0];
-                if (panelId) {
-                    panel.setAttribute('x-show', `${tabProp} === '${panelId}'`);
+                if (panelId && !panel.hasAttribute('x-show')) {
+                    const xShowValue = `${tabProp} === '${panelId}'`;
+                    panel.setAttribute('x-show', xShowValue);
                 }
             });
         });
@@ -326,6 +374,31 @@ function initializeTabsPlugin() {
     
     // Also process when Alpine is ready
     document.addEventListener('alpine:initialized', processTabs);
+    
+    // Process tabs when components are loaded/updated
+    document.addEventListener('indux:components-ready', processTabs);
+    document.addEventListener('indux:components-processed', processTabs);
+    
+    // Fallback polling for edge cases (reduced frequency)
+    let pollCount = 0;
+    const maxPolls = 10; // 2 seconds at 200ms intervals
+    const pollInterval = setInterval(() => {
+        pollCount++;
+        if (pollCount >= maxPolls) {
+            clearInterval(pollInterval);
+            return;
+        }
+        
+        // Only check if there are unprocessed panels
+        const currentPanels = document.querySelectorAll('[x-tabpanel]');
+        if (currentPanels && currentPanels.length > 0) {
+            const unprocessedPanels = Array.from(currentPanels).filter(panel => !panel.hasAttribute('x-show'));
+            
+            if (unprocessedPanels.length > 0) {
+                processTabs();
+            }
+        }
+    }, 200);
 }
 
 // Initialize the plugin

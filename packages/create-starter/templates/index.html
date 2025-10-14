@@ -41,26 +41,31 @@
   <main class="[&>section]:py-10">
 
     <!-- Home -->
+     <section x-route="/" x-cloak>
+      <x-tab-buttons></x-tab-buttons>
+      <x-tab-panel></x-tab-panel>
+      <div id="b" x-tabpanel>Panel B</div>
+     </section>
     <section x-route="/" class="prose w-full mb-40" x-markdown="README.md"></section>
 
     <!-- Page 1 -->
-    <section x-route="/page-1">
+    <section x-route="/page-1" x-cloak>
       <h1 x-text="$x.content.page1">Page 1</h1>
     </section>
 
     <!-- Page 2 -->
-    <section x-route="/page-2">
+    <section x-route="/page-2" x-cloak>
       <h1 x-text="$x.content.page2">Page 2</h1>
     </section>
 
     <!-- License -->
-    <section x-route="/license" class="prose w-full mb-40" x-markdown="LICENSE.md"></section>
+    <section x-route="/license" class="prose w-full mb-40" x-markdown="LICENSE.md" x-cloak></section>
 
     <!-- Privacy -->
-    <section x-route="/privacy" class="prose w-full mb-40" x-markdown="privacy.md"></section>
+    <section x-route="/privacy" class="prose w-full mb-40" x-markdown="privacy.md" x-cloak></section>
 
     <!-- 404 -->
-    <section x-route="!*">
+    <section x-route="!*" x-cloak>
       <h1 x-text="$x.content.notFound">404 Page Not Found</h1>
     </section>
     

@@ -434,8 +434,19 @@ function processRouteVisibility(normalizedPath) {
     });
 }
 
+// Add x-cloak to route elements that don't have it
+function addXCloakToRouteElements() {
+    const routeElements = document.querySelectorAll('[x-route]:not([x-cloak])');
+    routeElements.forEach(element => {
+        element.setAttribute('x-cloak', '');
+    });
+}
+
 // Initialize visibility management
 function initializeVisibility() {
+    // Add x-cloak to route elements to prevent flash
+    addXCloakToRouteElements();
+    
     // Process initial visibility
     const currentPath = window.location.pathname;
     const normalizedPath = currentPath === '/' ? '/' : currentPath.replace(/^\/|\/$/g, '');
@@ -448,16 +459,25 @@ function initializeVisibility() {
 
     // Listen for component processing to ensure visibility is applied after components load
     window.addEventListener('indux:components-processed', () => {
+        // Add x-cloak to any new route elements
+        addXCloakToRouteElements();
+        
         const currentPath = window.location.pathname;
         const normalizedPath = currentPath === '/' ? '/' : currentPath.replace(/^\/|\/$/g, '');
         processRouteVisibility(normalizedPath);
     });
 }
 
-// Run immediately if DOM is ready, otherwise wait
+// Add x-cloak immediately to prevent flash
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeVisibility);
+    // DOM is still loading, add x-cloak as soon as possible
+    document.addEventListener('DOMContentLoaded', () => {
+        addXCloakToRouteElements();
+        initializeVisibility();
+    });
 } else {
+    // DOM is ready, add x-cloak immediately
+    addXCloakToRouteElements();
     initializeVisibility();
 }
 

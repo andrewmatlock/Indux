@@ -1,6 +1,6 @@
 {
   "name": "@indux/add",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Add and update Indux files in your project",
   "type": "module",
   "publishConfig": {

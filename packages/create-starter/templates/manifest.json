@@ -22,6 +22,8 @@
         }
     ],
   "components": [
+    "components/tab-buttons.html",
+    "components/tab-panel.html"
   ],
   "preloadedComponents": [
       "components/footer.html",
