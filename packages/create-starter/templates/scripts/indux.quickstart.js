@@ -1,6 +1,6 @@
 /*  Indux JS - Quickstart
 /*  By Andrew Matlock under MIT license
-/*  https://github.com/andrewmatlock/Indux
+/*  https://indux.build
 /*
 /*  Contains all Indux plugins bundled with:
 /*  - Alpine JS (alpinejs.dev)
@@ -11,6 +11,8 @@
 /*  - highlight.js (https://highlightjs.org)
 /*  - js-yaml (https://nodeca.github.io/js-yaml)
 /*  - Marked JS (https://marked.js.org)
+/*
+/*  Some plugins use Indux CSS styles.
 */
 
 
@@ -692,6 +694,8 @@ ${H}`)
                   addUtility('text', 'color', value);
                   addUtility('bg', 'background-color', value);
                   addUtility('border', 'border-color', value);
+                  addUtility('outline', 'outline-color', value);
+                  addUtility('ring', 'box-shadow', `0 0 0 1px ${value}`);
                   addUtility('fill', 'fill', value);
                   addUtility('stroke', 'stroke', value);
 
@@ -2219,10 +2223,13 @@ ${H}`)
                               const baseClass = parsed.baseClass;
                               
                               // Check if this class has an opacity modifier and matches our base class
-                              if (baseClass.includes('/') && baseClass.startsWith(className + '/')) {
-                                  const opacity = baseClass.split('/')[1];
-                                  // Validate that the opacity is a number between 0-100
-                                  return !isNaN(opacity) && opacity >= 0 && opacity <= 100;
+                              if (baseClass.includes('/')) {
+                                  const baseWithoutOpacity = baseClass.split('/')[0];
+                                  if (baseWithoutOpacity === className) {
+                                      const opacity = baseClass.split('/')[1];
+                                      // Validate that the opacity is a number between 0-100
+                                      return !isNaN(opacity) && opacity >= 0 && opacity <= 100;
+                                  }
                               }
                               return false;
                           });
@@ -4312,6 +4319,27 @@ ${H}`)
 
                   // Return empty string for most properties to prevent expression display
                   if (typeof key === 'string') {
+                      // For known array properties, return a special proxy with route() function
+                      // This prevents infinite recursion while providing route() functionality
+                      if (key === 'legal' || key === 'docs' || key === 'features' || key === 'items') {
+                          return new Proxy({}, {
+                              get(target, prop) {
+                                  if (prop === 'route') {
+                                      return function(pathKey) {
+                                          // Return a safe fallback proxy that returns empty strings
+                                          return new Proxy({}, {
+                                              get() { return ''; }
+                                          });
+                                      };
+                                  }
+                                  if (prop === 'length') return 0;
+                                  if (typeof prop === 'string' && !isNaN(Number(prop))) {
+                                      return createLoadingProxy();
+                                  }
+                                  return '';
+                              }
+                          });
+                      }
                       return '';
                   }
 
@@ -4598,6 +4626,32 @@ ${H}`)
                                   if (Array.isArray(nestedValue)) {
                                       return new Proxy(nestedValue, {
                                           get(target, nestedKey) {
+                                              // Handle special keys
+                                              if (nestedKey === Symbol.iterator || nestedKey === 'then' || nestedKey === 'catch' || nestedKey === 'finally') {
+                                                  return undefined;
+                                              }
+
+                                              // Handle route() function for route-specific lookups on arrays
+                                              if (nestedKey === 'route') {
+                                                  return function(pathKey) {
+                                                      // Only create route proxy if we have valid data
+                                                      if (target && typeof target === 'object') {
+                                                          // Get data source name from the first item's contentType metadata
+                                                          return createRouteProxy(
+                                                              target, 
+                                                              pathKey, 
+                                                              (Array.isArray(target) && target.length > 0 && target[0] && target[0].contentType) 
+                                                                  ? target[0].contentType 
+                                                                  : undefined
+                                                          );
+                                                      }
+                                                      // Return a safe fallback proxy
+                                                      return new Proxy({}, {
+                                                          get() { return undefined; }
+                                                      });
+                                                  };
+                                              }
+
                                               if (nestedKey === 'length') {
                                                   return target.length;
                                               }
@@ -4620,17 +4674,69 @@ ${H}`)
                                   }
                                   // Only create proxy for objects, return primitives directly
                                   if (typeof nestedValue === 'object' && nestedValue !== null) {
-                                      return new Proxy(nestedValue, {
-                                          get(target, nestedKey) {
-                                              // Handle toPrimitive for text content
-                                              if (nestedKey === Symbol.toPrimitive) {
-                                                  return function () {
-                                                      return target[nestedKey] || '';
-                                                  };
+                                      if (Array.isArray(nestedValue)) {
+                                          // Handle nested arrays with route() function
+                                          return new Proxy(nestedValue, {
+                                              get(target, nestedKey) {
+                                                  // Handle special keys
+                                                  if (nestedKey === Symbol.iterator || nestedKey === 'then' || nestedKey === 'catch' || nestedKey === 'finally') {
+                                                      return undefined;
+                                                  }
+
+                                                  // Handle route() function for route-specific lookups on nested arrays
+                                                  if (nestedKey === 'route') {
+                                                      return function(pathKey) {
+                                                          // Only create route proxy if we have valid data
+                                                          if (target && typeof target === 'object') {
+                                                              // Get data source name from the first item's contentType metadata
+                                                              return createRouteProxy(
+                                                                  target, 
+                                                                  pathKey, 
+                                                                  (Array.isArray(target) && target.length > 0 && target[0] && target[0].contentType) 
+                                                                      ? target[0].contentType 
+                                                                      : undefined
+                                                              );
+                                                          }
+                                                          // Return a safe fallback proxy
+                                                          return new Proxy({}, {
+                                                              get() { return undefined; }
+                                                          });
+                                                      };
+                                                  }
+
+                                                  if (nestedKey === 'length') {
+                                                      return target.length;
+                                                  }
+                                                  if (typeof nestedKey === 'string' && !isNaN(Number(nestedKey))) {
+                                                      const index = Number(nestedKey);
+                                                      if (index >= 0 && index < target.length) {
+                                                          return createArrayItemProxy(target[index]);
+                                                      }
+                                                      return createLoadingProxy();
+                                                  }
+                                                  // Add essential array methods
+                                                  if (nestedKey === 'filter' || nestedKey === 'map' || nestedKey === 'find' || 
+                                                      nestedKey === 'findIndex' || nestedKey === 'some' || nestedKey === 'every' ||
+                                                      nestedKey === 'reduce' || nestedKey === 'forEach' || nestedKey === 'slice') {
+                                                      return target[nestedKey].bind(target);
+                                                  }
+                                                  return createLoadingProxy();
                                               }
-                                              return target[nestedKey];
-                                          }
-                                      });
+                                          });
+                                      } else {
+                                          // Handle nested objects
+                                          return new Proxy(nestedValue, {
+                                              get(target, nestedKey) {
+                                                  // Handle toPrimitive for text content
+                                                  if (nestedKey === Symbol.toPrimitive) {
+                                                      return function () {
+                                                          return target[nestedKey] || '';
+                                                      };
+                                                  }
+                                                  return target[nestedKey];
+                                              }
+                                          });
+                                      }
                                   }
                                   // Return primitive values directly (strings, numbers, booleans)
                                   return nestedValue;
@@ -4747,22 +4853,75 @@ ${H}`)
                       // Original behavior for static dropdowns
                       menu = document.getElementById(dropdownId);
                       if (!menu) {
+                          // Check if this might be a component-based dropdown
+                          if (window.InduxComponentsRegistry && window.InduxComponentsLoader) {
+                              // Try to find the menu in components
+                              const componentName = dropdownId; // Assume the dropdownId is the component name
+                              const registry = window.InduxComponentsRegistry;
+                              
+                              if (registry.registered.has(componentName)) {
+                                  // Component exists, wait for it to be loaded
+                                  const waitForComponent = async () => {
+                                      const loader = window.InduxComponentsLoader;
+                                      const content = await loader.loadComponent(componentName);
+                                      if (content) {
+                                          // Create a temporary container to parse the component
+                                          const tempDiv = document.createElement('div');
+                                          tempDiv.innerHTML = content.trim();
+                                          const menuElement = tempDiv.querySelector(`#${dropdownId}`);
+                                          
+                                          if (menuElement) {
+                                              // Clone the menu and append to body
+                                              menu = menuElement.cloneNode(true);
+                                              menu.setAttribute('id', dropdownId);
+                                              document.body.appendChild(menu);
+                                              el.setAttribute('popovertarget', dropdownId);
+                                              
+                                              // Initialize Alpine on the menu
+                                              Alpine.initTree(menu);
+                                              
+                                              // Set up the dropdown after menu is ready
+                                              setupDropdown();
+                                          } else {
+                                              console.warn(`[Indux] Menu with id "${dropdownId}" not found in component "${componentName}"`);
+                                          }
+                                      } else {
+                                          console.warn(`[Indux] Failed to load component "${componentName}" for dropdown`);
+                                      }
+                                  };
+                                  
+                                  // Wait for components to be ready, then try to load
+                                  if (window.__induxComponentsInitialized) {
+                                      waitForComponent();
+                                  } else {
+                                      window.addEventListener('indux:components-ready', waitForComponent);
+                                  }
+                                  return; // Exit early, setup will happen in waitForComponent
+                              }
+                          }
+                          
                           console.warn(`[Indux] Dropdown menu with id "${dropdownId}" not found`);
                           return;
                       }
                       el.setAttribute('popovertarget', dropdownId);
                   }
 
-                  // Set up popover
-                  menu.setAttribute('popover', '');
+                  // Set up the dropdown
+                  setupDropdown();
 
-                  // Set up anchor positioning
-                  const anchorName = `--dropdown-${anchorCode}`;
-                  el.style.setProperty('anchor-name', anchorName);
-                  menu.style.setProperty('position-anchor', anchorName);
+                  function setupDropdown() {
+                      if (!menu) return;
+                      
+                      // Set up popover
+                      menu.setAttribute('popover', '');
 
-                  // Set up hover functionality after menu is ready
-                  if (modifiers.includes('hover')) {
+                      // Set up anchor positioning
+                      const anchorName = `--dropdown-${anchorCode}`;
+                      el.style.setProperty('anchor-name', anchorName);
+                      menu.style.setProperty('position-anchor', anchorName);
+
+                      // Set up hover functionality after menu is ready
+                      if (modifiers.includes('hover')) {
                       const handleShowPopover = () => {
                           if (menu && !menu.matches(':popover-open')) {
                               clearTimeout(hoverTimeout);
@@ -4904,6 +5063,7 @@ ${H}`)
                       // Setup listeners after a brief delay to ensure menu is rendered
                       setTimeout(setupMenuItemListeners, 10);
                   }
+                  } // End of setupDropdown function
               });
           });
       });
@@ -6369,6 +6529,7 @@ ${H}`)
 
                   // Handle snap-close behavior for width
                   if (pixelConstraints.closeX !== null) {
+                      // Close when element becomes smaller than threshold (dragging toward inside)
                       if (newWidth <= pixelConstraints.closeX) {
                           el.classList.add('resizable-closing');
                           currentSnap = 'closing';
@@ -6380,8 +6541,9 @@ ${H}`)
                       }
                   }
 
-                  // Handle snap-close behavior for height (always check, regardless of handle direction)
+                  // Handle snap-close behavior for height
                   if (pixelConstraints.closeY !== null) {
+                      // Close when element becomes smaller than threshold (dragging toward inside)
                       if (newHeight <= pixelConstraints.closeY) {
                           el.classList.add('resizable-closing');
                           currentSnap = 'closing';
@@ -7569,6 +7731,97 @@ ${H}`)
       initialize: initializeAnchors
   };
 
+
+  // Router magic property
+
+  // Initialize router magic property
+  function initializeRouterMagic() {
+      // Check if Alpine is available
+      if (typeof Alpine === 'undefined') {
+          console.error('[Indux Router Magic] Alpine is not available');
+          return;
+      }
+      
+      // Create a reactive object for route data
+      const route = Alpine.reactive({
+          current: window.location.pathname,
+          segments: [],
+          params: {},
+          matches: null
+      });
+
+      // Update route when route changes
+      const updateRoute = () => {
+          const currentRoute = window.InduxRoutingNavigation?.getCurrentRoute() || window.location.pathname;
+          
+          // Strip localization codes and other injected segments to get the logical route
+          let logicalRoute = currentRoute;
+          
+          // Check if there's a localization code at the start of the path
+          const pathParts = currentRoute.split('/').filter(Boolean);
+          if (pathParts.length > 0) {
+              // Check if first segment is a language code (2-5 characters, alphanumeric with hyphens/underscores)
+              const firstSegment = pathParts[0];
+              if (/^[a-zA-Z0-9_-]{2,5}$/.test(firstSegment)) {
+                  // This might be a language code, check if it's in the available locales
+                  const store = Alpine.store('locale');
+                  if (store && store.available && store.available.includes(firstSegment)) {
+                      // Remove the language code from the path
+                      logicalRoute = '/' + pathParts.slice(1).join('/');
+                      if (logicalRoute === '/') logicalRoute = '/';
+                  }
+              }
+          }
+          
+          const normalizedPath = logicalRoute === '/' ? '' : logicalRoute.replace(/^\/|\/$/g, '');
+          const segments = normalizedPath ? normalizedPath.split('/').filter(segment => segment) : [];
+          
+          route.current = logicalRoute;
+          route.segments = segments;
+          route.params = {};
+      };
+
+      // Listen for route changes
+      window.addEventListener('indux:route-change', updateRoute);
+      window.addEventListener('popstate', updateRoute);
+      
+      // Register $route magic property - return the route string directly
+      Alpine.magic('route', () => route.current);
+  }
+
+  // Initialize when Alpine is ready and router is ready
+  document.addEventListener('alpine:init', () => {
+      // Wait for router to be ready
+      const waitForRouter = () => {
+          if (window.InduxRoutingNavigation && window.InduxRouting) {
+              try {
+                  initializeRouterMagic();
+              } catch (error) {
+                  console.error('[Indux Router Magic] Failed to initialize:', error);
+              }
+          } else {
+              // Wait a bit more for router to initialize
+              setTimeout(waitForRouter, 50);
+          }
+      };
+      
+      waitForRouter();
+  });
+
+  // Also try to initialize immediately if Alpine and router are already available
+  if (typeof Alpine !== 'undefined' && window.InduxRoutingNavigation && window.InduxRouting) {
+      try {
+          initializeRouterMagic();
+      } catch (error) {
+          console.error('[Indux Router Magic] Failed to initialize immediately:', error);
+      }
+  }
+
+  // Export magic property interface
+  window.InduxRoutingMagic = {
+      initialize: initializeRouterMagic
+  };
+
   /* Indux Slides */
 
   function initializeCarouselPlugin() {
@@ -8406,7 +8659,35 @@ ${H}`)
   	        delayValue = computedStyle.getPropertyValue('--tooltip-hover-delay').trim();
   	    }
   	    
-  	    return delayValue ? parseInt(delayValue) : 500; // Default to 500ms if not set
+  	    if (!delayValue) {
+  	        return 500; // Default to 500ms if not set
+  	    }
+  	    
+  	    // Parse CSS time value (supports various time units)
+  	    const timeValue = parseFloat(delayValue);
+  	    
+  	    if (delayValue.endsWith('s')) {
+  	        return timeValue * 1000; // Convert seconds to milliseconds
+  	    } else if (delayValue.endsWith('ms')) {
+  	        return timeValue; // Already in milliseconds
+  	    } else if (delayValue.endsWith('m')) {
+  	        return timeValue * 60 * 1000; // Convert minutes to milliseconds
+  	    } else if (delayValue.endsWith('h')) {
+  	        return timeValue * 60 * 60 * 1000; // Convert hours to milliseconds
+  	    } else if (delayValue.endsWith('min')) {
+  	        return timeValue * 60 * 1000; // Convert minutes to milliseconds
+  	    } else if (delayValue.endsWith('sec')) {
+  	        return timeValue * 1000; // Convert seconds to milliseconds
+  	    } else if (delayValue.endsWith('second')) {
+  	        return timeValue * 1000; // Convert seconds to milliseconds
+  	    } else if (delayValue.endsWith('minute')) {
+  	        return timeValue * 60 * 1000; // Convert minutes to milliseconds
+  	    } else if (delayValue.endsWith('hour')) {
+  	        return timeValue * 60 * 60 * 1000; // Convert hours to milliseconds
+  	    } else {
+  	        // If no unit, assume milliseconds (backward compatibility)
+  	        return timeValue;
+  	    }
   	}
 
   	function initializeTooltipPlugin() {

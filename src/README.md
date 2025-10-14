@@ -85,19 +85,19 @@ Creates new Indux project from template.
 ### Individual File Updates
 
 ```bash
-npx @indux/indux.js
-npx @indux/indux.css
-npx @indux/indux.theme.css
-npx @indux/indux.code.css
-npx @indux/indux.quickstart.js
+npx @indux/add js
+npx @indux/add css
+npx @indux/add theme
+npx @indux/add code
+npx @indux/add quickstart
 ```
 Downloads and overwrites specific Indux files with latest versions from CDN.
 
 ### Bulk Update
 
 ```bash
-npx @indux/update
+npx @indux/add update
 ```
 Scans project directory and updates all Indux files except `indux.theme.css` (which is preserved for custom modifications).
 
-**Note:** These commands require the `@indux/indx-cli` package to be published to npm first.
+**Note:** These commands require the `@indux/add` package to be published to npm first.

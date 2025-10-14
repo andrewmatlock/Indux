@@ -107,6 +107,9 @@ function buildStylesheets() {
     // Step 5: Copy indux.css to docs and starter template
     copyInduxCssToTargets();
 
+    // Step 6: Sync starter template to create-starter package
+    syncStarterTemplate();
+
 }
 
 
@@ -302,6 +305,51 @@ function copyInduxCssToTargets() {
     console.log('');
 }
 
+// Sync starter template to create-starter package
+function syncStarterTemplate() {
+    console.log('Syncing starter template to create-starter package...');
+
+    const sourceDir = path.join('..', 'templates', 'starter');
+    const targetDir = path.join('..', 'packages', 'create-starter', 'templates');
+
+    if (!fs.existsSync(sourceDir)) {
+        console.warn('  ⚠ Warning: templates/starter not found, skipping sync');
+        return;
+    }
+
+    if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    try {
+        // Copy all files from templates/starter to packages/create-starter/templates
+        const entries = fs.readdirSync(sourceDir, { withFileTypes: true });
+        
+        for (const entry of entries) {
+            const sourcePath = path.join(sourceDir, entry.name);
+            const targetPath = path.join(targetDir, entry.name);
+            
+            if (entry.isDirectory()) {
+                // Recursively copy directories
+                if (fs.existsSync(targetPath)) {
+                    fs.rmSync(targetPath, { recursive: true, force: true });
+                }
+                fs.cpSync(sourcePath, targetPath, { recursive: true });
+                console.log(`  ✓ Synced directory: ${entry.name}`);
+            } else {
+                // Copy files
+                fs.copyFileSync(sourcePath, targetPath);
+                console.log(`  ✓ Synced file: ${entry.name}`);
+            }
+        }
+        
+        console.log('  ✓ Starter template synced successfully');
+    } catch (error) {
+        console.warn('  ⚠ Warning: Failed to sync starter template:', error.message);
+    }
+
+    console.log('');
+}
 
 // Distribute standalone files
 function distributeStandaloneFiles() {

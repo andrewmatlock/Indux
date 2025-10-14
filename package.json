@@ -13,8 +13,7 @@
     ],
     "scripts": {
         "clean": "rimraf src/scripts/indux.js src/scripts/indux.quickstart.js src/styles/indux.css",
-        "build": "cd src && node scripts/build.js && rollup -c rollup.config.mjs && cd .. && npm run copy-to-dist",
-        "copy-to-dist": "mkdir -p dist && cp src/scripts/indux*.js dist/ && cp src/styles/*.css dist/ && cp src/styles/core/*.css dist/ && cp src/styles/elements/*.css dist/ && cp src/styles/utilities/*.css dist/",
+        "build": "cd src && node scripts/build.js && rollup -c rollup.config.mjs",
         "build:docs": "echo 'Docs is a static website - no build needed'",
         "start:docs": "cd docs && browser-sync start --config bs-config.js",
         "start:starter": "cd templates/starter && browser-sync start --config bs-config.js --port 3001",

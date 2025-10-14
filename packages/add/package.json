@@ -1,16 +1,14 @@
 {
-  "name": "@indux/indx-cli",
-  "version": "1.0.0",
-  "description": "CLI tools for installing and updating Indux files",
+  "name": "@indux/add",
+  "version": "1.0.5",
+  "description": "Add and update Indux files in your project",
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "src/index.js",
   "bin": {
-    "@indux/update": "./bin/indx-update",
-    "@indux/indux.quickstart.js": "./bin/indx-quickstart",
-    "@indux/indux.js": "./bin/indx-js",
-    "@indux/indux.css": "./bin/indx-css",
-    "@indux/indux.theme.css": "./bin/indx-theme",
-    "@indux/indux.code.css": "./bin/indx-code"
+    "indx": "./bin/indx"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
