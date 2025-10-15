@@ -61,6 +61,16 @@ window.InduxRouting = {
             return pathToCheck.startsWith(normalizedPattern + '/');
         }
 
+        // Handle exact matches (starting with =) - after localization processing
+        if (condition.startsWith('=')) {
+            const exactPath = condition.slice(1);
+            if (exactPath === '/') {
+                return pathToCheck === '/' || pathToCheck === '';
+            }
+            const normalizedExactPath = exactPath.replace(/^\/+|\/+$/g, '');
+            return pathToCheck === normalizedExactPath;
+        }
+
         // Handle exact paths (starting with /)
         if (condition.startsWith('/')) {
             if (condition === '/') {

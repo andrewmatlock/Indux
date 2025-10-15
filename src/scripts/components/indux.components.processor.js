@@ -171,7 +171,7 @@ window.InduxComponentsProcessor = {
                 // Preserve important attributes including data-order, x-route, and other routing/data attributes
                 const preserveAttributes = [
                     'data-order', 'x-route', 'data-component', 'data-head',
-                    'x-route-*', 'data-route-*'
+                    'x-route-*', 'data-route-*', 'x-tabpanel'
                 ];
                 const shouldPreserve = preserveAttributes.some(preserveAttr =>
                     attr.name === preserveAttr || attr.name.startsWith(preserveAttr.replace('*', ''))

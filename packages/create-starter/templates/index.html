@@ -32,7 +32,7 @@
 </head>
 
 <!-- Page class applies classic web/app layout -->
-<body class="page">
+<body class="page" x-data="{ tab_test: 'a' }">
 
   <!-- header.html component -->
   <x-header></x-header>
@@ -41,17 +41,14 @@
   <main class="[&>section]:py-10">
 
     <!-- Home -->
-     <section x-route="/"
-      <x-tab-buttons></x-tab-buttons>
-      <x-tab-panel></x-tab-panel>
-      <div id="b" x-tabpanel>Panel B</div>
-     </section>
     <section x-route="/" class="prose w-full mb-40" x-markdown="README.md"></section>
 
     <!-- Page 1 -->
-    <section x-route="/page-1"
+    <section x-route="=page-1">
       <h1 x-text="$x.content.page1">Page 1</h1>
     </section>
+
+    <section x-route="/page-1/test">Test</section>
 
     <!-- Page 2 -->
     <section x-route="/page-2"
