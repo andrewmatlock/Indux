@@ -2,7 +2,7 @@
 
 @layer components {
 
-    :where(input, textarea, label:has(input:not([role=button], [type=checkbox], [type=radio], [type=file]))) {
+    :where(input, textarea, label:has([type=search], [type=file]), .label:has([type=search], [type=file])) {
         width: 100%;
         max-width: 100%;
         color: var(--color-field-inverse, oklch(16.6% 0.026 267));
@@ -35,8 +35,15 @@
             background-color: color-mix(in oklch, var(--color-field-surface, oklch(91.79% 0.0029 264.26)) 80%, var(--color-field-inverse, oklch(16.6% 0.026 267)))
         }
 
-        &[type="file"] {
-            display: none
+        &[type=file] {
+            max-width: 0;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: -1;
         }
     }
 
@@ -47,24 +54,12 @@
         padding-right: var(--spacing-field-padding, 0.625rem)
     }
 
-    /* Label wrapper for search input */
-    :where(label:has(input[type="search"])) {
+     /* Label wrapper for search and file inputs */
+     :where(label, .label):has([type=search],[type=file]) {
         display: flex;
         flex-flow: row;
-        justify-content: start;
         align-items: center;
         padding-inline-start: 0;
-
-        /* Search icon */
-        & [x-icon] {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: var(--spacing-field-height, 2.25rem);
-            height: 100%;
-            margin-inline-end: 0;
-            color: var(--color-content-subtle, oklch(67.4% 0.0318 251.27))
-        }
 
         /* Input element overrides */
         & :where(input) {
@@ -88,8 +83,32 @@
         }
     }
 
+    /* Additional styles for label with file input */
+    :where(label, .label):has([type=file]) {
+        justify-content: center;
+        gap: var(--spacing, 0.5rem);
+        height: var(--spacing-field-height, 2.25rem);
+        cursor: pointer
+    }
+
+    /* Additional styles for label with search input */
+        :where(label, .label):has([type=search]) {
+        justify-content: start;
+
+         /* Search icon */
+         & [x-icon] {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: var(--spacing-field-height, 2.25rem);
+            height: 100%;
+            margin-inline-end: 0;
+            color: var(--color-content-subtle, oklch(67.4% 0.0318 251.27))
+        }
+    }
+
     /* Hide search input cancel button */
-    :where(input[type="search"])::-webkit-search-cancel-button {
+    :where(input[type=search])::-webkit-search-cancel-button {
         appearance: none;
         -webkit-appearance: none;
         -moz-appearance: none;

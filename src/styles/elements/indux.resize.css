@@ -195,35 +195,35 @@
     }
 
     /* RTL overrides - more specific than :where([x-resize]) */
-    [dir="rtl"] :where([x-resize]) .resize-handle-start {
+    [dir=rtl] :where([x-resize]) .resize-handle-start {
         left: auto;
         right: calc(var(--spacing-resize-handle, 1rem) * -0.5);
     }
 
-    [dir="rtl"] :where([x-resize]) .resize-handle-end {
+    [dir=rtl] :where([x-resize]) .resize-handle-end {
         right: auto;
         left: calc(var(--spacing-resize-handle, 1rem) * -0.5);
     }
 
-    [dir="rtl"] :where([x-resize]) .resize-handle-top-start {
+    [dir=rtl] :where([x-resize]) .resize-handle-top-start {
         left: auto;
         right: calc(var(--spacing-resize-handle, 1rem) * -0.5);
         cursor: ne-resize;
     }
 
-    [dir="rtl"] :where([x-resize]) .resize-handle-top-end {
+    [dir=rtl] :where([x-resize]) .resize-handle-top-end {
         right: auto;
         left: calc(var(--spacing-resize-handle, 1rem) * -0.5);
         cursor: nw-resize;
     }
 
-    [dir="rtl"] :where([x-resize]) .resize-handle-bottom-start {
+    [dir=rtl] :where([x-resize]) .resize-handle-bottom-start {
         left: auto;
         right: calc(var(--spacing-resize-handle, 1rem) * -0.5);
         cursor: se-resize;
     }
 
-    [dir="rtl"] :where([x-resize]) .resize-handle-bottom-end {
+    [dir=rtl] :where([x-resize]) .resize-handle-bottom-end {
         right: auto;
         left: calc(var(--spacing-resize-handle, 1rem) * -0.5);
         cursor: sw-resize;

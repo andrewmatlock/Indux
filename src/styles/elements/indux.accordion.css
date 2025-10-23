@@ -68,7 +68,7 @@
     }
 
     /* RTL support */
-    [dir="rtl"] :where(details):not(.unset) {
+    [dir=rtl] :where(details):not(.unset) {
     
         & summary::before {
             transform: rotate(180deg)

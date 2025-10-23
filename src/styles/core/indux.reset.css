@@ -126,7 +126,7 @@
         -webkit-appearance: none
     }
 
-    :where(button, [role="button"]) {
+    :where(button, [role=button]) {
         cursor: pointer
     }
 

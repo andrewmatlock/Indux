@@ -3,6 +3,8 @@
 import fs from 'fs';
 import path from 'path';
 import { glob } from 'glob';
+import cssnano from 'cssnano';
+import postcss from 'postcss';
 
 // Configuration
 const CONFIG = {
@@ -64,6 +66,9 @@ const CONFIG = {
         // Files to distribute as standalone (excluded from main indux.css)
         standaloneFiles: ['indux.theme.css', 'indux.code.css'],
         
+        // Files that should be minified
+        minifyFiles: ['indux.css', 'indux.code.css'],
+        
         // Files that should only be copied to docs (not starter template)
         docsOnlyFiles: ['indux.code.css'],
 
@@ -89,25 +94,28 @@ function buildSubscripts() {
 }
 
 // Build stylesheets
-function buildStylesheets() {
+async function buildStylesheets() {
     console.log('Building stylesheets...\n');
 
     // Step 1: Build the main indux.css file
     buildMainStylesheet();
 
-    // Step 2: Distribute standalone files
+    // Step 2: Minify CSS files
+    await minifyCssFiles();
+
+    // Step 3: Distribute standalone files
     distributeStandaloneFiles();
 
-    // Step 3: Handle special popover-dependent files
+    // Step 4: Handle special popover-dependent files
     handlePopoverDependentFiles();
 
-    // Step 4: Handle special group-dependent files
+    // Step 5: Handle special group-dependent files
     handleGroupDependentFiles();
 
-    // Step 5: Copy indux.css to docs and starter template
+    // Step 6: Copy indux.css to docs and starter template
     copyInduxCssToTargets();
 
-    // Step 6: Sync starter template to create-starter package
+    // Step 7: Sync starter template to create-starter package
     syncStarterTemplate();
 
 }
@@ -168,6 +176,101 @@ function buildMainStylesheet() {
     fs.writeFileSync(outputPath, mainContent.join('\n\n'));
     console.log(`  ✓ Created indux.css`);
     console.log('');
+}
+
+// Minify CSS files
+async function minifyCssFiles() {
+    console.log('Minifying CSS files...');
+
+    for (const cssFile of CONFIG.stylesheets.minifyFiles) {
+        await minifyCssFile(cssFile);
+    }
+}
+
+// Minify a single CSS file
+async function minifyCssFile(cssFileName) {
+    console.log(`Minifying ${cssFileName}...`);
+
+    // Determine source directory based on file
+    let sourceDir = CONFIG.stylesheets.outputDir;
+    if (cssFileName === 'indux.code.css') {
+        sourceDir = 'styles/elements';
+    }
+    
+    const cssPath = path.join(sourceDir, cssFileName);
+    
+    if (!fs.existsSync(cssPath)) {
+        console.warn(`  ⚠ Warning: ${cssFileName} not found, skipping minification`);
+        return;
+    }
+
+    try {
+        const cssContent = fs.readFileSync(cssPath, 'utf8');
+        
+        // Configure cssnano options - conservative settings for framework CSS
+        const processor = postcss([
+            cssnano({
+                preset: ['default', {
+                    // Safe optimizations that don't remove CSS
+                    discardComments: {
+                        removeAll: true,
+                    },
+                    normalizeWhitespace: true,
+                    colormin: true,
+                    convertValues: true,
+                    mergeIdents: true,
+                    mergeLonghand: true,
+                    mergeRules: true,
+                    minifyFontValues: true,
+                    minifyGradients: true,
+                    minifyParams: true,
+                    minifySelectors: true,
+                    normalizeCharset: true,
+                    normalizeDisplayValues: true,
+                    normalizePositions: true,
+                    normalizeRepeatStyle: true,
+                    normalizeString: true,
+                    normalizeTimingFunctions: true,
+                    normalizeUnicode: true,
+                    normalizeUrl: true,
+                    orderedValues: true,
+                    reduceIdents: true,
+                    reduceInitial: true,
+                    reduceTransforms: true,
+                    svgo: true,
+                    uniqueSelectors: true,
+                    
+                    // Disable potentially dangerous optimizations for framework CSS
+                    discardDuplicates: false,    // Keep duplicates (might be intentional)
+                    discardEmpty: false,         // Keep empty rules (might be placeholders)
+                    discardOverridden: false,    // Keep overridden rules (might be needed for specificity)
+                }]
+            })
+        ]);
+
+        const result = await processor.process(cssContent, { from: cssPath });
+        
+        if (result.warnings && result.warnings.length > 0) {
+            console.warn(`  ⚠ Warning: ${cssFileName} minification had warnings:`, result.warnings);
+        }
+
+        // Write the minified CSS
+        const minifiedFileName = cssFileName.replace('.css', '.min.css');
+        const minifiedPath = path.join(CONFIG.stylesheets.outputDir, minifiedFileName);
+        fs.writeFileSync(minifiedPath, result.css);
+        
+        // Calculate compression ratio
+        const originalSize = Buffer.byteLength(cssContent, 'utf8');
+        const minifiedSize = Buffer.byteLength(result.css, 'utf8');
+        const compressionRatio = ((originalSize - minifiedSize) / originalSize * 100).toFixed(1);
+        
+        console.log(`  ✓ Created ${minifiedFileName}`);
+        console.log(`  ✓ Size: ${(originalSize / 1024).toFixed(1)}KB → ${(minifiedSize / 1024).toFixed(1)}KB (${compressionRatio}% reduction)`);
+        console.log('');
+        
+    } catch (error) {
+        console.error(`  ❌ Error minifying ${cssFileName}:`, error.message);
+    }
 }
 
 // Strip base layer popover styles from content (used when compiling into main indux.css)
@@ -278,6 +381,7 @@ function copyInduxCssToTargets() {
     console.log('Copying indux.css to target directories...');
 
     const cssSource = path.join('styles', 'indux.css');
+    const cssMinSource = path.join('styles', 'indux.min.css');
     
     if (!fs.existsSync(cssSource)) {
         console.warn('  ⚠ Warning: indux.css not found, skipping copy');
@@ -293,6 +397,13 @@ function copyInduxCssToTargets() {
     fs.copyFileSync(cssSource, cssDocsDest);
     console.log('  ✓ Copied indux.css to docs/styles');
 
+    // Copy minified CSS to docs/styles if it exists
+    if (fs.existsSync(cssMinSource)) {
+        const cssMinDocsDest = path.join(docsStylesDir, 'indux.min.css');
+        fs.copyFileSync(cssMinSource, cssMinDocsDest);
+        console.log('  ✓ Copied indux.min.css to docs/styles');
+    }
+
     // Copy to templates/starter/styles
     const starterStylesDir = path.join('..', 'templates', 'starter', 'styles');
     if (!fs.existsSync(starterStylesDir)) {
@@ -301,6 +412,13 @@ function copyInduxCssToTargets() {
     const cssStarterDest = path.join(starterStylesDir, 'indux.css');
     fs.copyFileSync(cssSource, cssStarterDest);
     console.log('  ✓ Copied indux.css to templates/starter/styles');
+
+    // Copy minified CSS to templates/starter/styles if it exists
+    if (fs.existsSync(cssMinSource)) {
+        const cssMinStarterDest = path.join(starterStylesDir, 'indux.min.css');
+        fs.copyFileSync(cssMinSource, cssMinStarterDest);
+        console.log('  ✓ Copied indux.min.css to templates/starter/styles');
+    }
 
     console.log('');
 }
@@ -374,6 +492,15 @@ function distributeStandaloneFiles() {
         fs.copyFileSync(sourcePath, outputPath);
         console.log(`  ✓ Copied ${standaloneFile} to styles/`);
 
+        // Copy minified version if it exists
+        const minifiedFile = standaloneFile.replace('.css', '.min.css');
+        const minifiedSourcePath = path.join(CONFIG.stylesheets.outputDir, minifiedFile);
+        if (fs.existsSync(minifiedSourcePath)) {
+            const minifiedOutputPath = path.join(CONFIG.stylesheets.outputDir, minifiedFile);
+            fs.copyFileSync(minifiedSourcePath, minifiedOutputPath);
+            console.log(`  ✓ Copied ${minifiedFile} to styles/`);
+        }
+
         // Copy to docs/styles
         const docsStylesDir = path.join('..', 'docs', 'styles');
         if (!fs.existsSync(docsStylesDir)) {
@@ -382,6 +509,13 @@ function distributeStandaloneFiles() {
         const docsDest = path.join(docsStylesDir, standaloneFile);
         fs.copyFileSync(sourcePath, docsDest);
         console.log(`  ✓ Copied ${standaloneFile} to docs/styles`);
+
+        // Copy minified version to docs/styles if it exists
+        if (fs.existsSync(minifiedSourcePath)) {
+            const docsMinDest = path.join(docsStylesDir, minifiedFile);
+            fs.copyFileSync(minifiedSourcePath, docsMinDest);
+            console.log(`  ✓ Copied ${minifiedFile} to docs/styles`);
+        }
 
         // Copy to templates/starter/styles (skip if docs-only file)
         if (!CONFIG.stylesheets.docsOnlyFiles.includes(standaloneFile)) {
@@ -392,6 +526,13 @@ function distributeStandaloneFiles() {
             const starterDest = path.join(starterStylesDir, standaloneFile);
             fs.copyFileSync(sourcePath, starterDest);
             console.log(`  ✓ Copied ${standaloneFile} to templates/starter/styles`);
+
+            // Copy minified version to templates/starter/styles if it exists
+            if (fs.existsSync(minifiedSourcePath)) {
+                const starterMinDest = path.join(starterStylesDir, minifiedFile);
+                fs.copyFileSync(minifiedSourcePath, starterMinDest);
+                console.log(`  ✓ Copied ${minifiedFile} to templates/starter/styles`);
+            }
         } else {
             console.log(`  ✓ Skipped ${standaloneFile} for templates/starter/styles (docs-only)`);
         }
@@ -586,8 +727,11 @@ const copyToDocsPlugin = {
 
             // Copy indux.css to both docs and starter
             const cssSource = path.join('styles', 'indux.css');
+            const cssMinSource = path.join('styles', 'indux.min.css');
             const cssDocsDest = path.join(docsStylesDir, 'indux.css');
             const cssStarterDest = path.join(starterStylesDir, 'indux.css');
+            const cssMinDocsDest = path.join(docsStylesDir, 'indux.min.css');
+            const cssMinStarterDest = path.join(starterStylesDir, 'indux.min.css');
 
             if (fs.existsSync(cssSource)) {
                 fs.copyFileSync(cssSource, cssDocsDest);
@@ -597,8 +741,18 @@ const copyToDocsPlugin = {
                 console.warn('  ⚠ Warning: indux.css not found');
             }
 
+            if (fs.existsSync(cssMinSource)) {
+                fs.copyFileSync(cssMinSource, cssMinDocsDest);
+                fs.copyFileSync(cssMinSource, cssMinStarterDest);
+                console.log('  ✓ Copied indux.min.css to docs/styles and templates/starter/styles');
+            } else {
+                console.warn('  ⚠ Warning: indux.min.css not found');
+            }
+
             // Copy standalone files to docs and starter (with docs-only handling)
-            for (const standaloneFile of CONFIG.stylesheets.standaloneFiles) {
+            const standaloneFiles = ['indux.theme.css', 'indux.code.css'];
+            const docsOnlyFiles = ['indux.code.css'];
+            for (const standaloneFile of standaloneFiles) {
                 const source = path.join('styles', standaloneFile);
                 const docsDest = path.join(docsStylesDir, standaloneFile);
 
@@ -607,7 +761,7 @@ const copyToDocsPlugin = {
                     fs.copyFileSync(source, docsDest);
                     
                     // Copy to starter only if not docs-only
-                    if (!CONFIG.stylesheets.docsOnlyFiles.includes(standaloneFile)) {
+                    if (!docsOnlyFiles.includes(standaloneFile)) {
                         const starterDest = path.join(starterStylesDir, standaloneFile);
                         fs.copyFileSync(source, starterDest);
                         console.log('  ✓ Copied ' + standaloneFile + ' to docs/styles and templates/starter/styles');
@@ -616,6 +770,25 @@ const copyToDocsPlugin = {
                     }
                 } else {
                     console.warn('  ⚠ Warning: ' + standaloneFile + ' not found');
+                }
+
+                // Copy minified version if it exists
+                const minifiedFile = standaloneFile.replace('.css', '.min.css');
+                const minifiedSource = path.join('styles', minifiedFile);
+                const minifiedDocsDest = path.join(docsStylesDir, minifiedFile);
+
+                if (fs.existsSync(minifiedSource)) {
+                    // Always copy minified to docs
+                    fs.copyFileSync(minifiedSource, minifiedDocsDest);
+                    
+                    // Copy minified to starter only if not docs-only
+                    if (!docsOnlyFiles.includes(standaloneFile)) {
+                        const minifiedStarterDest = path.join(starterStylesDir, minifiedFile);
+                        fs.copyFileSync(minifiedSource, minifiedStarterDest);
+                        console.log('  ✓ Copied ' + minifiedFile + ' to docs/styles and templates/starter/styles');
+                    } else {
+                        console.log('  ✓ Copied ' + minifiedFile + ' to docs/styles (docs-only)');
+                    }
                 }
             }
         } catch (e) {
@@ -671,7 +844,7 @@ async function build() {
         buildSubscripts();
 
         // Step 2: Build stylesheets
-        buildStylesheets();
+        await buildStylesheets();
 
         // Step 3: Build rollup files
         buildRollupFiles();
@@ -719,13 +892,22 @@ function copyToDocs() {
 
     // Copy indux.css to docs/styles
     const cssSource = path.join('styles', 'indux.css');
+    const cssMinSource = path.join('styles', 'indux.min.css');
     const cssDest = path.join(docsStylesDir, 'indux.css');
+    const cssMinDest = path.join(docsStylesDir, 'indux.min.css');
 
     if (fs.existsSync(cssSource)) {
         fs.copyFileSync(cssSource, cssDest);
         console.log('  ✓ Copied indux.css to docs/styles');
     } else {
         console.warn('  ⚠ Warning: indux.css not found');
+    }
+
+    if (fs.existsSync(cssMinSource)) {
+        fs.copyFileSync(cssMinSource, cssMinDest);
+        console.log('  ✓ Copied indux.min.css to docs/styles');
+    } else {
+        console.warn('  ⚠ Warning: indux.min.css not found');
     }
 
     // Copy standalone files to docs/styles
@@ -738,6 +920,16 @@ function copyToDocs() {
             console.log(`  ✓ Copied ${standaloneFile} to docs/styles`);
         } else {
             console.warn(`  ⚠ Warning: ${standaloneFile} not found`);
+        }
+
+        // Copy minified version if it exists
+        const minifiedFile = standaloneFile.replace('.css', '.min.css');
+        const minifiedSource = path.join('styles', minifiedFile);
+        const minifiedDest = path.join(docsStylesDir, minifiedFile);
+
+        if (fs.existsSync(minifiedSource)) {
+            fs.copyFileSync(minifiedSource, minifiedDest);
+            console.log(`  ✓ Copied ${minifiedFile} to docs/styles`);
         }
     }
 

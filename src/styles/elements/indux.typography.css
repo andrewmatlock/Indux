@@ -3,8 +3,7 @@
 @layer base {
 
     /* All text elements */
-    :where(a, abbr, address, blockquote, code, del, figcaption, h1, h2, h3, h4, h5, h6, ins, label:not(.avatar), legend, p, small, cite, q), .h1, .h2, .h3, .h4, .h5, .h6, .paragraph, .small, .caption {
-        color: var(--color-content-stark, oklch(16.6% 0.026 267));
+    :where(a, abbr, address, blockquote, code, del, figcaption, h1, h2, h3, h4, h5, h6, ins, label:not(.avatar, :has([type=file], [type=search])), legend, p, small, cite, q), .h1, .h2, .h3, .h4, .h5, .h6, .paragraph, .small, .caption, .label {
 
         /* Support inline icons */
         &:where(:has( [x-icon])) {
@@ -153,7 +152,7 @@
     }
 
     /* Keyboard text */
-    :where(kbd) {
+    :where(kbd), .kbd {
         display: inline-block;
         vertical-align: baseline;
         width: fit-content;
@@ -174,27 +173,27 @@
     }
 
     /* RTL keyboard overrides */
-    [dir="rtl"] :where(kbd:not(:last-of-type)) {
+    [dir=rtl] :where(kbd:not(:last-of-type), .kbd:not(:last-of-type)) {
         margin-inline-start: 1px;
         margin-inline-end: 0
     }
 
     /* Labels */
-    :where(label) {
+    :where(label), .label {
         width: -moz-fit-content;
         width: fit-content;
         user-select: none
     }
 
     /* Legends */
-    :where(legend) {
+    :where(legend), .legend {
         display: block;
         max-width: 100%;
         white-space: normal
     }
 
     /* Badges */
-    :where(mark) {
+    :where(mark), .badge {
         display: inline-flex;
         justify-content: center;
         align-items: center;
@@ -227,7 +226,7 @@
     :where(ol):not(nav ol):not(menu ol),
     :where(ul):not(nav ul):not(menu ul) {
 
-        &:not(:has(input[type="checkbox"])) {
+        &:not(:has(input[type=checkbox])) {
             padding-inline-start: 1.75ch;
         }
 
@@ -254,12 +253,12 @@
             }
 
             /* Checklist items */
-            &:has(input[type="checkbox"]) {
+            &:has(input[type=checkbox]) {
                 position: relative;
                 display: inherit;
                 list-style: none;
 
-                & input[type="checkbox"] {
+                & input[type=checkbox] {
                     position: absolute;
                     top: 0.45ch;
                     left: -1ch
@@ -269,8 +268,8 @@
     }
 
     /* RTL list overrides */
-    [dir="rtl"] :where(ol):not(nav ol):not(menu ol),
-    [dir="rtl"] :where(ul):not(nav ul):not(menu ul) {
+    [dir=rtl] :where(ol):not(nav ol):not(menu ol),
+    [dir=rtl] :where(ul):not(nav ul):not(menu ul) {
         & li:has([x-icon]) {
             & [x-icon] {
                 left: auto;
@@ -278,8 +277,8 @@
             }
         }
 
-        & li:has(input[type="checkbox"]) {
-            & input[type="checkbox"] {
+        & li:has(input[type=checkbox]) {
+            & input[type=checkbox] {
                 left: auto;
                 right: -1.25ch
             }

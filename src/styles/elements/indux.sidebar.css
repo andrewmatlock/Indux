@@ -60,7 +60,7 @@
         }
 
         /* RTL overrides - slide in from left in RTL context */
-        [dir="rtl"] & {
+        [dir=rtl] & {
             @starting-style {
                 transform: translateX(-100%);
             }
@@ -84,7 +84,7 @@
             }
 
             /* RTL overrides */
-            [dir="rtl"] & {
+            [dir=rtl] & {
                 @starting-style {
                     transform: translateX(100%);
                 }

@@ -68,8 +68,11 @@ const copyToDocsPlugin = {
 
             // Copy indux.css to both docs and starter
             const cssSource = path.join('styles', 'indux.css');
+            const cssMinSource = path.join('styles', 'indux.min.css');
             const cssDocsDest = path.join(docsStylesDir, 'indux.css');
             const cssStarterDest = path.join(starterStylesDir, 'indux.css');
+            const cssMinDocsDest = path.join(docsStylesDir, 'indux.min.css');
+            const cssMinStarterDest = path.join(starterStylesDir, 'indux.min.css');
 
             if (fs.existsSync(cssSource)) {
                 fs.copyFileSync(cssSource, cssDocsDest);
@@ -79,8 +82,17 @@ const copyToDocsPlugin = {
                 console.warn('  ⚠ Warning: indux.css not found');
             }
 
+            if (fs.existsSync(cssMinSource)) {
+                fs.copyFileSync(cssMinSource, cssMinDocsDest);
+                fs.copyFileSync(cssMinSource, cssMinStarterDest);
+                console.log('  ✓ Copied indux.min.css to docs/styles and templates/starter/styles');
+            } else {
+                console.warn('  ⚠ Warning: indux.min.css not found');
+            }
+
             // Copy standalone files to docs and starter (with docs-only handling)
-            for (const standaloneFile of CONFIG.stylesheets.standaloneFiles) {
+            const standaloneFiles = ['indux.theme.css', 'indux.code.css'];
+            for (const standaloneFile of standaloneFiles) {
                 const source = path.join('styles', standaloneFile);
                 const docsDest = path.join(docsStylesDir, standaloneFile);
 
@@ -89,7 +101,8 @@ const copyToDocsPlugin = {
                     fs.copyFileSync(source, docsDest);
                     
                     // Copy to starter only if not docs-only
-                    if (!CONFIG.stylesheets.docsOnlyFiles.includes(standaloneFile)) {
+                    const docsOnlyFiles = ['indux.code.css'];
+                    if (!docsOnlyFiles.includes(standaloneFile)) {
                         const starterDest = path.join(starterStylesDir, standaloneFile);
                         fs.copyFileSync(source, starterDest);
                         console.log('  ✓ Copied ' + standaloneFile + ' to docs/styles and templates/starter/styles');
@@ -98,6 +111,25 @@ const copyToDocsPlugin = {
                     }
                 } else {
                     console.warn('  ⚠ Warning: ' + standaloneFile + ' not found');
+                }
+
+                // Copy minified version if it exists
+                const minifiedFile = standaloneFile.replace('.css', '.min.css');
+                const minifiedSource = path.join('styles', minifiedFile);
+                const minifiedDocsDest = path.join(docsStylesDir, minifiedFile);
+
+                if (fs.existsSync(minifiedSource)) {
+                    // Always copy minified to docs
+                    fs.copyFileSync(minifiedSource, minifiedDocsDest);
+                    
+                    // Copy minified to starter only if not docs-only
+                    if (!docsOnlyFiles.includes(standaloneFile)) {
+                        const minifiedStarterDest = path.join(starterStylesDir, minifiedFile);
+                        fs.copyFileSync(minifiedSource, minifiedStarterDest);
+                        console.log('  ✓ Copied ' + minifiedFile + ' to docs/styles and templates/starter/styles');
+                    } else {
+                        console.log('  ✓ Copied ' + minifiedFile + ' to docs/styles (docs-only)');
+                    }
                 }
             }
         } catch (e) {

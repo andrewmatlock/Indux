@@ -21,7 +21,7 @@
 
             <!-- Localization menu -->
             <button class="ghost" x-dropdown.bottom="localization-menu" aria-label="Localization Menu" x-icon="lucide:languages"></button>
-                <menu popover id="localization-menu" class="bottom-end">
+            <menu popover id="localization-menu" class="bottom-end">
                 <li @click="$locale.set('en')" :class="{ 'brand pointer-events-none': $locale.current === 'en' }">English</li>
                 <li @click="$locale.set('ar')" :class="{ 'brand pointer-events-none': $locale.current === 'ar' }">العربية</li>
                 <li @click="$locale.set('zh')" :class="{ 'brand pointer-events-none': $locale.current === 'zh' }">中文</li>
