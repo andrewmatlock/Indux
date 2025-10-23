@@ -34,8 +34,8 @@ Auto-publishes to npm and jsDelivr CDN via GitHub Actions. Files available at UR
 
 And distributed publically like:
 
-- `https://cdn.jsdelivr.net/npm/@indux/indux@latest/dist/indux.js`
-- `https://cdn.jsdelivr.net/npm/@indux/indux@latest/dist/indux.css`
+- `https://cdn.jsdelivr.net/npm/@indux/indux@latest/dist/indux.min.js`
+- `https://cdn.jsdelivr.net/npm/@indux/indux@latest/dist/indux.min.css`
 
 ### Version Numbering Strategy
 
