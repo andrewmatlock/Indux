@@ -35,11 +35,7 @@ project-name/
 │   ├── 192x192.png           # Small icon variant
 │   ├── 512x512.png           # Large icon variant
 ├── styles/                   # CSS stylesheets
-│   ├── custom.css            # Place for custom styles
-│   └── indux.css             # Indux framework styles
 │   └── indux.theme.css       # Project theme variables
-├── scripts/                  # JavaScript files
-│   └── indux.quickstart.js   # Indux framework + Alpine + Tailwind
 ├── _redirects                # SPA routing support for modern static hosts
 ├── .htaccess                 # SPA routing support for Apache-based hosts
 ├── favicon.ico               # Browser tab icon
@@ -65,8 +61,7 @@ project-name/
 - [ ] Update or remove HTML components and data sources (e.g. for localization)
 
 **Style & Content**
-- [ ] Update `indux.css` theme variables
-- [ ] Add unique styles to `custom.css`
+- [ ] Update `indux.theme.css` variables
 - [ ] Update `logo.html`, `header.html` and `footer.html` components
 - [ ] Create custom HTML components for pages, sections, etc.
 - [ ] Update index.html `<body>` with top-level routes and components
