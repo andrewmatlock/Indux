@@ -1,0 +1,12 @@
+data:
+  test_cards:
+    cards:
+      - id: 1
+        title: "Card 1"
+        description: "First test card"
+      - id: 2
+        title: "Card 2"
+        description: "Second test card"
+      - id: 3
+        title: "Card 3"
+        description: "Third test card"

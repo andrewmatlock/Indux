@@ -21,22 +21,19 @@
   <link rel="manifest" href="/manifest.json">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles/indux.css">
+  <link rel="stylesheet" href="/styles/indux.theme.css">
+  <link rel="stylesheet" href="/styles/indux.min.css">
 
   <!-- Scripts -->
-  <script src="/scripts/indux.quickstart.js"></script>
+  <script defer src="/scripts/indux.quickstart.js"></script>
 
 </head>
 
 <body class="page">
 
-  <x-header></x-header>
-
-  <main>
-    <!-- Content -->
+  <main class="container py-8">
+    <x-card-list cards="$x.test.data.test_cards.cards"></x-card-list>
   </main>
-
-  <x-footer></x-footer>
 
 </body>
 

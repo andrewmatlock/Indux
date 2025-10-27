@@ -160,6 +160,12 @@ var Indux = (function (exports) {
     	                // Store both original case and lowercase for flexibility
     	                props[attr.name] = attr.value;
     	                props[attr.name.toLowerCase()] = attr.value;
+    	                // For Alpine bindings (starting with :), also store without the : prefix
+    	                if (attr.name.startsWith(':')) {
+    	                    const keyWithoutColon = attr.name.substring(1);
+    	                    props[keyWithoutColon] = attr.value;
+    	                    props[keyWithoutColon.toLowerCase()] = attr.value;
+    	                }
     	            }
     	        });
     	        // Process $modify usage in all elements
@@ -219,6 +225,27 @@ var Indux = (function (exports) {
     	                                        }
     	                                        // If value starts with $, it's an Alpine expression - don't quote
     	                                        if (val.startsWith('$')) {
+    	                                            // Special handling for x-for, x-if, and x-show with $x data source expressions
+    	                                            // Add safe fallbacks to prevent errors during initial render when data source hasn't loaded yet
+    	                                            if ((attr.name === 'x-for' || attr.name === 'x-if' || attr.name === 'x-show') && val.startsWith('$x') && !val.includes('??')) {
+    	                                                // Convert regular property access dots to optional chaining for safe navigation
+    	                                                let safeVal = val.replace(/\./g, '?.');
+    	                                                // Add fallback based on directive type (only if user hasn't already provided one)
+    	                                                if (attr.name === 'x-for') {
+    	                                                    // x-for needs an iterable, so fallback to empty array
+    	                                                    return `${safeVal} ?? []`;
+    	                                                } else {
+    	                                                    // x-if and x-show evaluate to boolean, fallback to false
+    	                                                    return `${safeVal} ?? false`;
+    	                                                }
+    	                                            }
+    	                                            return val;
+    	                                        }
+    	                                        // Special handling for x-for, x-if, and x-show - these can contain expressions
+    	                                        // that reference data sources or other dynamic content
+    	                                        if (attr.name === 'x-for' || attr.name === 'x-if' || attr.name === 'x-show') {
+    	                                            // For these directives, preserve the value as-is to allow Alpine to evaluate it
+    	                                            // This is critical for x-for expressions like "card in $x.data.items"
     	                                            return val;
     	                                        }
     	                                        // Always quote string values to ensure they're treated as strings, not variables
@@ -876,7 +903,6 @@ var Indux = (function (exports) {
                 });
                 
                 // Set up header with proper ARIA attributes
-                header.setAttribute('role', 'tablist');
                 header.setAttribute('aria-label', 'Code examples');
                 
                 // Insert header at the beginning
@@ -7382,8 +7408,8 @@ var Indux = (function (exports) {
                             }
                         }
                     } catch (e) {
-                        // Skip stylesheets that can't be accessed due to CORS
-                        console.warn('Skipped stylesheet due to CORS:', sheet.href || 'inline');
+                        // Skip stylesheets that can't be accessed (external CDN files, CORS, etc.)
+                        // This is expected behavior for external stylesheets
                     }
                 }
 

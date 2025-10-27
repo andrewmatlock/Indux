@@ -812,8 +812,8 @@ class TailwindCompiler {
                         }
                     }
                 } catch (e) {
-                    // Skip stylesheets that can't be accessed due to CORS
-                    console.warn('Skipped stylesheet due to CORS:', sheet.href || 'inline');
+                    // Skip stylesheets that can't be accessed (external CDN files, CORS, etc.)
+                    // This is expected behavior for external stylesheets
                 }
             }
 

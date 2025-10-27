@@ -20,12 +20,11 @@
         }
     ],
     "components": [
+        "test/card-list.html"
     ],
     "preloadedComponents": [
-        "components/navigation/footer.html",
-        "components/navigation/header.html",
-        "components/navigation/logo.html"
     ],
     "data": {
+        "test": "/test/test.yaml"
     }
 }

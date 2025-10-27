@@ -290,7 +290,6 @@ function initializeCodePlugin() {
             });
             
             // Set up header with proper ARIA attributes
-            header.setAttribute('role', 'tablist');
             header.setAttribute('aria-label', 'Code examples');
             
             // Insert header at the beginning

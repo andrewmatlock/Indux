@@ -112,10 +112,7 @@ async function buildStylesheets() {
     // Step 5: Handle special group-dependent files
     handleGroupDependentFiles();
 
-    // Step 6: Copy indux.css to docs and starter template
-    copyInduxCssToTargets();
-
-    // Step 7: Sync starter template to create-starter package
+    // Step 6: Sync starter template to create-starter package
     syncStarterTemplate();
 
 }
@@ -376,53 +373,6 @@ function handlePopoverDependentFiles() {
     console.log('');
 }
 
-// Copy indux.css to docs and starter template directories
-function copyInduxCssToTargets() {
-    console.log('Copying indux.css to target directories...');
-
-    const cssSource = path.join('styles', 'indux.css');
-    const cssMinSource = path.join('styles', 'indux.min.css');
-    
-    if (!fs.existsSync(cssSource)) {
-        console.warn('  ⚠ Warning: indux.css not found, skipping copy');
-        return;
-    }
-
-    // Copy to docs/styles
-    const docsStylesDir = path.join('..', 'docs', 'styles');
-    if (!fs.existsSync(docsStylesDir)) {
-        fs.mkdirSync(docsStylesDir, { recursive: true });
-    }
-    const cssDocsDest = path.join(docsStylesDir, 'indux.css');
-    fs.copyFileSync(cssSource, cssDocsDest);
-    console.log('  ✓ Copied indux.css to docs/styles');
-
-    // Copy minified CSS to docs/styles if it exists
-    if (fs.existsSync(cssMinSource)) {
-        const cssMinDocsDest = path.join(docsStylesDir, 'indux.min.css');
-        fs.copyFileSync(cssMinSource, cssMinDocsDest);
-        console.log('  ✓ Copied indux.min.css to docs/styles');
-    }
-
-    // Copy to templates/starter/styles
-    const starterStylesDir = path.join('..', 'templates', 'starter', 'styles');
-    if (!fs.existsSync(starterStylesDir)) {
-        fs.mkdirSync(starterStylesDir, { recursive: true });
-    }
-    const cssStarterDest = path.join(starterStylesDir, 'indux.css');
-    fs.copyFileSync(cssSource, cssStarterDest);
-    console.log('  ✓ Copied indux.css to templates/starter/styles');
-
-    // Copy minified CSS to templates/starter/styles if it exists
-    if (fs.existsSync(cssMinSource)) {
-        const cssMinStarterDest = path.join(starterStylesDir, 'indux.min.css');
-        fs.copyFileSync(cssMinSource, cssMinStarterDest);
-        console.log('  ✓ Copied indux.min.css to templates/starter/styles');
-    }
-
-    console.log('');
-}
-
 // Sync starter template to create-starter package
 function syncStarterTemplate() {
     console.log('Syncing starter template to create-starter package...');
@@ -501,41 +451,8 @@ function distributeStandaloneFiles() {
             console.log(`  ✓ Copied ${minifiedFile} to styles/`);
         }
 
-        // Copy to docs/styles
-        const docsStylesDir = path.join('..', 'docs', 'styles');
-        if (!fs.existsSync(docsStylesDir)) {
-            fs.mkdirSync(docsStylesDir, { recursive: true });
-        }
-        const docsDest = path.join(docsStylesDir, standaloneFile);
-        fs.copyFileSync(sourcePath, docsDest);
-        console.log(`  ✓ Copied ${standaloneFile} to docs/styles`);
-
-        // Copy minified version to docs/styles if it exists
-        if (fs.existsSync(minifiedSourcePath)) {
-            const docsMinDest = path.join(docsStylesDir, minifiedFile);
-            fs.copyFileSync(minifiedSourcePath, docsMinDest);
-            console.log(`  ✓ Copied ${minifiedFile} to docs/styles`);
-        }
-
-        // Copy to templates/starter/styles (skip if docs-only file)
-        if (!CONFIG.stylesheets.docsOnlyFiles.includes(standaloneFile)) {
-            const starterStylesDir = path.join('..', 'templates', 'starter', 'styles');
-            if (!fs.existsSync(starterStylesDir)) {
-                fs.mkdirSync(starterStylesDir, { recursive: true });
-            }
-            const starterDest = path.join(starterStylesDir, standaloneFile);
-            fs.copyFileSync(sourcePath, starterDest);
-            console.log(`  ✓ Copied ${standaloneFile} to templates/starter/styles`);
-
-            // Copy minified version to templates/starter/styles if it exists
-            if (fs.existsSync(minifiedSourcePath)) {
-                const starterMinDest = path.join(starterStylesDir, minifiedFile);
-                fs.copyFileSync(minifiedSourcePath, starterMinDest);
-                console.log(`  ✓ Copied ${minifiedFile} to templates/starter/styles`);
-            }
-        } else {
-            console.log(`  ✓ Skipped ${standaloneFile} for templates/starter/styles (docs-only)`);
-        }
+        // Note: Files are no longer copied to docs or templates/starter
+        // These directories now maintain their own local file versions
     }
 
     console.log('');
@@ -754,119 +671,12 @@ function copyFilesToDist() {
     console.log('');
 }
 
-// Copy to docs and starter template plugin (runs after quickstart build)
-const copyToDocsPlugin = {
-    name: 'copy-to-docs',
+// Copy to dist plugin (runs after quickstart build)
+const copyToDistPlugin = {
+    name: 'copy-to-dist',
     writeBundle() {
         // Copy files to dist directory for clean jsdelivr URLs
         copyFilesToDist();
-
-        // Copy files to docs and starter template directories after build
-        try {
-            // Ensure docs directories exist
-            const docsScriptsDir = path.join('..', 'docs', 'scripts');
-            const docsStylesDir = path.join('..', 'docs', 'styles');
-            
-            if (!fs.existsSync(docsScriptsDir)) {
-                fs.mkdirSync(docsScriptsDir, { recursive: true });
-            }
-            if (!fs.existsSync(docsStylesDir)) {
-                fs.mkdirSync(docsStylesDir, { recursive: true });
-            }
-
-            // Ensure starter template directories exist
-            const starterScriptsDir = path.join('..', 'templates', 'starter', 'scripts');
-            const starterStylesDir = path.join('..', 'templates', 'starter', 'styles');
-            
-            if (!fs.existsSync(starterScriptsDir)) {
-                fs.mkdirSync(starterScriptsDir, { recursive: true });
-            }
-            if (!fs.existsSync(starterStylesDir)) {
-                fs.mkdirSync(starterStylesDir, { recursive: true });
-            }
-
-            // Copy indux.quickstart.js to both docs and starter
-            const quickstartSource = path.join('scripts', 'indux.quickstart.js');
-            const quickstartDocsDest = path.join(docsScriptsDir, 'indux.quickstart.js');
-            const quickstartStarterDest = path.join(starterScriptsDir, 'indux.quickstart.js');
-
-            if (fs.existsSync(quickstartSource)) {
-                fs.copyFileSync(quickstartSource, quickstartDocsDest);
-                fs.copyFileSync(quickstartSource, quickstartStarterDest);
-                console.log('  ✓ Copied indux.quickstart.js to docs/scripts and templates/starter/scripts');
-            } else {
-                console.warn('  ⚠ Warning: indux.quickstart.js not found');
-            }
-
-            // Copy indux.css to both docs and starter
-            const cssSource = path.join('styles', 'indux.css');
-            const cssMinSource = path.join('styles', 'indux.min.css');
-            const cssDocsDest = path.join(docsStylesDir, 'indux.css');
-            const cssStarterDest = path.join(starterStylesDir, 'indux.css');
-            const cssMinDocsDest = path.join(docsStylesDir, 'indux.min.css');
-            const cssMinStarterDest = path.join(starterStylesDir, 'indux.min.css');
-
-            if (fs.existsSync(cssSource)) {
-                fs.copyFileSync(cssSource, cssDocsDest);
-                fs.copyFileSync(cssSource, cssStarterDest);
-                console.log('  ✓ Copied indux.css to docs/styles and templates/starter/styles');
-            } else {
-                console.warn('  ⚠ Warning: indux.css not found');
-            }
-
-            if (fs.existsSync(cssMinSource)) {
-                fs.copyFileSync(cssMinSource, cssMinDocsDest);
-                fs.copyFileSync(cssMinSource, cssMinStarterDest);
-                console.log('  ✓ Copied indux.min.css to docs/styles and templates/starter/styles');
-            } else {
-                console.warn('  ⚠ Warning: indux.min.css not found');
-            }
-
-            // Copy standalone files to docs and starter (with docs-only handling)
-            const standaloneFiles = ['indux.theme.css', 'indux.code.css'];
-            const docsOnlyFiles = ['indux.code.css'];
-            for (const standaloneFile of standaloneFiles) {
-                const source = path.join('styles', standaloneFile);
-                const docsDest = path.join(docsStylesDir, standaloneFile);
-
-                if (fs.existsSync(source)) {
-                    // Always copy to docs
-                    fs.copyFileSync(source, docsDest);
-                    
-                    // Copy to starter only if not docs-only
-                    if (!docsOnlyFiles.includes(standaloneFile)) {
-                        const starterDest = path.join(starterStylesDir, standaloneFile);
-                        fs.copyFileSync(source, starterDest);
-                        console.log('  ✓ Copied ' + standaloneFile + ' to docs/styles and templates/starter/styles');
-                    } else {
-                        console.log('  ✓ Copied ' + standaloneFile + ' to docs/styles (docs-only)');
-                    }
-                } else {
-                    console.warn('  ⚠ Warning: ' + standaloneFile + ' not found');
-                }
-
-                // Copy minified version if it exists
-                const minifiedFile = standaloneFile.replace('.css', '.min.css');
-                const minifiedSource = path.join('styles', minifiedFile);
-                const minifiedDocsDest = path.join(docsStylesDir, minifiedFile);
-
-                if (fs.existsSync(minifiedSource)) {
-                    // Always copy minified to docs
-                    fs.copyFileSync(minifiedSource, minifiedDocsDest);
-                    
-                    // Copy minified to starter only if not docs-only
-                    if (!docsOnlyFiles.includes(standaloneFile)) {
-                        const minifiedStarterDest = path.join(starterStylesDir, minifiedFile);
-                        fs.copyFileSync(minifiedSource, minifiedStarterDest);
-                        console.log('  ✓ Copied ' + minifiedFile + ' to docs/styles and templates/starter/styles');
-                    } else {
-                        console.log('  ✓ Copied ' + minifiedFile + ' to docs/styles (docs-only)');
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn('  ⚠ Warning: Failed to copy files to docs and starter:', e.message);
-        }
     }
 };
 
@@ -898,7 +708,7 @@ export default [
         plugins: [
             ...baseConfig.plugins,
             quickstartCleanupPlugin,
-            copyToDocsPlugin
+            copyToDistPlugin
         ]
     }
 ];`;
