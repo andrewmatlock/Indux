@@ -2,7 +2,7 @@
 
 @layer components {
 
-    :where(input, textarea, label:has([type=search], [type=file]), .label:has([type=search], [type=file])) {
+    :where(input:not([type=range]), textarea, label:has([type=search], [type=file]), .label:has([type=search], [type=file])) {
         width: 100%;
         max-width: 100%;
         color: var(--color-field-inverse, oklch(16.6% 0.026 267));
@@ -48,7 +48,7 @@
     }
 
     /* Input-specific styles */
-    :where(input) {
+    :where(input:not([type=range])) {
         height: var(--spacing-field-height, 2.25rem);
         padding-left: var(--spacing-field-padding, 0.625rem);
         padding-right: var(--spacing-field-padding, 0.625rem)

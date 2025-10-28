@@ -20,11 +20,9 @@
         }
     ],
     "components": [
-        "test/card-list.html"
     ],
     "preloadedComponents": [
     ],
     "data": {
-        "test": "/test/test.yaml"
     }
 }

@@ -21,18 +21,79 @@
   <link rel="manifest" href="/manifest.json">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/styles/indux.theme.css">
-  <link rel="stylesheet" href="/styles/indux.min.css">
+  <link rel="stylesheet" href="/styles/core/indux.theme.css">
+  <link rel="stylesheet" href="/styles/core/indux.reset.css">
+  <link rel="stylesheet" href="/styles/elements/indux.accordion.css">
+  <link rel="stylesheet" href="/styles/elements/indux.avatar.css">
+  <link rel="stylesheet" href="/styles/elements/indux.button.css">
+  <link rel="stylesheet" href="/styles/elements/indux.checkbox.css">
+  <link rel="stylesheet" href="/styles/elements/indux.code.css">
+  <link rel="stylesheet" href="/styles/elements/indux.dialog.css">
+  <link rel="stylesheet" href="/styles/elements/indux.divider.css">
+  <link rel="stylesheet" href="/styles/elements/indux.dropdown.css">
+  <link rel="stylesheet" href="/styles/elements/indux.form.css">
+  <link rel="stylesheet" href="/styles/elements/indux.input.css">
+  <link rel="stylesheet" href="/styles/elements/indux.radio.css">
+  <link rel="stylesheet" href="/styles/elements/indux.range.css">
+  <link rel="stylesheet" href="/styles/elements/indux.resize.css">
+  <link rel="stylesheet" href="/styles/elements/indux.sidebar.css">
+  <link rel="stylesheet" href="/styles/elements/indux.slides.css">
+  <link rel="stylesheet" href="/styles/elements/indux.switch.css">
+  <link rel="stylesheet" href="/styles/elements/indux.table.css">
+  <link rel="stylesheet" href="/styles/elements/indux.toast.css">
+  <link rel="stylesheet" href="/styles/elements/indux.tooltip.css">
+  <link rel="stylesheet" href="/styles/elements/indux.typography.css">
+  <link rel="stylesheet" href="/styles/utilities/indux.utilities.css">
 
   <!-- Scripts -->
-  <script defer src="/scripts/indux.quickstart.js"></script>
+  <script defer src="/scripts/indux.code.js"></script>
+  <script defer src="/scripts/indux.components.js"></script>
+  <script defer src="/scripts/indux.data.js"></script>
+  <script defer src="/scripts/indux.dropdowns.js"></script>
+  <script defer src="/scripts/indux.icons.js"></script>
+  <script defer src="/scripts/indux.localization.js"></script>
+  <script defer src="/scripts/indux.markdown.js"></script>
+  <script defer src="/scripts/indux.resize.js"></script>
+  <script defer src="/scripts/indux.router.js"></script>
+  <script defer src="/scripts/indux.slides.js"></script>
+  <script defer src="/scripts/indux.tabs.js"></script>
+  <script defer src="/scripts/indux.themes.js"></script>
+  <script defer src="/scripts/indux.toasts.js"></script>
+  <script defer src="/scripts/indux.tooltips.js"></script>
+  <script defer src="/scripts/indux.url.parameters.js"></script>
+  <script defer src="/scripts/indux.utilities.js"></script>
 
 </head>
 
 <body class="page">
 
   <main class="container py-8">
-    <x-card-list cards="$x.test.data.test_cards.cards"></x-card-list>
+
+    <form>
+    <button class="button">Button</button>
+    
+    <label>
+      <span>Slider</span>
+      <input type="range" list="markers" min="0" max="100" value="50" step="25" />
+      <datalist id="markers">
+        <option value="0" label="0"></option>
+        <option value="25" label="25"></option>
+        <option value="50" label="50"></option>
+        <option value="75" label="75"></option>
+        <option value="100" label="100"></option>
+      </datalist>
+    </label>
+
+    <input type="text" placeholder="Text" />
+
+    <input type="checkbox" role="switch" />
+
+    <input type="radio" name="radio" />
+    <input type="radio" name="radio" />
+    <input type="checkbox" name="checkbox" />
+    <input type="checkbox" name="checkbox" />
+  </form>
+
   </main>
 
 </body>
