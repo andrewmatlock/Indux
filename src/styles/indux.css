@@ -1455,6 +1455,7 @@
 
     input[type=range] {
         appearance: none;
+        background-color: transparent;
         border-radius: var(--radius, 0.5rem);
         cursor: default;
 
