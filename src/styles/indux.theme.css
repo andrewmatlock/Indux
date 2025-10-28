@@ -87,6 +87,12 @@
     --color-content-subtle: var(--color-500);
     --color-brand-content: #f6c07b;
     --color-accent-content: #ffa1ad;
+
+    /* Popover form elements */
+    :where([popover]) {
+        --color-field-surface: color-mix(in oklch, var(--color-600) 60%, var(--color-700));
+        --color-field-surface-hover: color-mix(in oklch, var(--color-600) 80%, var(--color-700));
+    }
 }
 
 @layer base {
