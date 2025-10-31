@@ -277,6 +277,10 @@
             margin-top: calc(1rem * 3)
         }
 
+        & > h4+p {
+            margin-top: 0.25rem;
+        }
+
         & > h5 {
             margin-top: 1rem;
             margin-bottom: 1rem

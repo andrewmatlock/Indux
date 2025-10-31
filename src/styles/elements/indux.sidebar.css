@@ -49,48 +49,48 @@
         @starting-style {
             transform: translateX(100%);
             opacity: 1;
-            scale: 1;
+            scale: 1
         }
 
         /* Closing state - slide out to inline-end */
         &:not(:popover-open) {
             transform: translateX(100%);
             opacity: 1;
-            scale: 1;
+            scale: 1
         }
 
         /* RTL overrides - slide in from left in RTL context */
         [dir=rtl] & {
             @starting-style {
-                transform: translateX(-100%);
+                transform: translateX(-100%)
             }
 
             &:not(:popover-open) {
-                transform: translateX(-100%);
+                transform: translateX(-100%)
             }
         }
 
         /* Modifier class to originate sidebar from inline-start (left in LTR, right in RTL) */
-        &.start {
+        &.appear-start {
             inset-inline-start: 0;
             inset-inline-end: auto;
 
             @starting-style {
-                transform: translateX(-100%);
+                transform: translateX(-100%)
             }
 
             &:not(:popover-open) {
-                transform: translateX(-100%);
+                transform: translateX(-100%)
             }
 
             /* RTL overrides */
             [dir=rtl] & {
                 @starting-style {
-                    transform: translateX(100%);
+                    transform: translateX(100%)
                 }
 
                 &:not(:popover-open) {
-                    transform: translateX(100%);
+                    transform: translateX(100%)
                 }
             }
         }

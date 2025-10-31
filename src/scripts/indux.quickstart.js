@@ -1662,10 +1662,12 @@ ${H}`)
                   }
               }
 
-              return {
+              const result = {
                   classes: Array.from(allClasses),
                   variableSuffixes: Array.from(usedVariableSuffixes)
               };
+
+              return result;
           } catch (error) {
               console.error('Error getting used classes:', error);
               return { classes: [], variableSuffixes: [] };
@@ -1868,6 +1870,153 @@ ${H}`)
               }
           }
 
+          // Fallback: detect classes inside compound selectors (e.g., aside[popover].appear-start { ... })
+          // This is broader and runs last to avoid duplicating rules already captured above.
+          try {
+              const compoundRegex = /([^{}]+)\{([^}]+)\}/gm;
+              let compoundMatch;
+              while ((compoundMatch = compoundRegex.exec(cssText)) !== null) {
+                  const selector = compoundMatch[1].trim();
+                  const cssRules = compoundMatch[2].trim();
+
+                  // Skip at-rules and keyframes/selectors without classes
+                  if (selector.startsWith('@')) continue;
+
+                  const classMatches = selector.match(/\.[A-Za-z0-9_-]+/g);
+                  if (!classMatches) continue;
+
+                  for (const classToken of classMatches) {
+                      const className = classToken.substring(1);
+
+                      // Skip Tailwind-generated or already captured classes
+                      if (this.isTailwindGeneratedClass(className)) continue;
+
+                      // Combine CSS rules if the class already exists
+                      if (utilities.has(className)) {
+                          const existingRules = utilities.get(className);
+                          utilities.set(className, `${existingRules}; ${cssRules}`);
+                      } else {
+                          utilities.set(className, cssRules);
+                      }
+                  }
+              }
+          } catch (e) {
+              // Be tolerant: this is a best-effort extractor
+          }
+
+          // Universal fallback with basic nesting resolution for selectors using '&'
+          // Captures context like :where(aside[popover]) &.appear-start &:not(:popover-open)
+          try {
+              const rules = [];
+
+              // Minimal nested CSS resolver: scans and builds combined selectors
+              const resolveNested = (text, parentSelector = '') => {
+                  let i = 0;
+                  while (i < text.length) {
+                      // Skip whitespace
+                      while (i < text.length && /\s/.test(text[i])) i++;
+                      if (i >= text.length) break;
+
+                      // Capture selector up to '{'
+                      let selStart = i;
+                      while (i < text.length && text[i] !== '{') i++;
+                      if (i >= text.length) break;
+                      const rawSelector = text.slice(selStart, i).trim();
+
+                      // Find matching '}' with brace depth
+                      i++; // skip '{'
+                      let depth = 1;
+                      let blockStart = i;
+                      while (i < text.length && depth > 0) {
+                          if (text[i] === '{') depth++;
+                          else if (text[i] === '}') depth--;
+                          i++;
+                      }
+                      const block = text.slice(blockStart, i - 1);
+
+                      // Build combined selector by replacing '&' with parentSelector
+                      const combinedSelector = parentSelector
+                          ? rawSelector.replace(/&/g, parentSelector).trim()
+                          : rawSelector.trim();
+
+                      // Extract immediate declarations (ignore nested blocks and at-rules)
+                      const extractTopLevelDecls = (content) => {
+                          let decl = '';
+                          let depth = 0;
+                          let i2 = 0;
+                          while (i2 < content.length) {
+                              const ch = content[i2];
+                              if (ch === '{') { depth++; i2++; continue; }
+                              if (ch === '}') { depth--; i2++; continue; }
+                              if (depth === 0) {
+                                  decl += ch;
+                              }
+                              i2++;
+                          }
+                          // Remove comments and trim whitespace
+                          decl = decl.replace(/\/\*[^]*?\*\//g, '').trim();
+                          // Remove at-rules at top-level within block (e.g., @starting-style)
+                          decl = decl.split(';')
+                              .map(s => s.trim())
+                              .filter(s => s && !s.startsWith('@') && s.includes(':'))
+                              .join('; ');
+                          if (decl && !decl.endsWith(';')) decl += ';';
+                          return decl;
+                      };
+
+                      const declText = extractTopLevelDecls(block);
+                      if (declText) {
+                          rules.push({ selector: combinedSelector, css: declText });
+                      }
+
+                      // Recurse into nested blocks with current selector as parent
+                      resolveNested(block, combinedSelector);
+                  }
+              };
+
+              resolveNested(cssText, '');
+
+              // Map resolved rules to utilities by class token presence
+              for (const rule of rules) {
+                  // Clean selector: strip comments and normalize whitespace
+                  let cleanedSelector = rule.selector.replace(/\/\*[^]*?\*\//g, '').replace(/\s+/g, ' ').trim();
+                  const classTokens = cleanedSelector.match(/\.[A-Za-z0-9_-]+/g);
+                  if (!classTokens) continue;
+
+                  for (const token of classTokens) {
+                      const className = token.slice(1);
+                      if (this.isTailwindGeneratedClass(className)) continue;
+
+                      // Store selector-aware utility so variants preserve context and pseudos
+                      const value = { selector: cleanedSelector, css: rule.css };
+                      if (utilities.has(className)) {
+                          const existing = utilities.get(className);
+                          if (typeof existing === 'string') {
+                              utilities.set(className, [ { selector: `.${className}`, css: existing }, value ]);
+                          } else if (Array.isArray(existing)) {
+                              const found = existing.find(e => e.selector === value.selector);
+                              if (found) {
+                                  found.css = `${found.css}; ${value.css}`;
+                              } else {
+                                  existing.push(value);
+                              }
+                          } else if (existing && existing.selector) {
+                              if (existing.selector === value.selector) {
+                                  existing.css = `${existing.css}; ${value.css}`;
+                                  utilities.set(className, [ existing ]);
+                              } else {
+                                  utilities.set(className, [ existing, value ]);
+                              }
+                          }
+                      } else {
+                          utilities.set(className, [ value ]);
+                      }
+                  }
+              }
+          } catch (e) {
+              // Tolerate parsing errors; this is best-effort
+          }
+
           return utilities;
       }
 
@@ -1978,7 +2127,7 @@ ${H}`)
               };
 
               // Helper to generate a single utility with its variants
-              const generateUtility = (baseClass, css) => {
+              const generateUtility = (baseClass, css, selectorInfo) => {
                   // Find all variants of this base class that are actually used
                   const usedVariants = usedClasses
                       .filter(cls => {
@@ -1996,7 +2145,18 @@ ${H}`)
                       const importantCss = css.includes(';') ? 
                           css.replace(/;/g, ' !important;') : 
                           css + ' !important';
-                      const rule = `.${escapeClassName('!' + baseClass)} { ${importantCss} }`;
+                      let rule;
+                      if (selectorInfo && selectorInfo.selector) {
+                          const variantSel = `.${escapeClassName('!' + baseClass)}`;
+                          let contextual = selectorInfo.selector.replace(new RegExp(`\\.${baseClass}(?=[^a-zA-Z0-9_-]|$)`), variantSel);
+                          if (contextual === selectorInfo.selector) {
+                              // Fallback: append class to the end if base token not found
+                              contextual = `${selectorInfo.selector}${variantSel}`;
+                          }
+                          rule = `${contextual} { ${importantCss} }`;
+                      } else {
+                          rule = `.${escapeClassName('!' + baseClass)} { ${importantCss} }`;
+                      }
                       if (!generatedRules.has(rule)) {
                           utilities.push(rule);
                           generatedRules.add(rule);
@@ -2048,13 +2208,31 @@ ${H}`)
                           // Handle arbitrary selectors with nested CSS
                           rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContent}\n    }\n}`;
                       } else {
-                          // Regular selector
-                          rule = `${selector} { ${cssContent} }`;
+                          // Regular selector or contextual replacement using original selector info
+                          if (selectorInfo && selectorInfo.selector) {
+                              const contextualRe = new RegExp(`\\.${baseClass}(?=[^a-zA-Z0-9_-]|$)`);
+                              let contextual = selectorInfo.selector.replace(contextualRe, selector);
+                              if (contextual === selectorInfo.selector) {
+                                  // Fallback when base token not directly present
+                                  contextual = `${selectorInfo.selector}${selector}`;
+                              }
+                              rule = `${contextual} { ${cssContent} }`;
+                          } else {
+                              rule = `${selector} { ${cssContent} }`;
+                          }
                       }
                       
-                      const finalRule = hasMediaQuery ? 
-                          `${mediaQueryRule} { ${rule} }` : 
-                          rule;
+                      let finalRule;
+                      if (hasMediaQuery) {
+                          // Wrap once for responsive variants unless the rule already contains @media
+                          if (typeof rule === 'string' && rule.trim().startsWith('@media')) {
+                              finalRule = rule;
+                          } else {
+                              finalRule = `${mediaQueryRule} { ${rule} }`;
+                          }
+                      } else {
+                          finalRule = rule;
+                      }
 
 
                       if (!generatedRules.has(finalRule)) {
@@ -2065,7 +2243,7 @@ ${H}`)
               };
 
               // Generate utilities for each custom class that's actually used
-              for (const [className, css] of this.customUtilities.entries()) {
+              for (const [className, cssOrSelector] of this.customUtilities.entries()) {
                   // Check if this specific utility class is actually used (including variants and important)
                   const isUsed = usedClasses.some(cls => {
                       // Parse the class to extract the base utility name
@@ -2079,7 +2257,17 @@ ${H}`)
                   });
 
                   if (isUsed) {
-                      generateUtility(className, css);
+                      if (typeof cssOrSelector === 'string') {
+                          generateUtility(className, cssOrSelector, null);
+                      } else if (Array.isArray(cssOrSelector)) {
+                          for (const entry of cssOrSelector) {
+                              if (entry && entry.css && entry.selector) {
+                                  generateUtility(className, entry.css, { selector: entry.selector });
+                              }
+                          }
+                      } else if (cssOrSelector && cssOrSelector.css && cssOrSelector.selector) {
+                          generateUtility(className, cssOrSelector.css, { selector: cssOrSelector.selector });
+                      }
                   }
               }
 
@@ -2349,6 +2537,8 @@ ${H}`)
                   for (const [name, value] of discoveredCustomUtilities.entries()) {
                       this.customUtilities.set(name, value);
                   }
+                  
+                  
 
                   // Check for variable changes
                   const variables = this.extractThemeVariables(themeCss);
@@ -4378,7 +4568,9 @@ ${H}`)
                               }
                           });
                       }
-                      return '';
+                      // For other string properties that might be nested objects/arrays, return loading proxy
+                      // This allows chaining like $x.nested.stuff.people.route('path')
+                      return createLoadingProxy();
                   }
 
                   // Return empty object for nested properties
@@ -4408,6 +4600,96 @@ ${H}`)
           });
       }
 
+      // Create a proxy for arrays with route() support
+      function createArrayProxyWithRoute(arrayTarget) {
+          return new Proxy(arrayTarget, {
+              get(target, key) {
+                  // Handle special keys
+                  if (key === Symbol.iterator || key === 'then' || key === 'catch' || key === 'finally') {
+                      return undefined;
+                  }
+
+                  // Handle route() function for route-specific lookups on arrays
+                  if (key === 'route') {
+                      return function(pathKey) {
+                          // Only create route proxy if we have valid data
+                          if (target && typeof target === 'object') {
+                              // Get data source name from the first item's contentType metadata
+                              return createRouteProxy(
+                                  target, 
+                                  pathKey, 
+                                  (Array.isArray(target) && target.length > 0 && target[0] && target[0].contentType) 
+                                      ? target[0].contentType 
+                                      : undefined
+                              );
+                          }
+                          // Return a safe fallback proxy
+                          return new Proxy({}, {
+                              get() { return undefined; }
+                          });
+                      };
+                  }
+
+                  if (key === 'length') {
+                      return target.length;
+                  }
+                  if (typeof key === 'string' && !isNaN(Number(key))) {
+                      const index = Number(key);
+                      if (index >= 0 && index < target.length) {
+                          return createArrayItemProxy(target[index]);
+                      }
+                      return createLoadingProxy();
+                  }
+                  // Add essential array methods
+                  if (key === 'filter' || key === 'map' || key === 'find' || 
+                      key === 'findIndex' || key === 'some' || key === 'every' ||
+                      key === 'reduce' || key === 'forEach' || key === 'slice') {
+                      return target[key].bind(target);
+                  }
+                  return createLoadingProxy();
+              }
+          });
+      }
+
+      // Create a proxy for nested objects that properly handles arrays and further nesting
+      function createNestedObjectProxy(objTarget) {
+          return new Proxy(objTarget, {
+              get(target, key) {
+                  // Handle special keys
+                  if (key === Symbol.iterator || key === 'then' || key === 'catch' || key === 'finally') {
+                      return undefined;
+                  }
+
+                  // Handle toPrimitive for text content
+                  if (key === Symbol.toPrimitive) {
+                      return function () {
+                          return target[key] || '';
+                      };
+                  }
+
+                  const value = target[key];
+                  
+                  // If the property is an array, wrap it in the array proxy with route() support
+                  if (Array.isArray(value)) {
+                      return createArrayProxyWithRoute(value);
+                  }
+                  
+                  // If the property is an object, wrap it recursively for further nesting
+                  if (typeof value === 'object' && value !== null) {
+                      return createNestedObjectProxy(value);
+                  }
+                  
+                  // If value is undefined, return a loading proxy to maintain chain and prevent errors
+                  if (value === undefined) {
+                      return createLoadingProxy();
+                  }
+                  
+                  // Return primitive values directly
+                  return value;
+              }
+          });
+      }
+
       // Create proxy for route-specific lookups
       function createRouteProxy(dataSourceData, pathKey, dataSourceName) {
           // First check if we have a valid route
@@ -4433,21 +4715,25 @@ ${H}`)
               // Error finding route
           }
           
-          // If no route found, return null to make the expression falsy
-          if (!foundItem) {
-              return null;
-          }
-          
-          // Return a proxy for the found item
+          // Return a proxy for the found item (or safe proxy if no route found)
           return new Proxy({}, {
               get(target, prop) {
                   try {
-                      if (foundItem && prop in foundItem) {
+                      // If no route found, return safe values
+                      if (!foundItem) {
+                          // Return empty string for text properties to prevent errors
+                          if (typeof prop === 'string') {
+                              return '';
+                          }
+                          return undefined;
+                      }
+                      
+                      if (prop in foundItem) {
                           return foundItem[prop];
                       }
                       
                       // Special handling for 'group' property - find the group containing the matched item
-                      if (prop === 'group' && foundItem) {
+                      if (prop === 'group') {
                           const groupItem = findGroupContainingItem(dataSourceData, foundItem);
                           return groupItem?.group || '';
                       }
@@ -4662,119 +4948,13 @@ ${H}`)
                               const nestedValue = target[key];
                               if (nestedValue) {
                                   if (Array.isArray(nestedValue)) {
-                                      return new Proxy(nestedValue, {
-                                          get(target, nestedKey) {
-                                              // Handle special keys
-                                              if (nestedKey === Symbol.iterator || nestedKey === 'then' || nestedKey === 'catch' || nestedKey === 'finally') {
-                                                  return undefined;
-                                              }
-
-                                              // Handle route() function for route-specific lookups on arrays
-                                              if (nestedKey === 'route') {
-                                                  return function(pathKey) {
-                                                      // Only create route proxy if we have valid data
-                                                      if (target && typeof target === 'object') {
-                                                          // Get data source name from the first item's contentType metadata
-                                                          return createRouteProxy(
-                                                              target, 
-                                                              pathKey, 
-                                                              (Array.isArray(target) && target.length > 0 && target[0] && target[0].contentType) 
-                                                                  ? target[0].contentType 
-                                                                  : undefined
-                                                          );
-                                                      }
-                                                      // Return a safe fallback proxy
-                                                      return new Proxy({}, {
-                                                          get() { return undefined; }
-                                                      });
-                                                  };
-                                              }
-
-                                              if (nestedKey === 'length') {
-                                                  return target.length;
-                                              }
-                                              if (typeof nestedKey === 'string' && !isNaN(Number(nestedKey))) {
-                                                  const index = Number(nestedKey);
-                                                  if (index >= 0 && index < target.length) {
-                                                      return createArrayItemProxy(target[index]);
-                                                  }
-                                                  return createLoadingProxy();
-                                              }
-                                              // Add essential array methods
-                                              if (nestedKey === 'filter' || nestedKey === 'map' || nestedKey === 'find' || 
-                                                  nestedKey === 'findIndex' || nestedKey === 'some' || nestedKey === 'every' ||
-                                                  nestedKey === 'reduce' || nestedKey === 'forEach' || nestedKey === 'slice') {
-                                                  return target[nestedKey].bind(target);
-                                              }
-                                              return createLoadingProxy();
-                                          }
-                                      });
+                                      // Use helper function for arrays with route() support
+                                      return createArrayProxyWithRoute(nestedValue);
                                   }
                                   // Only create proxy for objects, return primitives directly
                                   if (typeof nestedValue === 'object' && nestedValue !== null) {
-                                      if (Array.isArray(nestedValue)) {
-                                          // Handle nested arrays with route() function
-                                          return new Proxy(nestedValue, {
-                                              get(target, nestedKey) {
-                                                  // Handle special keys
-                                                  if (nestedKey === Symbol.iterator || nestedKey === 'then' || nestedKey === 'catch' || nestedKey === 'finally') {
-                                                      return undefined;
-                                                  }
-
-                                                  // Handle route() function for route-specific lookups on nested arrays
-                                                  if (nestedKey === 'route') {
-                                                      return function(pathKey) {
-                                                          // Only create route proxy if we have valid data
-                                                          if (target && typeof target === 'object') {
-                                                              // Get data source name from the first item's contentType metadata
-                                                              return createRouteProxy(
-                                                                  target, 
-                                                                  pathKey, 
-                                                                  (Array.isArray(target) && target.length > 0 && target[0] && target[0].contentType) 
-                                                                      ? target[0].contentType 
-                                                                      : undefined
-                                                              );
-                                                          }
-                                                          // Return a safe fallback proxy
-                                                          return new Proxy({}, {
-                                                              get() { return undefined; }
-                                                          });
-                                                      };
-                                                  }
-
-                                                  if (nestedKey === 'length') {
-                                                      return target.length;
-                                                  }
-                                                  if (typeof nestedKey === 'string' && !isNaN(Number(nestedKey))) {
-                                                      const index = Number(nestedKey);
-                                                      if (index >= 0 && index < target.length) {
-                                                          return createArrayItemProxy(target[index]);
-                                                      }
-                                                      return createLoadingProxy();
-                                                  }
-                                                  // Add essential array methods
-                                                  if (nestedKey === 'filter' || nestedKey === 'map' || nestedKey === 'find' || 
-                                                      nestedKey === 'findIndex' || nestedKey === 'some' || nestedKey === 'every' ||
-                                                      nestedKey === 'reduce' || nestedKey === 'forEach' || nestedKey === 'slice') {
-                                                      return target[nestedKey].bind(target);
-                                                  }
-                                                  return createLoadingProxy();
-                                              }
-                                          });
-                                      } else {
-                                          // Handle nested objects
-                                          return new Proxy(nestedValue, {
-                                              get(target, nestedKey) {
-                                                  // Handle toPrimitive for text content
-                                                  if (nestedKey === Symbol.toPrimitive) {
-                                                      return function () {
-                                                          return target[nestedKey] || '';
-                                                      };
-                                                  }
-                                                  return target[nestedKey];
-                                              }
-                                          });
-                                      }
+                                      // Handle nested objects - use helper function for proper array/object handling
+                                      return createNestedObjectProxy(nestedValue);
                                   }
                                   // Return primitive values directly (strings, numbers, booleans)
                                   return nestedValue;
