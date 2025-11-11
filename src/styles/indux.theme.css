@@ -108,7 +108,7 @@
 
     /* Text selection */
     ::selection {
-        background-color: color-mix(in oklch, var(--color-surface-1) 92%, var(--color-content-stark))
+        background-color: color-mix(in oklch, var(--color-content-stark) 90%, transparent);
     }
 
     /* Focus state */

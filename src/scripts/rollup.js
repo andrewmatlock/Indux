@@ -1,5 +1,5 @@
 import './indux.components.js';
-import './indux.code.js';
+import './indux.appwrite.auth.js';
 import './indux.components.js';
 import './indux.data.js';
 import './indux.dropdowns.js';

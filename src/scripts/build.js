@@ -29,6 +29,39 @@ const CONFIG = {
         'indux.router.magic.js'
     ],
 
+    // Utilities subscripts order
+    utilitiesSubscripts: [
+        'indux.utilities.generators.js',
+        'indux.utilities.variants.js',
+        'indux.utilities.main.js',
+        'indux.utilities.sync.js',
+        'indux.utilities.cache.js',
+        'indux.utilities.helpers.js',
+        'indux.utilities.compile.js',
+        'indux.utilities.observation.js',
+        'indux.utilities.init.js'
+    ],
+
+    // Auth subscripts order
+    authSubscripts: [
+        'indux.appwrite.auth.config.js',
+        'indux.appwrite.auth.store.js',
+        'indux.appwrite.auth.main.js',
+        'indux.appwrite.auth.frontend.js',
+        'indux.appwrite.auth.teams.core.js',
+        'indux.appwrite.auth.teams.defaults.js',
+        'indux.appwrite.auth.teams.roles.defaults.js',
+        'indux.appwrite.auth.teams.roles.js',
+        'indux.appwrite.auth.teams.userRoles.js',
+        'indux.appwrite.auth.teams.members.js',
+        'indux.appwrite.auth.teams.callbacks.js',
+        'indux.appwrite.auth.teams.convenience.js',
+        'indux.appwrite.auth.users.anonymous.js',
+        'indux.appwrite.auth.users.magic.js',
+        'indux.appwrite.auth.users.oauth.js',
+        'indux.appwrite.auth.users.callbacks.js'
+    ],
+
     // Core plugins that should load first
     corePlugins: ['scripts/indux.components.js'],
 
@@ -36,9 +69,11 @@ const CONFIG = {
     ignorePatterns: [
         'scripts/components/**',
         'scripts/router/**',
+        'scripts/auth/**',
         '**/alpine.v3.*.js',
         'scripts/indux.js',
         'scripts/indux.quickstart.js',
+        'scripts/indux.code.js',
         'scripts/indux/slides.js',
         '**/tailwind.*.js',
         'scripts/rollup.js',
@@ -89,6 +124,12 @@ function buildSubscripts() {
 
     // Build routing
     combineSubscripts(CONFIG.routingSubscripts, 'indux.router.js', 'router');
+
+    // Build utilities
+    combineSubscripts(CONFIG.utilitiesSubscripts, 'indux.utilities.js', 'utilities');
+
+    // Build auth
+    combineSubscripts(CONFIG.authSubscripts, 'indux.appwrite.auth.js', 'auth');
 
     console.log('✓ Subscripts built successfully!\n');
 }
@@ -622,6 +663,8 @@ function copyFilesToDist() {
         { source: 'styles/indux.code.min.css', dest: '../dist/indux.code.min.css' },
         
         // Individual plugin files
+        { source: 'scripts/indux.appwrite.auth.js', dest: '../dist/indux.appwrite.auth.js' },
+        { source: 'scripts/indux.code.js', dest: '../dist/indux.code.js' },
         { source: 'scripts/indux.components.js', dest: '../dist/indux.components.js' },
         { source: 'scripts/indux.data.js', dest: '../dist/indux.data.js' },
         { source: 'scripts/indux.dropdowns.js', dest: '../dist/indux.dropdowns.js' },
@@ -689,7 +732,7 @@ export default [
             file: 'scripts/indux.js',
             format: 'iife',
             name: 'Indux',
-            banner: \`/*  Indux JS\n/*  By Andrew Matlock under MIT license\n/*  https://github.com/andrewmatlock/Indux\n/*\n/*  Contains all Indux plugins bundled with Iconify (iconify.design)\n/*\n/*  With on-demand reference to:\n/*  - highlight.js (https://highlightjs.org)\n/*  - js-yaml (https://nodeca.github.io/js-yaml)\n/*  - Marked JS (https://marked.js.org)\n/*\n/*  Requires Alpine JS (alpinejs.dev) to operate.\n/*  Some plugins use Indux CSS styles.\n*/\n\n\` // Add header
+            banner: \`/*  Indux JS\n/*  By Andrew Matlock under MIT license\n/*  https://github.com/andrewmatlock/Indux\n/*\n/*  Contains all Indux plugins bundled with Iconify (iconify.design)\n/*\n/*  With on-demand reference to:\n/*  - js-yaml (https://nodeca.github.io/js-yaml)\n/*  - Marked JS (https://marked.js.org)\n/*\n/*  Requires Alpine JS (alpinejs.dev) to operate.\n/*  Some plugins use Indux CSS styles.\n*/\n\n\` // Add header
         },
         plugins: [
             ...baseConfig.plugins
@@ -703,7 +746,7 @@ export default [
             file: 'scripts/indux.quickstart.js',
             format: 'iife',
             name: 'InduxAlpineTailwind',
-            banner: \`/*  Indux JS - Quickstart\n/*  By Andrew Matlock under MIT license\n/*  https://indux.build\n/*\n/*  Contains all Indux plugins bundled with:\n/*  - Alpine JS (alpinejs.dev)\n/*  - Iconify (iconify.design)\n/*  - Tailwind CSS (modified Play CDN script) (tailwindcss.com)\n/*\n/*  With on-demand reference to:\n/*  - highlight.js (https://highlightjs.org)\n/*  - js-yaml (https://nodeca.github.io/js-yaml)\n/*  - Marked JS (https://marked.js.org)\n/*\n/*  Some plugins use Indux CSS styles.\n*/\n\n\` // Add header
+            banner: \`/*  Indux JS - Quickstart\n/*  By Andrew Matlock under MIT license\n/*  https://indux.build\n/*\n/*  Contains all Indux plugins bundled with:\n/*  - Alpine JS (alpinejs.dev)\n/*  - Iconify (iconify.design)\n/*  - Tailwind CSS (modified Play CDN script) (tailwindcss.com)\n/*\n/*  With on-demand reference to:\n/*  - js-yaml (https://nodeca.github.io/js-yaml)\n/*  - Marked JS (https://marked.js.org)\n/*\n/*  Some plugins use Indux CSS styles.\n*/\n\n\` // Add header
         },
         plugins: [
             ...baseConfig.plugins,

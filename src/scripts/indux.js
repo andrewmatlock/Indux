@@ -5,7 +5,6 @@
 /*  Contains all Indux plugins bundled with Iconify (iconify.design)
 /*
 /*  With on-demand reference to:
-/*  - highlight.js (https://highlightjs.org)
 /*  - js-yaml (https://nodeca.github.io/js-yaml)
 /*  - Marked JS (https://marked.js.org)
 /*
@@ -621,929 +620,5856 @@ var Indux = (function (exports) {
 
     requireIndux_components();
 
-    /* Indux Code */
+    var indux_appwrite_auth = {};
 
-    // Cache for highlight.js loading
-    let hljsPromise = null;
+    /* Auth config */
 
-    // Load highlight.js from CDN
-    async function loadHighlightJS() {
-        if (typeof hljs !== 'undefined') {
-            return hljs;
-        }
-        
-        // Return existing promise if already loading
-        if (hljsPromise) {
-            return hljsPromise;
-        }
-        
-        hljsPromise = new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js';
-            script.onload = () => {
-                // Initialize highlight.js
-                if (typeof hljs !== 'undefined') {
-                    resolve(hljs);
-                } else {
-                    console.error('[Indux Code] Highlight.js failed to load - hljs is undefined');
-                    hljsPromise = null; // Reset so we can try again
-                    reject(new Error('highlight.js failed to load'));
-                }
-            };
-            script.onerror = (error) => {
-                console.error('[Indux Code] Script failed to load:', error);
-                hljsPromise = null; // Reset so we can try again
-                reject(error);
-            };
-            document.head.appendChild(script);
-        });
-        
-        return hljsPromise;
+    var hasRequiredIndux_appwrite_auth;
+
+    function requireIndux_appwrite_auth () {
+    	if (hasRequiredIndux_appwrite_auth) return indux_appwrite_auth;
+    	hasRequiredIndux_appwrite_auth = 1;
+    	// Load manifest if not already loaded
+    	async function ensureManifest() {
+    	    if (window.InduxComponentsRegistry?.manifest) {
+    	        return window.InduxComponentsRegistry.manifest;
+    	    }
+
+    	    try {
+    	        const response = await fetch('/manifest.json');
+    	        return await response.json();
+    	    } catch (error) {
+    	        return null;
+    	    }
+    	}
+
+    	// Get Appwrite config from manifest
+    	async function getAppwriteConfig() {
+    	    const manifest = await ensureManifest();
+    	    if (!manifest?.appwrite) {
+    	        return null;
+    	    }
+
+    	    const appwriteConfig = manifest.appwrite;
+    	    const endpoint = appwriteConfig.endpoint;
+    	    const projectId = appwriteConfig.projectId;
+    	    const devKey = appwriteConfig.devKey; // Optional dev key to bypass rate limits in development
+
+    	    if (!endpoint || !projectId) {
+    	        return null;
+    	    }
+
+    	    // Get auth methods from config (defaults to ["magic", "oauth"] if not specified)
+    	    const authMethods = appwriteConfig.auth?.methods || ["magic", "oauth"];
+    	    
+    	    // Guest session support: "guest-auto" = automatic, "guest-manual" = manual only
+    	    const guestAuto = authMethods.includes("guest-auto");
+    	    const guestManual = authMethods.includes("guest-manual");
+    	    const hasGuest = guestAuto || guestManual;
+    	    
+    	    const magicEnabled = authMethods.includes("magic");
+    	    const oauthEnabled = authMethods.includes("oauth");
+    	    
+    	    // Teams support: presence of teams object enables it
+    	    const teamsEnabled = !!appwriteConfig.auth?.teams;
+    	    const permanentTeams = appwriteConfig.auth?.teams?.permanent || null; // Array of team names (immutable)
+    	    const templateTeams = appwriteConfig.auth?.teams?.template || null; // Array of team names (can be deleted and reapplied)
+    	    const teamsPollInterval = appwriteConfig.auth?.teams?.pollInterval || null; // Polling interval in milliseconds (null = disabled)
+    	    
+    	    // Default roles: permanent (cannot be deleted) and template (can be deleted)
+    	    // These are objects mapping role names to permissions: { "Admin": ["inviteMembers", ...] }
+    	    const permanentRoles = appwriteConfig.auth?.roles?.permanent || null; // Object: { "RoleName": ["permission1", ...] }
+    	    const templateRoles = appwriteConfig.auth?.roles?.template || null; // Object: { "RoleName": ["permission1", ...] }
+    	    
+    	    // Member roles: derived from permanent and template roles (merged)
+    	    // This is used for role normalization, permission checking, and creatorRole logic
+    	    const memberRoles = permanentRoles || templateRoles 
+    	        ? { ...(permanentRoles || {}), ...(templateRoles || {}) }
+    	        : (appwriteConfig.auth?.memberRoles || null); // Fallback to legacy memberRoles if roles not defined
+    	    
+    	    // Creator role: string reference to a role in memberRoles (role creator gets by default)
+    	    const creatorRole = appwriteConfig.auth?.creatorRole || null;
+    	    
+    	    return {
+    	        endpoint,
+    	        projectId,
+    	        devKey, // Optional dev key for development
+    	        authMethods,
+    	        guest: hasGuest,
+    	        guestAuto: guestAuto,
+    	        guestManual: guestManual,
+    	        anonymous: guestAuto, // For backwards compatibility with existing code
+    	        magic: magicEnabled,
+    	        oauth: oauthEnabled,
+    	        teams: teamsEnabled,
+    	        permanentTeams: permanentTeams, // Array of team names (cannot be deleted)
+    	        templateTeams: templateTeams, // Array of team names (can be deleted and reapplied)
+    	        teamsPollInterval: teamsPollInterval, // Polling interval in milliseconds (null = disabled)
+    	        memberRoles: memberRoles, // Role definitions: { "RoleName": ["permission1", "permission2"] }
+    	        permanentRoles: permanentRoles, // Object: { "RoleName": ["permission1", ...] } (cannot be deleted)
+    	        templateRoles: templateRoles, // Object: { "RoleName": ["permission1", ...] } (can be deleted)
+    	        creatorRole: creatorRole // String reference to memberRoles key
+    	    };
+    	}
+
+    	// Initialize Appwrite client (assumes SDK loaded separately)
+    	let appwriteClient = null;
+    	let appwriteAccount = null;
+    	let appwriteTeams = null;
+    	let appwriteUsers = null;
+
+    	async function getAppwriteClient() {
+    	    // Check if Appwrite SDK is loaded
+    	    if (!window.Appwrite || !window.Appwrite.Client || !window.Appwrite.Account) {
+    	        return null;
+    	    }
+
+    	    if (!appwriteClient) {
+    	        const config = await getAppwriteConfig();
+    	        if (!config) {
+    	            return null;
+    	        }
+
+    	        appwriteClient = new window.Appwrite.Client()
+    	            .setEndpoint(config.endpoint)
+    	            .setProject(config.projectId);
+    	        
+    	        // Add dev key header if provided (bypasses rate limits in development)
+    	        // See: https://appwrite.io/docs/advanced/platform/rate-limits#dev-keys
+    	        if (config.devKey) {
+    	            appwriteClient.headers['X-Appwrite-Dev-Key'] = config.devKey;
+    	        }
+
+    	        appwriteAccount = new window.Appwrite.Account(appwriteClient);
+    	        appwriteTeams = new window.Appwrite.Teams(appwriteClient);
+    	        
+    	        // Initialize Users service if available (for fetching user details)
+    	        if (window.Appwrite.Users) {
+    	            appwriteUsers = new window.Appwrite.Users(appwriteClient);
+    	        }
+    	    }
+
+    	    return {
+    	        client: appwriteClient,
+    	        account: appwriteAccount,
+    	        teams: appwriteTeams,
+    	        users: appwriteUsers, // Add users service for fetching user details
+    	        realtime: window.Appwrite?.Realtime ? new window.Appwrite.Realtime(appwriteClient) : null // Realtime service for subscriptions
+    	    };
+    	}
+
+    	// Export configuration interface
+    	window.InduxAppwriteAuthConfig = {
+    	    getAppwriteConfig,
+    	    getAppwriteClient,
+    	    ensureManifest
+    	};
+
+    	/* Auth store */
+
+    	// Initialize auth store
+    	function initializeAuthStore() {
+    	    if (typeof Alpine === 'undefined') {
+    	        return;
+    	    }
+
+    	    const config = window.InduxAppwriteAuthConfig;
+    	    if (!config) {
+    	        return;
+    	    }
+
+    	    // Cross-tab synchronization using localStorage events
+    	    const STORAGE_KEY = 'indux:auth:state';
+    	    
+    	    // Listen for storage events from other tabs
+    	    window.addEventListener('storage', (e) => {
+    	        if (e.key === STORAGE_KEY && e.newValue) {
+    	            try {
+    	                const state = JSON.parse(e.newValue);
+    	                const store = Alpine.store('auth');
+    	                if (store) {
+    	                    // Update store state from other tab
+    	                    store.isAuthenticated = state.isAuthenticated;
+    	                    store.isAnonymous = state.isAnonymous;
+    	                    store.user = state.user;
+    	                    store.session = state.session;
+    	                    store.magicLinkSent = state.magicLinkSent || false;
+    	                    store.magicLinkExpired = state.magicLinkExpired || false;
+    	                    store.error = state.error;
+    	                }
+    	            } catch (error) {
+    	                // Failed to sync state from other tab
+    	            }
+    	        }
+    	    });
+
+    	    // Helper to sync state to localStorage (for cross-tab communication)
+    	    function syncStateToStorage(store) {
+    	        try {
+    	            const state = {
+    	                isAuthenticated: store.isAuthenticated,
+    	                isAnonymous: store.isAnonymous,
+    	                user: store.user,
+    	                session: store.session,
+    	                magicLinkSent: store.magicLinkSent,
+    	                magicLinkExpired: store.magicLinkExpired,
+    	                error: store.error
+    	            };
+    	            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    	        } catch (error) {
+    	            // Failed to sync state to storage
+    	        }
+    	    }
+
+    	    const authStore = {
+    	        user: null,
+    	        session: null,
+    	        isAuthenticated: false,
+    	        isAnonymous: false,
+    	        inProgress: false,
+    	        error: null,
+    	        magicLinkSent: false,
+    	        magicLinkExpired: false,
+    	        teams: [], // List of user's teams
+    	        currentTeam: null, // Currently selected/active team
+    	        _teamsPollInterval: null, // Interval ID for teams polling (deprecated, use realtime instead)
+    	        _teamsRealtimeUnsubscribe: null, // Realtime subscription cleanup function (may be array of unsubscribes)
+    	        _teamsRealtimeSubscribing: false, // Flag to prevent recursive subscription during refresh
+    	        // Team management properties (reactive, no x-data needed)
+    	        newTeamName: '',
+    	        updateTeamNameInput: '',
+    	        inviteEmail: '',
+    	        inviteRoles: [], // Array of selected roles for checkboxes
+    	        currentTeamMemberships: [],
+    	        deletedTemplateTeams: [],
+    	        deletedTemplateRoles: [], // Deleted template roles (can be reapplied)
+    	        _teamImmutableCache: {},
+    	        // User-generated roles properties
+    	        newRoleName: '',
+    	        newRolePermissions: [], // Array of selected permissions for checkboxes
+    	        allAvailablePermissions: [], // Cached list of all available permissions for autocomplete
+    	        editingRole: null, // Current role being edited: { teamId, oldRoleName, newRoleName, permissions }
+    	        editingMember: null, // Current member being edited: { teamId, membershipId, roles }
+    	        _initialized: false,
+    	        _initializing: false,
+    	        _appwrite: null,
+    	        _guestAuto: false,
+    	        _guestManual: false,
+    	        guestManualEnabled: false,
+    	        _oauthProvider: null, // Store OAuth provider name (google, github, etc.) when login is initiated
+    	        _syncStateToStorage: syncStateToStorage,
+    	        
+    	        // Permission cache properties (initialized early for Alpine reactivity)
+    	        _permissionCache: {},
+    	        _userRoleCache: null,
+    	        _allRolesCache: null,
+    	        _allRolesCacheByTeam: {}, // Cache roles per team ID
+    	        _rolePermanentCache: {}, // Cache permanent role status per team: { teamId: { roleName: true/false } }
+    	        _userGeneratedRolesCache: {},
+    	        
+    	        // Permission cache methods (always available, return safe defaults)
+    	        canInviteMembers() {
+    	            return (this._permissionCache && this._permissionCache.inviteMembers) || false;
+    	        },
+    	        canRemoveMembers() {
+    	            return (this._permissionCache && this._permissionCache.removeMembers) || false;
+    	        },
+    	        canRenameTeam() {
+    	            return (this._permissionCache && this._permissionCache.renameTeam) || false;
+    	        },
+    	        // Check if user can authenticate (not already authenticated as non-anonymous or in progress)
+    	        canAuthenticate() {
+    	            return !((this.isAuthenticated && !this.isAnonymous) || this.inProgress);
+    	        },
+    	        canDeleteTeam() {
+    	            return (this._permissionCache && this._permissionCache.deleteTeam) || false;
+    	        },
+    	        currentUserRole() {
+    	            return this._userRoleCache || null;
+    	        },
+    	        allTeamRoles(team) {
+    	            // If team is provided, get roles for that specific team
+    	            if (team && team.$id) {
+    	                // Return cached roles for this specific team
+    	                return this._allRolesCacheByTeam[team.$id] || {};
+    	            }
+    	            // Fallback: return roles for current team
+    	            if (this.currentTeam && this.currentTeam.$id) {
+    	                return this._allRolesCacheByTeam[this.currentTeam.$id] || this._allRolesCache || {};
+    	            }
+    	            return this._allRolesCache || {};
+    	        },
+    	        isUserGeneratedRoleCached(roleName) {
+    	            return (this._userGeneratedRolesCache && this._userGeneratedRolesCache[roleName]) || false;
+    	        },
+    	        // Fallback for canManageRoles (will be overridden by roles module if available)
+    	        async canManageRoles() {
+    	            // If no custom roles defined, owner has manageRoles permission
+    	            const config = window.InduxAppwriteAuthConfig;
+    	            if (config) {
+    	                try {
+    	                    const appwriteConfig = await config.getAppwriteConfig();
+    	                    const memberRoles = appwriteConfig?.memberRoles;
+    	                    if (!memberRoles || Object.keys(memberRoles).length === 0) {
+    	                        // No custom roles - owner has all permissions including manageRoles
+    	                        if (this.isCurrentTeamOwner) {
+    	                            return await this.isCurrentTeamOwner();
+    	                        }
+    	                        return false;
+    	                    }
+    	                    // Custom roles defined - check if user has manageRoles permission
+    	                    if (this.hasTeamPermission) {
+    	                        return await this.hasTeamPermission('manageRoles');
+    	                    }
+    	                } catch (error) {
+    	                    return false;
+    	                }
+    	            }
+    	            return false;
+    	        },
+    	        
+    	        // Alias for backwards compatibility
+    	        async canCreateRoles() {
+    	            return await this.canManageRoles();
+    	        },
+
+    	        // Get personal team (convenience getter - returns first default team)
+    	        get personalTeam() {
+    	            // This is async, so we can't use a getter directly
+    	            // Return null and let users call getPersonalTeam() or getDefaultTeams() directly
+    	            return null;
+    	        },
+
+    	        // Get authentication method (oauth, magic, anonymous)
+    	        getMethod() {
+    	            if (!this.session) return null;
+    	            const provider = this.session.provider;
+    	            if (provider === 'anonymous') return 'anonymous';
+    	            if (provider === 'magic-url') return 'magic';
+    	            // OAuth providers return their name (google, github, etc.)
+    	            if (provider && provider !== 'anonymous' && provider !== 'magic-url') return 'oauth';
+    	            return null;
+    	        },
+
+    	        // Get OAuth provider name (google, github, etc.) or null for non-OAuth methods
+    	        // Uses stored provider from loginOAuth() call, or falls back to session.provider
+    	        // For existing sessions without stored provider, triggers async fetch from Appwrite identities
+    	        getProvider() {
+    	            if (!this.session) {
+    	                return null;
+    	            }
+    	            const sessionProvider = this.session.provider;
+    	            
+    	            // For OAuth, return the stored provider name (google, github, etc.)
+    	            // session.provider returns "oauth2" generically, so we use _oauthProvider
+    	            if (sessionProvider && sessionProvider !== 'anonymous' && sessionProvider !== 'magic-url') {
+    	                // Try to get from store first, then localStorage, then sessionStorage
+    	                let provider = this._oauthProvider;
+    	                if (!provider) {
+    	                    try {
+    	                        // Try localStorage first (persists across redirects)
+    	                        provider = localStorage.getItem('indux:oauth:provider');
+    	                        if (!provider) {
+    	                            // Fallback to sessionStorage
+    	                            provider = sessionStorage.getItem('indux:oauth:provider');
+    	                        }
+    	                        if (provider) {
+    	                            this._oauthProvider = provider; // Cache it in store
+    	                        }
+    	                    } catch (e) {
+    	                        // Storage error
+    	                    }
+    	                }
+    	                
+    	                // If still no provider, trigger async fetch from Appwrite identities (for existing sessions)
+    	                // This runs in background and updates _oauthProvider when complete
+    	                if (!provider && this._appwrite && this._appwrite.account && !this._fetchingProvider) {
+    	                    this._fetchingProvider = true; // Prevent multiple simultaneous fetches
+    	                    this._appwrite.account.listIdentities().then(identities => {
+    	                        if (identities && identities.identities && identities.identities.length > 0) {
+    	                            // Find OAuth identity (provider will be google, github, etc.)
+    	                            const oauthIdentity = identities.identities.find(id => 
+    	                                id.provider && 
+    	                                id.provider !== 'anonymous' && 
+    	                                id.provider !== 'magic-url' &&
+    	                                id.provider !== 'oauth2'
+    	                            );
+    	                            if (oauthIdentity && oauthIdentity.provider) {
+    	                                this._oauthProvider = oauthIdentity.provider; // Cache it
+    	                                // Store in localStorage for future use
+    	                                try {
+    	                                    localStorage.setItem('indux:oauth:provider', oauthIdentity.provider);
+    	                                    // Trigger Alpine reactivity by accessing store
+    	                                    const store = Alpine.store('auth');
+    	                                    if (store) {
+    	                                        void store._oauthProvider;
+    	                                    }
+    	                                } catch (e) {
+    	                                    // Ignore storage errors
+    	                                }
+    	                            }
+    	                        }
+    	                        this._fetchingProvider = false;
+    	                    }).catch(error => {
+    	                        this._fetchingProvider = false;
+    	                    });
+    	                }
+    	                
+    	                const finalProvider = provider || sessionProvider;
+    	                return finalProvider;
+    	            }
+    	            return null;
+    	        },
+
+    	        // Initialize auth state - simple session restoration
+    	        async init() {
+    	            if (this._initializing) {
+    	                return;
+    	            }
+    	            
+    	            if (this._initialized) {
+    	                return;
+    	            }
+
+    	            this._initializing = true;
+    	            this.inProgress = true;
+    	            this.error = null;
+
+    	            try {
+    	                const appwrite = await config.getAppwriteClient();
+    	                if (!appwrite) {
+    	                    this._initialized = true;
+    	                    this._initializing = false;
+    	                    this.inProgress = false;
+    	                    return;
+    	                }
+
+    	                this._appwrite = appwrite;
+
+    	                // Get auth methods config from manifest
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                this._guestAuto = appwriteConfig?.guestAuto === true;
+    	                this._guestManual = appwriteConfig?.guestManual === true;
+    	                this.guestManualEnabled = appwriteConfig?.guestManual === true;
+
+    	                // Try to restore existing session
+    	                try {
+    	                    this.user = await appwrite.account.get();
+    	                    const sessionsResponse = await appwrite.account.listSessions();
+    	                    const allSessions = sessionsResponse.sessions || [];
+    	                    const currentSession = allSessions.find(s => s.current === true) || allSessions[0];
+    	                    
+    	                    if (currentSession) {
+    	                        this.session = currentSession;
+    	                        this.isAuthenticated = true;
+    	                        this.isAnonymous = currentSession.provider === 'anonymous';
+    	                        
+    	                        // Restore OAuth provider from localStorage if available (persists across redirects)
+    	                        // This ensures provider name persists across page refreshes
+    	                        if (!this.isAnonymous && currentSession.provider !== 'magic-url') {
+    	                            try {
+    	                                // Try localStorage first (persists across redirects), fallback to sessionStorage
+    	                                let storedProvider = localStorage.getItem('indux:oauth:provider');
+    	                                if (!storedProvider) {
+    	                                    storedProvider = sessionStorage.getItem('indux:oauth:provider');
+    	                                }
+    	                                if (storedProvider) {
+    	                                    this._oauthProvider = storedProvider;
+    	                                }
+    	                            } catch (e) {
+    	                                // Storage error
+    	                            }
+    	                        }
+    	                        
+    	                        // If guest is disabled but we have anonymous session, clear it
+    	                        if (this.isAnonymous && !this._guestAuto && !this._guestManual) {
+    	                            try {
+    	                                await appwrite.account.deleteSession(this.session.$id);
+    	                                this.isAuthenticated = false;
+    	                                this.isAnonymous = false;
+    	                                this.user = null;
+    	                                this.session = null;
+    	                            } catch (deleteError) {
+    	                                // Failed to delete guest session
+    	                            }
+    	                        }
+    	                    } else {
+    	                        this.isAuthenticated = true; // User exists, session might be managed by cookies
+    	                        this.isAnonymous = false;
+    	                    }
+    	                    
+    	                    // Load teams if enabled and user is authenticated
+    	                    if (this.isAuthenticated && appwriteConfig?.teams && this.listTeams) {
+    	                        try {
+    	                            await this.listTeams();
+    	                            // Auto-create default teams if enabled
+    	                            if ((appwriteConfig.permanentTeams || appwriteConfig.templateTeams) && window.InduxAppwriteAuthTeamsDefaults?.ensureDefaultTeams) {
+    	                                await window.InduxAppwriteAuthTeamsDefaults.ensureDefaultTeams(this);
+    	                            }
+    	                        } catch (teamsError) {
+    	                            // Don't fail initialization if teams fail to load
+    	                        }
+    	                    }
+    	                } catch (error) {
+    	                    // No existing session - this is expected
+    	                    this.isAuthenticated = false;
+    	                    this.isAnonymous = false;
+    	                    this.user = null;
+    	                    this.session = null;
+    	                }
+
+    	                // Sync state to localStorage
+    	                syncStateToStorage(this);
+    	            } catch (error) {
+    	                this.error = error.message;
+    	                this.isAuthenticated = false;
+    	                this.isAnonymous = false;
+    	            } finally {
+    	                this.inProgress = false;
+    	                this._initialized = true;
+    	                this._initializing = false;
+
+    	                // Dispatch initialized event - let callback handlers process after
+    	                window.dispatchEvent(new CustomEvent('indux:auth:initialized', {
+    	                    detail: {
+    	                        isAuthenticated: this.isAuthenticated,
+    	                        isAnonymous: this.isAnonymous
+    	                    }
+    	                }));
+    	            }
+    	        },
+
+    	        // Manually create guest session (only works if guest-manual is enabled)
+    	        async createGuest() {
+    	            if (!this._guestManual) {
+    	                return { success: false, error: 'Manual guest creation is not enabled' };
+    	            }
+
+    	            if (this.isAuthenticated && !this.isAnonymous) {
+    	                return { success: false, error: 'Already signed in. Please logout first.' };
+    	            }
+
+    	            if (this.isAnonymous) {
+    	                return { success: true, user: this.user, message: 'Already a guest' };
+    	            }
+
+    	            // Use the internal method if available, otherwise create it inline
+    	            if (this._createAnonymousSession) {
+    	                return await this._createAnonymousSession();
+    	            }
+
+    	            // Fallback: create anonymous session directly
+    	            if (!this._appwrite) {
+    	                this._appwrite = await config.getAppwriteClient();
+    	            }
+    	            if (!this._appwrite) {
+    	                return { success: false, error: 'Appwrite not configured' };
+    	            }
+
+    	            this.inProgress = true;
+
+    	            try {
+    	                const session = await this._appwrite.account.createAnonymousSession();
+    	                this.session = session;
+    	                this.user = await this._appwrite.account.get();
+    	                this.isAuthenticated = true;
+    	                this.isAnonymous = true;
+    	                this._oauthProvider = null;
+    	                try {
+    	                    localStorage.removeItem('indux:oauth:provider');
+    	                    sessionStorage.removeItem('indux:oauth:provider');
+    	                } catch (e) {
+    	                    // Ignore
+    	                }
+    	                
+    	                // Clear teams for guest sessions (guests don't have teams)
+    	                this.teams = [];
+    	                this.currentTeam = null;
+    	                
+    	                syncStateToStorage(this);
+    	                window.dispatchEvent(new CustomEvent('indux:auth:anonymous', {
+    	                    detail: { user: this.user }
+    	                }));
+
+    	                return { success: true, user: this.user };
+    	            } catch (error) {
+    	                this.error = error.message;
+    	                this.isAuthenticated = false;
+    	                this.isAnonymous = false;
+    	                return { success: false, error: error.message };
+    	            } finally {
+    	                this.inProgress = false;
+    	            }
+    	        },
+
+    	        // Convenience method: request guest session with automatic error handling
+    	        async requestGuest() {
+    	            const result = await this.createGuest();
+    	            
+    	            // Automatically handle errors
+    	            if (!result.success) {
+    	                this.error = result.error;
+    	            } else {
+    	                this.error = null;
+    	            }
+    	            
+    	            return result;
+    	        },
+
+    	        // Logout from current session (works for both guest and authenticated sessions)
+    	        async logout() {
+    	            if (!this._appwrite) {
+    	                return { success: false, error: 'Appwrite not configured' };
+    	            }
+
+    	            // If not authenticated, nothing to logout from
+    	            if (!this.isAuthenticated) {
+    	                return { success: true };
+    	            }
+
+    	            this.inProgress = true;
+
+    	            try {
+    	                // Delete current session (works for guest, magic link, and OAuth sessions)
+    	                if (this.session) {
+    	                    await this._appwrite.account.deleteSession(this.session.$id);
+    	                }
+
+    	                // Clear OAuth provider on logout
+    	                this._oauthProvider = null;
+    	                try {
+    	                    localStorage.removeItem('indux:oauth:provider');
+    	                    sessionStorage.removeItem('indux:oauth:provider');
+    	                } catch (e) {
+    	                    // Ignore
+    	                }
+    	                
+    	                // Clear magic link flags
+    	                this.magicLinkSent = false;
+    	                this.magicLinkExpired = false;
+    	                
+    	                // Stop teams realtime subscription if active
+    	                if (this.stopTeamsRealtime) {
+    	                    this.stopTeamsRealtime();
+    	                }
+    	                
+    	                // Stop teams polling if active (fallback)
+    	                if (this.stopTeamsPolling) {
+    	                    this.stopTeamsPolling();
+    	                }
+    	                
+    	                // Clear teams on logout
+    	                this.teams = [];
+    	                this.currentTeam = null;
+    	                
+    	                // Clear deleted teams tracking for this user (optional - uncomment if you want to clear on logout)
+    	                // try {
+    	                //     const userId = this.user?.$id;
+    	                //     if (userId) {
+    	                //         localStorage.removeItem(`indux:deleted-teams:${userId}`);
+    	                //     }
+    	                // } catch (e) {
+    	                //     // Ignore
+    	                // }
+    	                
+    	                // Restore to guest state after logout (if guest-auto is enabled)
+    	                // This only applies to non-guest sessions - if logging out from guest, don't create a new guest
+    	                if (!this.isAnonymous && this._guestAuto && this._createAnonymousSession) {
+    	                    await this._createAnonymousSession();
+    	                } else {
+    	                    // Clear auth state completely
+    	                    this.isAuthenticated = false;
+    	                    this.isAnonymous = false;
+    	                    this.user = null;
+    	                    this.session = null;
+    	                }
+    	                
+    	                syncStateToStorage(this);
+    	                window.dispatchEvent(new CustomEvent('indux:auth:logout'));
+    	                return { success: true };
+    	            } catch (error) {
+    	                this.error = error.message;
+    	                // If guest-auto is enabled and we were logged out from a non-guest session, try to restore guest
+    	                if (!this.isAnonymous && this._guestAuto && this._createAnonymousSession) {
+    	                    try {
+    	                        await this._createAnonymousSession();
+    	                    } catch (guestError) {
+    	                        // Fall through to clear state
+    	                        this.isAuthenticated = false;
+    	                        this.isAnonymous = false;
+    	                        this.user = null;
+    	                        this.session = null;
+    	                    }
+    	                } else {
+    	                    // Clear auth state completely
+    	                    this.isAuthenticated = false;
+    	                    this.isAnonymous = false;
+    	                    this.user = null;
+    	                    this.session = null;
+    	                }
+    	                // Stop teams realtime subscription if active
+    	                if (this.stopTeamsRealtime) {
+    	                    this.stopTeamsRealtime();
+    	                }
+    	                
+    	                // Stop teams polling if active (fallback)
+    	                if (this.stopTeamsPolling) {
+    	                    this.stopTeamsPolling();
+    	                }
+    	                
+    	                // Clear teams on logout error too
+    	                this.teams = [];
+    	                this.currentTeam = null;
+    	                return { success: false, error: error.message };
+    	            } finally {
+    	                this.inProgress = false;
+    	            }
+    	        },
+
+    	        // Clear current session
+    	        async clearSession() {
+    	            if (!this._appwrite) {
+    	                return { success: false, error: 'Appwrite not configured' };
+    	            }
+
+    	            this.inProgress = true;
+
+    	            try {
+    	                if (this.session) {
+    	                    await this._appwrite.account.deleteSession(this.session.$id);
+    	                }
+
+    	                this.isAuthenticated = false;
+    	                this.isAnonymous = false;
+    	                this.user = null;
+    	                this.session = null;
+    	                this.magicLinkSent = false;
+    	                this.magicLinkExpired = false;
+    	                this.error = null;
+    	                this._oauthProvider = null;
+    	                
+    	                // Clear teams
+    	                this.teams = [];
+    	                this.currentTeam = null;
+    	                
+    	                // Clear OAuth provider from storage
+    	                try {
+    	                    localStorage.removeItem('indux:oauth:provider');
+    	                    sessionStorage.removeItem('indux:oauth:provider');
+    	                } catch (e) {
+    	                    // Ignore
+    	                }
+    	                
+    	                syncStateToStorage(this);
+    	                window.dispatchEvent(new CustomEvent('indux:auth:session-cleared'));
+    	                return { success: true };
+    	            } catch (error) {
+    	                this.error = error.message;
+    	                this.isAuthenticated = false;
+    	                this.isAnonymous = false;
+    	                this.user = null;
+    	                this.session = null;
+    	                this.magicLinkSent = false;
+    	                this.magicLinkExpired = false;
+    	                return { success: false, error: error.message };
+    	            } finally {
+    	                this.inProgress = false;
+    	            }
+    	        },
+
+    	        // Refresh user data
+    	        async refresh() {
+    	            if (!this._appwrite) {
+    	                throw new Error('Appwrite not configured');
+    	            }
+
+    	            try {
+    	                this.user = await this._appwrite.account.get();
+    	                syncStateToStorage(this);
+    	                return this.user;
+    	            } catch (error) {
+    	                // Session may have expired
+    	                this.isAuthenticated = false;
+    	                this.isAnonymous = false;
+    	                this.user = null;
+    	                this.session = null;
+    	                syncStateToStorage(this);
+    	                throw error;
+    	            }
+    	        }
+    	    };
+    	    
+    	    Alpine.store('auth', authStore);
+    	}
+
+    	// Initialize when Alpine is ready
+    	document.addEventListener('alpine:init', () => {
+    	    try {
+    	        initializeAuthStore();
+    	    } catch (error) {
+    	        // Failed to initialize store
+    	    }
+    	});
+
+    	// Export store interface
+    	window.InduxAppwriteAuthStore = {
+    	    initialize: initializeAuthStore
+    	};
+
+    	/*  Indux Appwrite Auth
+    	/*  By Andrew Matlock under MIT license
+    	/*  https://github.com/andrewmatlock/Indux
+    	/*
+    	/*  Supports authentication with an Appwrite project
+    	/*  Requires Alpine JS (alpinejs.dev) to operate
+    	*/
+
+    	// Initialize auth plugin - orchestrates all modules
+    	let _pluginInitializing = false;
+    	async function initializeAppwriteAuthPlugin() {
+    	    if (_pluginInitializing) {
+    	        return;
+    	    }
+
+    	    // Wait for dependencies
+    	    if (!window.InduxAppwriteAuthConfig) {
+    	        return;
+    	    }
+
+    	    if (typeof Alpine === 'undefined') {
+    	        return;
+    	    }
+
+    	    _pluginInitializing = true;
+
+    	    // Wait for store to be ready
+    	    const waitForStore = () => {
+    	        const store = Alpine.store('auth');
+    	        if (store) {
+    	            // Initialize store first
+    	            if (!store._initialized && !store._initializing) {
+    	                store.init();
+    	            }
+    	            
+    	            // After store init, process callbacks and validate config
+    	            window.addEventListener('indux:auth:initialized', async () => {
+    	                // Validate role configuration if roles module is loaded
+    	                if (store.validateRoleConfig) {
+    	                    const validation = await store.validateRoleConfig();
+    	                    if (!validation.valid) ; else if (validation.warnings && validation.warnings.length > 0) ;
+    	                }
+    	                
+    	                // Process callbacks after store is initialized
+    	                if (window.InduxAppwriteAuthCallbacks) {
+    	                    const callbackInfo = window.InduxAppwriteAuthCallbacks.detect();
+    	                    if (callbackInfo.hasCallback || callbackInfo.hasExpired) {
+    	                        window.InduxAppwriteAuthCallbacks.process(callbackInfo);
+    	                    }
+    	                }
+    	                
+    	                // If no session and guest-auto is enabled, create guest session
+    	                if (!store.isAuthenticated && store._guestAuto && store._createAnonymousSession) {
+    	                    store._createAnonymousSession();
+    	                }
+    	            }, { once: true });
+    	            
+    	            _pluginInitializing = false;
+    	        } else {
+    	            setTimeout(waitForStore, 50);
+    	        }
+    	    };
+
+    	    // Start waiting after a short delay
+    	    setTimeout(waitForStore, 150);
+    	}
+
+    	// Handle initialization
+    	if (document.readyState === 'loading') {
+    	    document.addEventListener('DOMContentLoaded', () => {
+    	        if (window.Alpine) initializeAppwriteAuthPlugin();
+    	    });
+    	}
+
+    	document.addEventListener('alpine:init', initializeAppwriteAuthPlugin);
+
+    	// Export main interface
+    	window.InduxAppwriteAuth = {
+    	    initialize: initializeAppwriteAuthPlugin
+    	};
+
+    	/* Auth frontend */
+
+    	// Initialize $auth magic method
+    	function initializeAuthMagic() {
+    	    if (typeof Alpine === 'undefined') {
+    	        return false;
+    	    }
+
+    	    // Add $auth magic method (like $locale, $theme)
+    	    Alpine.magic('auth', () => {
+    	        const store = Alpine.store('auth');
+    	        if (!store) {
+    	            return {};
+    	        }
+    	        
+    	        return new Proxy({}, {
+    	            get(target, prop) {
+    	                // Handle special keys
+    	                if (prop === Symbol.iterator || prop === 'then' || prop === 'catch' || prop === 'finally') {
+    	                    return undefined;
+    	                }
+
+    	                // Direct store property access
+    	                if (prop in store) {
+    	                    const value = store[prop];
+    	                    // If it's a function, bind it to store context
+    	                    if (typeof value === 'function') {
+    	                        return value.bind(store);
+    	                    }
+    	                    return value;
+    	                }
+    	                
+    	                // Special handling for computed properties
+    	                if (prop === 'method') {
+    	                    return store.getMethod();
+    	                }
+    	                
+    	                if (prop === 'provider') {
+    	                    // getProvider() is synchronous but may trigger async fetch in background
+    	                    return store.getProvider();
+    	                }
+    	                
+    	                return undefined;
+    	            },
+    	            set(target, prop, value) {
+    	                // Forward assignments to the store for two-way binding (x-model)
+    	                if (prop in store) {
+    	                    store[prop] = value;
+    	                    return true;
+    	                }
+    	                // Allow setting new properties (though they won't persist)
+    	                target[prop] = value;
+    	                return true;
+    	            }
+    	        });
+    	    });
+    	    
+    	    return true;
+    	}
+
+    	// Handle both DOMContentLoaded and alpine:init
+    	if (document.readyState === 'loading') {
+    	    document.addEventListener('DOMContentLoaded', () => {
+    	        if (window.Alpine) {
+    	            initializeAuthMagic();
+    	        }
+    	    });
+    	}
+
+    	document.addEventListener('alpine:init', () => {
+    	    try {
+    	        initializeAuthMagic();
+    	    } catch (error) {
+    	        // Failed to initialize magic method
+    	    }
+    	});
+
+    	// Also try immediately if Alpine is already available
+    	if (typeof Alpine !== 'undefined') {
+    	    try {
+    	        initializeAuthMagic();
+    	    } catch (error) {
+    	        // Alpine might not be fully initialized yet, that's okay
+    	    }
+    	}
+
+    	// Export magic interface
+    	window.InduxAppwriteAuthMagic = {
+    	    initialize: initializeAuthMagic
+    	};
+
+    	/* Auth teams - Core operations */
+
+    	// Add core team methods to auth store
+    	function initializeTeamsCore() {
+    	    if (typeof Alpine === 'undefined') {
+    	        return;
+    	    }
+
+    	    const config = window.InduxAppwriteAuthConfig;
+    	    if (!config) {
+    	        return;
+    	    }
+
+    	    // Wait for store to be initialized
+    	    const waitForStore = () => {
+    	        const store = Alpine.store('auth');
+    	        if (store && !store.createTeam) {
+    	            // Team creation
+    	            store.createTeam = async function(teamId, name, roles = []) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                // Check if teams are enabled
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                if (appwriteConfig && !appwriteConfig.teams) {
+    	                    return { success: false, error: 'Teams are not enabled' };
+    	                }
+
+    	                if (!this.isAuthenticated) {
+    	                    return { success: false, error: 'You must be signed in to create a team' };
+    	                }
+
+    	                this.inProgress = true;
+    	                this.error = null;
+
+    	                try {
+    	                    // Generate unique teamId if not provided
+    	                    let finalTeamId = teamId;
+    	                    if (!finalTeamId) {
+    	                        if (window.Appwrite && window.Appwrite.ID && window.Appwrite.ID.unique) {
+    	                            finalTeamId = window.Appwrite.ID.unique();
+    	                        } else {
+    	                            finalTeamId = 'team_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    	                        }
+    	                    }
+    	                    
+    	                    // Determine initial roles for team creator
+    	                    let creatorRoles = roles;
+    	                    if (creatorRoles.length === 0) {
+    	                        // If no roles specified, use creatorRole from config
+    	                        const memberRoles = appwriteConfig?.memberRoles;
+    	                        const creatorRoleName = appwriteConfig?.creatorRole;
+    	                        
+    	                        if (memberRoles && creatorRoleName && memberRoles[creatorRoleName]) {
+    	                            // Use specified creatorRole
+    	                            creatorRoles = [creatorRoleName];
+    	                        } else if (memberRoles && Object.keys(memberRoles).length > 0) {
+    	                            // No creatorRole specified, find role with all owner permissions or use first
+    	                            let foundRole = null;
+    	                            for (const [roleName, permissions] of Object.entries(memberRoles)) {
+    	                                if (this.roleHasAllOwnerPermissions && await this.roleHasAllOwnerPermissions(roleName)) {
+    	                                    foundRole = roleName;
+    	                                    break;
+    	                                }
+    	                            }
+    	                            // If no role has all permissions, use first role
+    	                            creatorRoles = [foundRole || Object.keys(memberRoles)[0]];
+    	                        } else {
+    	                            // No memberRoles defined - use Appwrite default (owner)
+    	                            creatorRoles = ['owner'];
+    	                        }
+    	                    }
+    	                    
+    	                    // Normalize custom roles for Appwrite (add "owner" if needed)
+    	                    if (this.normalizeRolesForAppwrite) {
+    	                        creatorRoles = await this.normalizeRolesForAppwrite(creatorRoles);
+    	                    }
+    	                    
+    	                    const result = await this._appwrite.teams.create(finalTeamId, name, creatorRoles);
+
+    	                    // Apply default roles to the newly created team
+    	                    if (window.InduxAppwriteAuthTeamsRolesDefaults && this.ensureDefaultRoles) {
+    	                        await this.ensureDefaultRoles(finalTeamId);
+    	                    }
+
+    	                    // Refresh teams list
+    	                    await this.listTeams();
+
+    	                    return { success: true, team: result };
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    return { success: false, error: error.message };
+    	                } finally {
+    	                    this.inProgress = false;
+    	                }
+    	            };
+
+    	            // List user's teams
+    	            store.listTeams = async function(queries = [], search = '') {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                if (!this.isAuthenticated) {
+    	                    console.warn('[Indux Appwrite Auth] listTeams: User not authenticated');
+    	                    return { success: false, error: 'You must be signed in to list teams' };
+    	                }
+
+    	                try {
+    	                    const params = {
+    	                        queries: queries
+    	                    };
+    	                    if (search && search.trim().length > 0) {
+    	                        params.search = search;
+    	                    }
+    	                    const result = await this._appwrite.teams.list(params);
+
+    	                    // Update store with teams
+    	                    this.teams = result.teams || [];
+    	                    
+    	                    // Update currentTeam if it exists and was updated
+    	                    if (this.currentTeam && this.currentTeam.$id) {
+    	                        const updatedCurrentTeam = this.teams?.find(t => t.$id === this.currentTeam.$id);
+    	                        if (updatedCurrentTeam) {
+    	                            // Only update if name changed (to avoid unnecessary reactivity triggers)
+    	                            if (updatedCurrentTeam.name !== this.currentTeam.name) {
+    	                                this.currentTeam = { ...updatedCurrentTeam };
+    	                            }
+    	                        }
+    	                    }
+    	                    
+    	                    // Cache immutable status for all teams (if defaults module is loaded)
+    	                    if (window.InduxAppwriteAuthTeamsDefaults && this.isTeamImmutable) {
+    	                        for (const team of this.teams) {
+    	                            if (!this._teamImmutableCache[team.$id]) {
+    	                                this._teamImmutableCache[team.$id] = await this.isTeamImmutable(team.$id);
+    	                            }
+    	                        }
+    	                    }
+    	                    
+    	                    // Load deleted template teams (if defaults module is loaded)
+    	                    if (window.InduxAppwriteAuthTeamsDefaults && this.getDeletedTemplateTeams) {
+    	                        this.deletedTemplateTeams = await this.getDeletedTemplateTeams();
+    	                    }
+    	                    
+    	                    // Clean up duplicate default teams (permanent/template) if any exist
+    	                    if (window.InduxAppwriteAuthTeamsDefaults && this.cleanupDuplicateDefaultTeams) {
+    	                        const cleanupResult = await this.cleanupDuplicateDefaultTeams();
+    	                        if (cleanupResult.cleaned > 0) {
+    	                            if (cleanupResult.errors && cleanupResult.errors.length > 0) {
+    	                                console.warn('[Indux Appwrite Auth] Some duplicate teams could not be deleted:', cleanupResult.errors);
+    	                            }
+    	                            // Refresh teams list after cleanup
+    	                            if (this.listTeams) {
+    	                                await this.listTeams();
+    	                            }
+    	                        }
+    	                    }
+    	                    
+    	                    // Load deleted template roles for current team (if roles defaults module is loaded)
+    	                    if (this.currentTeam && this.currentTeam.$id && window.InduxAppwriteAuthTeamsRolesDefaults && this.getDeletedTemplateRoles) {
+    	                        this.deletedTemplateRoles = await this.getDeletedTemplateRoles(this.currentTeam.$id);
+    	                    }
+    	                    
+    	                    // Set currentTeam to first default team if available and not already set
+    	                    if (!this.currentTeam && this.teams.length > 0) {
+    	                        const appwriteConfig = await config.getAppwriteConfig();
+    	                        const hasDefaultTeams = (appwriteConfig?.permanentTeams && Array.isArray(appwriteConfig.permanentTeams) && appwriteConfig.permanentTeams.length > 0) ||
+    	                                               (appwriteConfig?.templateTeams && Array.isArray(appwriteConfig.templateTeams) && appwriteConfig.templateTeams.length > 0);
+    	                        
+    	                        if (hasDefaultTeams && window.InduxAppwriteAuthTeamsDefaults && this.getDefaultTeams) {
+    	                            const defaultTeams = await this.getDefaultTeams();
+    	                            if (defaultTeams.length > 0) {
+    	                                this.currentTeam = defaultTeams[0];
+    	                            } else {
+    	                                this.currentTeam = this.teams[0];
+    	                            }
+    	                        } else {
+    	                            this.currentTeam = this.teams[0];
+    	                        }
+    	                    }
+    	                    
+    	                    // Auto-load memberships for current team (if members module is loaded)
+    	                    if (this.currentTeam && this.currentTeam.$id && window.InduxAppwriteAuthTeamsMembers && this.listMemberships) {
+    	                        try {
+    	                            const membershipsResult = await this.listMemberships(this.currentTeam.$id);
+    	                            if (membershipsResult.success) {
+    	                                this.currentTeamMemberships = membershipsResult.memberships || [];
+    	                            }
+    	                        } catch (error) {
+    	                            // Silently handle errors (e.g., team was deleted)
+    	                            // listMemberships already handles "team not found" gracefully
+    	                            this.currentTeamMemberships = [];
+    	                        }
+    	                    }
+    	                    
+    	                    // Start teams realtime subscription if available (only if not already subscribed)
+    	                    // Also skip if we're in the middle of a realtime-triggered refresh
+    	                    // Check for any truthy value (function, object, or true flag)
+    	                    if (!this._teamsRealtimeUnsubscribe && !this._teamsRealtimeSubscribing) {
+    	                        const appwriteConfig = await config.getAppwriteConfig();
+    	                        if (this._appwrite?.realtime && this.startTeamsRealtime) {
+    	                            this.startTeamsRealtime();
+    	                        } else if (appwriteConfig?.teamsPollInterval && typeof appwriteConfig.teamsPollInterval === 'number' && appwriteConfig.teamsPollInterval > 0) {
+    	                            // Fallback to polling if realtime not available
+    	                            console.warn('[Indux Appwrite Auth] Realtime not available, falling back to polling');
+    	                            if (this.startTeamsPolling) {
+    	                                this.startTeamsPolling(appwriteConfig.teamsPollInterval);
+    	                            }
+    	                        }
+    	                    }
+    	                    
+    	                    return { success: true, teams: result.teams || [], total: result.total || 0 };
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    return { success: false, error: error.message };
+    	                }
+    	            };
+
+    	            // Get team by ID
+    	            store.getTeam = async function(teamId) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                if (!this.isAuthenticated) {
+    	                    return { success: false, error: 'You must be signed in to get team details' };
+    	                }
+
+    	                try {
+    	                    const result = await this._appwrite.teams.get({
+    	                        teamId: teamId
+    	                    });
+
+    	                    return { success: true, team: result };
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    return { success: false, error: error.message };
+    	                }
+    	            };
+
+    	            // Update team name
+    	            store.updateTeamName = async function(teamId, name) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                if (!this.isAuthenticated) {
+    	                    return { success: false, error: 'You must be signed in to update team name' };
+    	                }
+
+    	                if (!teamId) {
+    	                    return { success: false, error: 'Team ID is required' };
+    	                }
+
+    	                if (!name || !name.trim()) {
+    	                    return { success: false, error: 'Team name is required' };
+    	                }
+
+    	                this.inProgress = true;
+    	                this.error = null;
+
+    	                try {
+    	                    const result = await this._appwrite.teams.updateName(teamId, name.trim());
+    	                    
+    	                    // Use the result directly (it has the updated name from Appwrite)
+    	                    const updatedTeam = result;
+
+    	                    // Refresh teams list (this will update the teams array)
+    	                    await this.listTeams();
+    	                    
+    	                    // Update currentTeam reference if it was the updated team
+    	                    // Reassign the entire object to trigger Alpine reactivity
+    	                    if (this.currentTeam && this.currentTeam.$id === teamId) {
+    	                        // Use the result from Appwrite, or find it from the refreshed teams list
+    	                        const refreshedTeam = this.teams?.find(t => t.$id === teamId) || updatedTeam;
+    	                        
+    	                        if (refreshedTeam) {
+    	                            // Force Alpine reactivity by creating a new object reference
+    	                            // Alpine needs to see a new reference to trigger updates
+    	                            this.currentTeam = { ...refreshedTeam };
+    	                            
+    	                            // Also update the teams array reference in case it's being watched
+    	                            const teamIndex = this.teams?.findIndex(t => t.$id === teamId);
+    	                            if (teamIndex !== undefined && teamIndex >= 0 && this.teams) {
+    	                                // Create new array to trigger reactivity
+    	                                this.teams = [
+    	                                    ...this.teams.slice(0, teamIndex),
+    	                                    { ...refreshedTeam },
+    	                                    ...this.teams.slice(teamIndex + 1)
+    	                                ];
+    	                            }
+    	                            
+    	                            // Use Alpine's nextTick if available to ensure reactivity is triggered
+    	                            if (typeof Alpine !== 'undefined' && Alpine.nextTick) {
+    	                                Alpine.nextTick(() => {
+    	                                    // Ensure the update is visible
+    	                                    this.currentTeam = refreshedTeam;
+    	                                });
+    	                            }
+    	                        }
+    	                    }
+
+    	                    return { success: true, team: updatedTeam };
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    return { success: false, error: error.message };
+    	                } finally {
+    	                    this.inProgress = false;
+    	                }
+    	            };
+
+    	            // Delete team
+    	            store.deleteTeam = async function(teamId) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                if (!this.isAuthenticated) {
+    	                    return { success: false, error: 'You must be signed in to delete a team' };
+    	                }
+
+    	                // Check if team is immutable
+    	                if (this.isTeamImmutable) {
+    	                    const isImmutable = await this.isTeamImmutable(teamId);
+    	                    if (isImmutable) {
+    	                        return { success: false, error: 'This team cannot be deleted' };
+    	                    }
+    	                }
+
+    	                this.inProgress = true;
+    	                this.error = null;
+
+    	                try {
+    	                    // Get team name before deletion (for tracking)
+    	                    const team = this.teams?.find(t => t.$id === teamId);
+    	                    const teamName = team?.name;
+    	                    
+    	                    await this._appwrite.teams.delete({
+    	                        teamId: teamId
+    	                    });
+
+    	                    // Track deleted template team (don't recreate it, but allow reapplying)
+    	                    if (teamName && window.InduxAppwriteAuthTeamsDefaults) {
+    	                        const config = await window.InduxAppwriteAuthConfig.getAppwriteConfig();
+    	                        if (config?.templateTeams && Array.isArray(config.templateTeams)) {
+    	                            const resolvePersonalTeamName = window.InduxAppwriteAuthTeamsDefaults.resolvePersonalTeamName;
+    	                            // Check if this was a template team
+    	                            for (const nameConfig of config.templateTeams) {
+    	                                const resolvedName = await resolvePersonalTeamName(nameConfig);
+    	                                if (resolvedName === teamName) {
+    	                                    // Store deletion in localStorage (keyed by user ID)
+    	                                    try {
+    	                                        const userId = this.user?.$id;
+    	                                        if (userId) {
+    	                                            const key = `indux:deleted-teams:${userId}`;
+    	                                            const deleted = JSON.parse(localStorage.getItem(key) || '[]');
+    	                                            if (!deleted.includes(teamName)) {
+    	                                                deleted.push(teamName);
+    	                                                localStorage.setItem(key, JSON.stringify(deleted));
+    	                                            }
+    	                                        }
+    	                                    } catch (e) {
+    	                                        console.warn('[Indux Appwrite Auth] Failed to track deleted team:', e);
+    	                                    }
+    	                                    break;
+    	                                }
+    	                            }
+    	                        }
+    	                    }
+
+    	                    // Clear current team if it was deleted (before refreshing list to avoid loading memberships for deleted team)
+    	                    if (this.currentTeam && this.currentTeam.$id === teamId) {
+    	                        this.currentTeam = null;
+    	                        this.currentTeamMemberships = [];
+    	                    }
+
+    	                    // Refresh teams list
+    	                    await this.listTeams();
+
+    	                    return { success: true };
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    return { success: false, error: error.message };
+    	                } finally {
+    	                    this.inProgress = false;
+    	                }
+    	            };
+
+    	            // Get team preferences
+    	            store.getTeamPrefs = async function(teamId) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                if (!this.isAuthenticated) {
+    	                    return { success: false, error: 'You must be signed in to get team preferences' };
+    	                }
+
+    	                try {
+    	                    const result = await this._appwrite.teams.getPrefs({
+    	                        teamId: teamId
+    	                    });
+
+    	                    return { success: true, prefs: result };
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    return { success: false, error: error.message };
+    	                }
+    	            };
+
+    	            // Start realtime subscription for all auth entities (teams, memberships, account, roles/permissions)
+    	            store.startTeamsRealtime = function() {
+    	                // Don't subscribe if already subscribed (check for function, object, array, or true flag)
+    	                if (this._teamsRealtimeUnsubscribe) {
+    	                    return;
+    	                }
+    	                
+    	                // Only subscribe if authenticated and realtime is available
+    	                if (!this.isAuthenticated || !this._appwrite?.realtime) {
+    	                    return;
+    	                }
+    	                
+    	                try {
+    	                    // Subscribe to teams channel (covers: team create/update/delete, team preferences/roles)
+    	                    const teamsSubscription = this._appwrite.realtime.subscribe('teams', (response) => {
+    	                        // Prevent recursive subscription (don't subscribe again when refreshing)
+    	                        if (this._teamsRealtimeSubscribing) {
+    	                            return;
+    	                        }
+    	                        
+    	                        // Handle different event types
+    	                        if (response.events && Array.isArray(response.events)) {
+    	                            let shouldRefreshTeams = false;
+    	                            
+    	                            for (const event of response.events) {
+    	                                // Event format can be: "teams.update", "teams.create", "teams.delete", 
+    	                                // "teams.{teamId}", "teams *", etc.
+    	                                const parts = event.split(/[.\s]+/);
+    	                                const eventType = parts[0]; // 'teams', etc.
+    	                                const action = parts[1]; // 'update', 'create', 'delete', or teamId
+    	                                
+    	                                if (eventType === 'teams') {
+    	                                    // Check if it's an action (update, create, delete) or a team-specific event
+    	                                    // Note: team preferences (roles/permissions) updates trigger teams.update
+    	                                    if (action === 'update' || action === 'create' || action === 'delete' || action === '*') {
+    	                                        shouldRefreshTeams = true;
+    	                                    } else if (action && action.length > 10) {
+    	                                        // Likely a teamId (Appwrite IDs are long), treat as update
+    	                                        shouldRefreshTeams = true;
+    	                                    }
+    	                                }
+    	                            }
+    	                            
+    	                            // Refresh teams list if needed (only once per event batch)
+    	                            // This also refreshes roles/permissions since they're stored in team preferences
+    	                            if (shouldRefreshTeams && !this._teamsRealtimeSubscribing) {
+    	                                this._teamsRealtimeSubscribing = true;
+    	                                if (this.listTeams) {
+    	                                    this.listTeams().finally(() => {
+    	                                        this._teamsRealtimeSubscribing = false;
+    	                                    });
+    	                                } else {
+    	                                    this._teamsRealtimeSubscribing = false;
+    	                                }
+    	                            }
+    	                        }
+    	                    });
+    	                    
+    	                    // Subscribe to memberships channel (covers: invite, accept, update roles, delete)
+    	                    // Also subscribe to team-specific membership channels for better reactivity
+    	                    const membershipsSubscription = this._appwrite.realtime.subscribe('memberships', (response) => {
+    	                        // Prevent recursive subscription
+    	                        if (this._teamsRealtimeSubscribing) {
+    	                            return;
+    	                        }
+    	                        
+    	                        if (response.events && Array.isArray(response.events)) {
+    	                            let shouldRefreshMemberships = false;
+    	                            let affectedTeamId = null;
+    	                            
+    	                            // First, check payload for teamId (most reliable source)
+    	                            if (response.payload) {
+    	                                // Check various possible payload structures
+    	                                if (response.payload.teamId) {
+    	                                    affectedTeamId = response.payload.teamId;
+    	                                } else if (response.payload.team && response.payload.team.$id) {
+    	                                    affectedTeamId = response.payload.team.$id;
+    	                                } else if (response.payload.membership && response.payload.membership.teamId) {
+    	                                    affectedTeamId = response.payload.membership.teamId;
+    	                                }
+    	                            }
+    	                            
+    	                            for (const event of response.events) {
+    	                                // Handle different event formats:
+    	                                // - "memberships.update" (legacy format)
+    	                                // - "memberships.delete" (legacy format)
+    	                                // - "teams.{teamId}.memberships.{membershipId}.delete" (current format)
+    	                                // - "teams.*.memberships.*.delete" (wildcard format)
+    	                                // - "teams.{teamId}.memberships.*" (team-specific wildcard)
+    	                                const parts = event.split(/[.\s]+/);
+    	                                const eventType = parts[0]; // 'teams' or 'memberships'
+    	                                
+    	                                // Check for both legacy format (memberships.*) and current format (teams.*.memberships.*)
+    	                                if (eventType === 'memberships') {
+    	                                    // Legacy format: "memberships.update", "memberships.delete", etc.
+    	                                    const action = parts[1];
+    	                                    
+    	                                    // Check if second part is a teamId (long alphanumeric string)
+    	                                    const possibleTeamId = parts[1];
+    	                                    if (possibleTeamId && possibleTeamId.length > 10 && /^[a-f0-9]+$/i.test(possibleTeamId)) {
+    	                                        // This is a team-specific event
+    	                                        if (!affectedTeamId) {
+    	                                            affectedTeamId = possibleTeamId;
+    	                                        }
+    	                                        const actionFromTeamId = parts[2];
+    	                                        if (actionFromTeamId === 'create' || actionFromTeamId === 'update' || actionFromTeamId === 'delete' || actionFromTeamId === '*' || !actionFromTeamId) {
+    	                                            shouldRefreshMemberships = true;
+    	                                        }
+    	                                    } else if (action === 'create' || action === 'update' || action === 'delete' || action === '*') {
+    	                                        // Global membership event
+    	                                        shouldRefreshMemberships = true;
+    	                                    }
+    	                                } else if (eventType === 'teams' && parts.length >= 3 && parts[2] === 'memberships') {
+    	                                    // Current format: "teams.{teamId}.memberships.{membershipId}.delete"
+    	                                    // or "teams.*.memberships.*.delete"
+    	                                    const teamIdPart = parts[1]; // teamId or '*'
+    	                                    const membershipIdPart = parts[3]; // membershipId or '*'
+    	                                    const action = parts[4]; // 'create', 'update', 'delete', or undefined
+    	                                    
+    	                                    // Extract teamId if it's not a wildcard
+    	                                    if (teamIdPart && teamIdPart !== '*' && teamIdPart.length > 10 && /^[a-f0-9]+$/i.test(teamIdPart)) {
+    	                                        if (!affectedTeamId) {
+    	                                            affectedTeamId = teamIdPart;
+    	                                        }
+    	                                    }
+    	                                    
+    	                                    // Check if this is a create, update, or delete action
+    	                                    if (action === 'create' || action === 'update' || action === 'delete' || action === '*' || !action) {
+    	                                        shouldRefreshMemberships = true;
+    	                                    }
+    	                                }
+    	                            }
+    	                            
+    	                            // Refresh memberships for current team if viewing one
+    	                            // This ensures the UI updates immediately when a member is updated/deleted
+    	                            if (shouldRefreshMemberships) {
+    	                                // If we know which team was affected, only refresh if it's the current team
+    	                                // Otherwise, refresh for current team if viewing one
+    	                                const shouldRefreshCurrentTeam = !affectedTeamId || 
+    	                                    (this.currentTeam && this.currentTeam.$id === affectedTeamId);
+    	                                
+    	                                if (shouldRefreshCurrentTeam && this.currentTeam && this.currentTeam.$id && this.listMemberships) {
+    	                                    // Use async/await to ensure memberships are refreshed
+    	                                    this.listMemberships(this.currentTeam.$id).then((result) => {
+    	                                        // Force reactivity by ensuring new array reference
+    	                                        if (this.currentTeamMemberships) {
+    	                                            this.currentTeamMemberships = [...this.currentTeamMemberships];
+    	                                        }
+    	                                    }).catch(err => {
+    	                                        // Failed to refresh memberships after realtime event
+    	                                    });
+    	                                }
+    	                                
+    	                                // Also refresh teams list (membership changes affect team member counts)
+    	                                if (!this._teamsRealtimeSubscribing) {
+    	                                    this._teamsRealtimeSubscribing = true;
+    	                                    if (this.listTeams) {
+    	                                        this.listTeams().finally(() => {
+    	                                            this._teamsRealtimeSubscribing = false;
+    	                                        });
+    	                                    } else {
+    	                                        this._teamsRealtimeSubscribing = false;
+    	                                    }
+    	                                }
+    	                            }
+    	                        }
+    	                    });
+    	                    
+    	                    // Subscribe to account channel (covers: user profile updates, account status changes)
+    	                    const accountSubscription = this._appwrite.realtime.subscribe('account', (response) => {
+    	                        if (response.events && Array.isArray(response.events)) {
+    	                            let shouldRefreshUser = false;
+    	                            
+    	                            for (const event of response.events) {
+    	                                const parts = event.split(/[.\s]+/);
+    	                                const eventType = parts[0]; // 'account'
+    	                                const action = parts[1]; // 'update', 'delete', etc.
+    	                                
+    	                                if (eventType === 'account') {
+    	                                    if (action === 'update' || action === 'delete' || action === '*') {
+    	                                        shouldRefreshUser = true;
+    	                                    }
+    	                                }
+    	                            }
+    	                            
+    	                            // Refresh user data if account was updated
+    	                            if (shouldRefreshUser && this.getAccount) {
+    	                                this.getAccount();
+    	                            }
+    	                        }
+    	                    });
+    	                    
+    	                    // Store unsubscribe functions/objects
+    	                    const subscriptions = [teamsSubscription, membershipsSubscription, accountSubscription];
+    	                    const unsubscribeFunctions = [];
+    	                    
+    	                    for (const sub of subscriptions) {
+    	                        if (typeof sub === 'function') {
+    	                            unsubscribeFunctions.push(sub);
+    	                        } else if (sub && typeof sub.unsubscribe === 'function') {
+    	                            unsubscribeFunctions.push(() => sub.unsubscribe());
+    	                        } else if (sub) {
+    	                            unsubscribeFunctions.push(sub);
+    	                        }
+    	                    }
+    	                    
+    	                    // Store as array if multiple, or single value if only one
+    	                    if (unsubscribeFunctions.length > 1) {
+    	                        this._teamsRealtimeUnsubscribe = unsubscribeFunctions;
+    	                    } else if (unsubscribeFunctions.length === 1) {
+    	                        this._teamsRealtimeUnsubscribe = unsubscribeFunctions[0];
+    	                    } else {
+    	                        this._teamsRealtimeUnsubscribe = true; // Mark as subscribed
+    	                    }
+    	                } catch (error) {
+    	                    // Failed to start realtime subscriptions
+    	                }
+    	            };
+    	            
+    	            // Stop realtime subscriptions
+    	            store.stopTeamsRealtime = function() {
+    	                if (!this._teamsRealtimeUnsubscribe) {
+    	                    return;
+    	                }
+    	                
+    	                try {
+    	                    // Handle array of unsubscribe functions (multiple channels)
+    	                    if (Array.isArray(this._teamsRealtimeUnsubscribe)) {
+    	                        for (const unsubscribe of this._teamsRealtimeUnsubscribe) {
+    	                            if (typeof unsubscribe === 'function') {
+    	                                unsubscribe();
+    	                            } else if (unsubscribe && typeof unsubscribe.unsubscribe === 'function') {
+    	                                unsubscribe.unsubscribe();
+    	                            }
+    	                        }
+    	                    } else if (typeof this._teamsRealtimeUnsubscribe === 'function') {
+    	                        // Direct unsubscribe function
+    	                        this._teamsRealtimeUnsubscribe();
+    	                    } else if (this._teamsRealtimeUnsubscribe === true) {
+    	                        // Subscription active but no unsubscribe method available
+    	                    } else {
+    	                        // Subscription object - try to call unsubscribe if it exists
+    	                        if (typeof this._teamsRealtimeUnsubscribe.unsubscribe === 'function') {
+    	                            this._teamsRealtimeUnsubscribe.unsubscribe();
+    	                        }
+    	                    }
+    	                } catch (error) {
+    	                    console.warn('[Indux Appwrite Auth] Error stopping realtime subscriptions:', error);
+    	                } finally {
+    	                    this._teamsRealtimeUnsubscribe = null;
+    	                }
+    	            };
+    	            
+    	            // Start polling teams for updates (optional, configured via teamsPollInterval) - DEPRECATED: Use realtime instead
+    	            store.startTeamsPolling = function(intervalMs) {
+    	                // Clear existing interval if any
+    	                if (this._teamsPollInterval) {
+    	                    clearInterval(this._teamsPollInterval);
+    	                }
+    	                
+    	                // Only poll if authenticated
+    	                if (!this.isAuthenticated) {
+    	                    return;
+    	                }
+    	                
+    	                this._teamsPollInterval = setInterval(async () => {
+    	                    if (this.isAuthenticated && this.listTeams) {
+    	                        try {
+    	                            await this.listTeams();
+    	                        } catch (error) {
+    	                            console.warn('[Indux Appwrite Auth] Teams polling error:', error);
+    	                        }
+    	                    } else {
+    	                        // Stop polling if user logs out
+    	                        if (this.stopTeamsPolling) {
+    	                            this.stopTeamsPolling();
+    	                        }
+    	                    }
+    	                }, intervalMs);
+    	            };
+    	            
+    	            // Stop polling teams
+    	            store.stopTeamsPolling = function() {
+    	                if (this._teamsPollInterval) {
+    	                    clearInterval(this._teamsPollInterval);
+    	                    this._teamsPollInterval = null;
+    	                }
+    	            };
+    	            
+    	            // Update team preferences
+    	            store.updateTeamPrefs = async function(teamId, prefs) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                if (!this.isAuthenticated) {
+    	                    return { success: false, error: 'You must be signed in to update team preferences' };
+    	                }
+
+    	                this.inProgress = true;
+    	                this.error = null;
+
+    	                try {
+    	                    const result = await this._appwrite.teams.updatePrefs({
+    	                        teamId: teamId,
+    	                        prefs: prefs
+    	                    });
+
+    	                    return { success: true, prefs: result };
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    return { success: false, error: error.message };
+    	                } finally {
+    	                    this.inProgress = false;
+    	                }
+    	            };
+    	        } else if (!store) {
+    	            setTimeout(waitForStore, 50);
+    	        }
+    	    };
+
+    	    setTimeout(waitForStore, 100);
+    	}
+
+    	// Initialize when Alpine is ready
+    	document.addEventListener('alpine:init', () => {
+    	    try {
+    	        initializeTeamsCore();
+    	    } catch (error) {
+    	        // Failed to initialize teams core
+    	    }
+    	});
+
+    	// Also try immediately if Alpine is already available
+    	if (typeof Alpine !== 'undefined') {
+    	    try {
+    	        initializeTeamsCore();
+    	    } catch (error) {
+    	        // Alpine might not be fully initialized yet, that's okay
+    	    }
+    	}
+
+    	// Export core teams interface
+    	window.InduxAppwriteAuthTeamsCore = {
+    	    initialize: initializeTeamsCore
+    	};
+
+
+
+    	/* Auth teams - Default teams (permanent and template) */
+
+    	// Helper function to resolve personal team name (handles static strings and $x paths)
+    	async function resolvePersonalTeamName(nameConfig) {
+    	    if (!nameConfig || typeof nameConfig !== 'string') {
+    	        return null;
+    	    }
+    	    
+    	    // If it starts with $x., resolve via Indux data source
+    	    if (nameConfig.startsWith('$x.')) {
+    	        try {
+    	            // Remove '$x.' prefix and resolve path
+    	            const path = nameConfig.substring(3);
+    	            
+    	            // Use Alpine's $x magic method if available
+    	            if (typeof Alpine !== 'undefined' && Alpine.magic && Alpine.magic('x')) {
+    	                const $x = Alpine.magic('x');
+    	                // Split path and navigate through $x proxy
+    	                const parts = path.split('.');
+    	                let value = $x;
+    	                for (const part of parts) {
+    	                    if (value && typeof value === 'object' && part in value) {
+    	                        value = value[part];
+    	                        // If value is a Promise, wait for it
+    	                        if (value && typeof value.then === 'function') {
+    	                            value = await value;
+    	                        }
+    	                    } else {
+    	                        // Data source may not be loaded yet - silently return null
+    	                        return null;
+    	                    }
+    	                }
+    	                return value || null;
+    	            } else {
+    	                // Fallback: try data store directly
+    	                const dataStore = Alpine.store('data');
+    	                if (dataStore) {
+    	                    const parts = path.split('.');
+    	                    let value = dataStore;
+    	                    for (const part of parts) {
+    	                        if (value && typeof value === 'object' && part in value) {
+    	                            value = value[part];
+    	                        } else {
+    	                            return null;
+    	                        }
+    	                    }
+    	                    return value || null;
+    	                }
+    	            }
+    	        } catch (error) {
+    	            // Data source may not be loaded yet - silently return null
+    	            return null;
+    	        }
+    	    }
+    	    
+    	    // Otherwise, treat as static string
+    	    return nameConfig;
+    	}
+
+    	// Add default teams methods to auth store
+    	function initializeTeamsDefaults() {
+    	    if (typeof Alpine === 'undefined') {
+    	        return;
+    	    }
+
+    	    const config = window.InduxAppwriteAuthConfig;
+    	    if (!config) {
+    	        return;
+    	    }
+
+    	    // Wait for store to be initialized
+    	    const waitForStore = () => {
+    	        const store = Alpine.store('auth');
+    	        if (store && !store.isTeamImmutable) {
+    	            // Check if a team is immutable (cannot be deleted)
+    	            store.isTeamImmutable = async function(teamId) {
+    	                const team = this.teams?.find(t => t.$id === teamId);
+    	                if (!team) return false;
+    	                
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                if (!appwriteConfig?.permanentTeams || !Array.isArray(appwriteConfig.permanentTeams)) {
+    	                    return false;
+    	                }
+    	                
+    	                // Check if this team matches any permanent team
+    	                for (const nameConfig of appwriteConfig.permanentTeams) {
+    	                    const resolvedName = await resolvePersonalTeamName(nameConfig);
+    	                    if (resolvedName === team.name) {
+    	                        return true; // Immutable
+    	                    }
+    	                }
+    	                return false;
+    	            };
+    	            
+    	            // Get deleted template teams (teams that can be reapplied)
+    	            store.getDeletedTemplateTeams = async function() {
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                if (!appwriteConfig?.templateTeams || !Array.isArray(appwriteConfig.templateTeams)) {
+    	                    return [];
+    	                }
+    	                
+    	                // Get list of deleted template teams for this user
+    	                let deletedTeams = [];
+    	                try {
+    	                    const userId = this.user?.$id;
+    	                    if (userId) {
+    	                        const key = `indux:deleted-teams:${userId}`;
+    	                        deletedTeams = JSON.parse(localStorage.getItem(key) || '[]');
+    	                    }
+    	                } catch (e) {
+    	                    return [];
+    	                }
+    	                
+    	                // Resolve all template team names and filter to only deleted ones
+    	                const deletedTemplateTeams = [];
+    	                for (const nameConfig of appwriteConfig.templateTeams) {
+    	                    const resolvedName = await resolvePersonalTeamName(nameConfig);
+    	                    if (resolvedName && deletedTeams.includes(resolvedName)) {
+    	                        deletedTemplateTeams.push(resolvedName);
+    	                    }
+    	                }
+    	                
+    	                return deletedTemplateTeams;
+    	            };
+    	            
+    	            // Track deleted template team (internal helper)
+    	            store.trackDeletedTemplateTeam = async function(teamName) {
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                if (appwriteConfig?.templateTeams && Array.isArray(appwriteConfig.templateTeams)) {
+    	                    // Check if this was a template team
+    	                    for (const nameConfig of appwriteConfig.templateTeams) {
+    	                        const resolvedName = await resolvePersonalTeamName(nameConfig);
+    	                        if (resolvedName === teamName) {
+    	                            // Store deletion in localStorage (keyed by user ID)
+    	                            try {
+    	                                const userId = this.user?.$id;
+    	                                if (userId) {
+    	                                    const key = `indux:deleted-teams:${userId}`;
+    	                                    const deleted = JSON.parse(localStorage.getItem(key) || '[]');
+    	                                    if (!deleted.includes(teamName)) {
+    	                                        deleted.push(teamName);
+    	                                        localStorage.setItem(key, JSON.stringify(deleted));
+    	                                    }
+    	                                }
+    	                            } catch (e) {
+    	                                console.warn('[Indux Appwrite Auth] Failed to track deleted team:', e);
+    	                            }
+    	                            break;
+    	                        }
+    	                    }
+    	                }
+    	            };
+    	            
+    	            // Get default teams (teams matching configured default team names - both permanent and template)
+    	            store.getDefaultTeams = async function() {
+    	                if (!this.teams || this.teams.length === 0) {
+    	                    return [];
+    	                }
+    	                
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                const allDefaultTeamNames = [];
+    	                
+    	                // Resolve permanent teams
+    	                if (appwriteConfig?.permanentTeams && Array.isArray(appwriteConfig.permanentTeams)) {
+    	                    for (const nameConfig of appwriteConfig.permanentTeams) {
+    	                        const resolvedName = await resolvePersonalTeamName(nameConfig);
+    	                        if (resolvedName) {
+    	                            allDefaultTeamNames.push(resolvedName);
+    	                        }
+    	                    }
+    	                }
+    	                
+    	                // Resolve template teams
+    	                if (appwriteConfig?.templateTeams && Array.isArray(appwriteConfig.templateTeams)) {
+    	                    for (const nameConfig of appwriteConfig.templateTeams) {
+    	                        const resolvedName = await resolvePersonalTeamName(nameConfig);
+    	                        if (resolvedName) {
+    	                            allDefaultTeamNames.push(resolvedName);
+    	                        }
+    	                    }
+    	                }
+    	                
+    	                // Find teams matching default team names
+    	                const defaultTeams = this.teams.filter(team => allDefaultTeamNames.includes(team.name));
+    	                return defaultTeams;
+    	            };
+    	            
+    	            // Clean up duplicate permanent/template teams (keeps the oldest one, deletes the rest)
+    	            // This bypasses the immutable check for duplicates only
+    	            store.cleanupDuplicateDefaultTeams = async function() {
+    	                if (!this.teams || this.teams.length === 0) {
+    	                    return { success: true, cleaned: 0 };
+    	                }
+    	                
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                if (!appwriteConfig) {
+    	                    return { success: false, error: 'Appwrite config not available' };
+    	                }
+    	                
+    	                const allDefaultTeamNames = [];
+    	                
+    	                // Resolve permanent teams
+    	                if (appwriteConfig?.permanentTeams && Array.isArray(appwriteConfig.permanentTeams)) {
+    	                    for (const nameConfig of appwriteConfig.permanentTeams) {
+    	                        const resolvedName = await resolvePersonalTeamName(nameConfig);
+    	                        if (resolvedName) {
+    	                            allDefaultTeamNames.push(resolvedName);
+    	                        }
+    	                    }
+    	                }
+    	                
+    	                // Resolve template teams
+    	                if (appwriteConfig?.templateTeams && Array.isArray(appwriteConfig.templateTeams)) {
+    	                    for (const nameConfig of appwriteConfig.templateTeams) {
+    	                        const resolvedName = await resolvePersonalTeamName(nameConfig);
+    	                        if (resolvedName) {
+    	                            allDefaultTeamNames.push(resolvedName);
+    	                        }
+    	                    }
+    	                }
+    	                
+    	                let cleanedCount = 0;
+    	                const errors = [];
+    	                
+    	                // For each default team name, find duplicates and delete all but the oldest
+    	                for (const teamName of allDefaultTeamNames) {
+    	                    const matchingTeams = this.teams.filter(team => team.name === teamName);
+    	                    
+    	                    if (matchingTeams.length > 1) {
+    	                        // Sort by creation date (oldest first) and keep the first one
+    	                        const sortedTeams = matchingTeams.sort((a, b) => {
+    	                            const dateA = new Date(a.$createdAt || 0);
+    	                            const dateB = new Date(b.$createdAt || 0);
+    	                            return dateA - dateB;
+    	                        });
+    	                        
+    	                        sortedTeams[0];
+    	                        const teamsToDelete = sortedTeams.slice(1);
+    	                        
+    	                        // Delete all duplicates (bypass immutable check for duplicates)
+    	                        for (const team of teamsToDelete) {
+    	                            try {
+    	                                if (!this._appwrite) {
+    	                                    this._appwrite = await config.getAppwriteClient();
+    	                                }
+    	                                if (this._appwrite && this._appwrite.teams) {
+    	                                    // Directly delete via Appwrite API (bypassing our deleteTeam method which checks immutable)
+    	                                    await this._appwrite.teams.delete({ teamId: team.$id });
+    	                                    cleanedCount++;
+    	                                }
+    	                            } catch (error) {
+    	                                const errorMsg = `Error deleting duplicate team ${team.$id}: ${error.message}`;
+    	                                errors.push(errorMsg);
+    	                            }
+    	                        }
+    	                    }
+    	                }
+    	                
+    	                // Refresh teams list after cleanup
+    	                if (cleanedCount > 0 && this.listTeams) {
+    	                    await this.listTeams();
+    	                }
+    	                
+    	                return {
+    	                    success: errors.length === 0,
+    	                    cleaned: cleanedCount,
+    	                    errors: errors.length > 0 ? errors : undefined
+    	                };
+    	            };
+    	            
+    	            // Get personal team (first default team, or first team as fallback)
+    	            // Kept for backwards compatibility
+    	            store.getPersonalTeam = async function() {
+    	                const defaultTeams = await this.getDefaultTeams();
+    	                if (defaultTeams.length > 0) {
+    	                    return defaultTeams[0];
+    	                }
+    	                // Fallback to first team if no default teams
+    	                return this.teams && this.teams.length > 0 ? this.teams[0] : null;
+    	            };
+    	            
+    	            // Reapply a template team (create it if it was previously deleted)
+    	            store.reapplyTemplateTeam = async function(teamName) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                if (!this.isAuthenticated) {
+    	                    return { success: false, error: 'You must be signed in to reapply a template team' };
+    	                }
+
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                if (!appwriteConfig?.templateTeams || !Array.isArray(appwriteConfig.templateTeams)) {
+    	                    return { success: false, error: 'Template teams are not configured' };
+    	                }
+
+    	                // Verify this is a valid template team name
+    	                let isTemplateTeam = false;
+    	                for (const nameConfig of appwriteConfig.templateTeams) {
+    	                    const resolvedName = await resolvePersonalTeamName(nameConfig);
+    	                    if (resolvedName === teamName) {
+    	                        isTemplateTeam = true;
+    	                        break;
+    	                    }
+    	                }
+
+    	                if (!isTemplateTeam) {
+    	                    return { success: false, error: 'This is not a valid template team' };
+    	                }
+
+    	                // Check if team already exists
+    	                if (this.teams && this.teams.some(team => team.name === teamName)) {
+    	                    return { success: false, error: 'This team already exists' };
+    	                }
+
+    	                this.inProgress = true;
+    	                this.error = null;
+
+    	                try {
+    	                    // Create the template team (pass empty array to use creatorRole logic)
+    	                    const result = await this.createTeam(null, teamName, []);
+    	                    
+    	                    if (result.success) {
+    	                        // Remove from deleted teams list
+    	                        try {
+    	                            const userId = this.user?.$id;
+    	                            if (userId) {
+    	                                const key = `indux:deleted-teams:${userId}`;
+    	                                const deleted = JSON.parse(localStorage.getItem(key) || '[]');
+    	                                const updated = deleted.filter(name => name !== teamName);
+    	                                localStorage.setItem(key, JSON.stringify(updated));
+    	                            }
+    	                        } catch (e) {
+    	                            console.warn('[Indux Appwrite Auth] Failed to update deleted teams list:', e);
+    	                        }
+    	                        
+    	                        // Refresh teams list (this will also update deletedTemplateTeams)
+    	                        if (this.listTeams) {
+    	                            await this.listTeams();
+    	                        }
+    	                        
+    	                        // Update deletedTemplateTeams property
+    	                        if (this.getDeletedTemplateTeams) {
+    	                            this.deletedTemplateTeams = await this.getDeletedTemplateTeams();
+    	                        }
+    	                        
+    	                        return { success: true, team: result.team };
+    	                    } else {
+    	                        return { success: false, error: result.error };
+    	                    }
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    return { success: false, error: error.message };
+    	                } finally {
+    	                    this.inProgress = false;
+    	                }
+    	            };
+    	        } else if (!store) {
+    	            setTimeout(waitForStore, 50);
+    	        }
+    	    };
+
+    	    setTimeout(waitForStore, 100);
+    	}
+
+    	// Auto-create default teams if enabled - mandatory for all users
+    	async function ensureDefaultTeams(store) {
+    	    const appwriteConfig = await window.InduxAppwriteAuthConfig.getAppwriteConfig();
+    	    
+    	    // Check if default teams are enabled
+    	    const hasPermanent = appwriteConfig?.permanentTeams && Array.isArray(appwriteConfig.permanentTeams) && appwriteConfig.permanentTeams.length > 0;
+    	    const hasTemplate = appwriteConfig?.templateTeams && Array.isArray(appwriteConfig.templateTeams) && appwriteConfig.templateTeams.length > 0;
+    	    
+    	    if ((!hasPermanent && !hasTemplate) || !appwriteConfig?.teams) {
+    	        return { success: true, created: false, teams: [] };
+    	    }
+    	    
+    	    // Ensure teams list is loaded
+    	    if (!store.teams || store.teams.length === 0) {
+    	        if (store.listTeams) {
+    	            await store.listTeams();
+    	        }
+    	    }
+    	    
+    	    const createdTeams = [];
+    	    const existingTeams = [];
+    	    
+    	    // Get list of deleted template teams for this user (don't recreate them)
+    	    let deletedTeams = [];
+    	    try {
+    	        const userId = store.user?.$id;
+    	        if (userId) {
+    	            const key = `indux:deleted-teams:${userId}`;
+    	            deletedTeams = JSON.parse(localStorage.getItem(key) || '[]');
+    	        }
+    	    } catch (e) {
+    	        console.warn('[Indux Appwrite Auth] Failed to load deleted teams list:', e);
+    	    }
+    	    
+    	    // Process permanent teams (always create if missing)
+    	    if (hasPermanent) {
+    	        for (const nameConfig of appwriteConfig.permanentTeams) {
+    	            // Resolve team name (static or $x path)
+    	            const teamName = await resolvePersonalTeamName(nameConfig);
+    	            if (!teamName) {
+    	                // Data source may not be loaded yet - skip for now, will retry on next load
+    	                continue;
+    	            }
+    	            
+    	            // Check if user already has this permanent team (by name matching)
+    	            // Find ALL teams with this name to detect duplicates
+    	            const matchingTeams = store.teams?.filter(team => team.name === teamName) || [];
+    	            if (matchingTeams.length > 0) {
+    	                // If there are duplicates, log a warning and use the first one
+    	                if (matchingTeams.length > 1) {
+    	                    console.warn(`[Indux Appwrite Auth] Found ${matchingTeams.length} duplicate permanent teams with name "${teamName}". Using the first one.`);
+    	                    console.warn('[Indux Appwrite Auth] Duplicate team IDs:', matchingTeams.map(t => t.$id));
+    	                }
+    	                existingTeams.push(matchingTeams[0]);
+    	                continue;
+    	            }
+    	            
+    	            // Permanent team doesn't exist - create it (mandatory for all users)
+    	            try {
+    	                // Pass empty array to use creatorRole logic from config
+    	                const result = await store.createTeam(null, teamName, []);
+    	                
+    	                if (result.success) {
+    	                    createdTeams.push(result.team);
+    	                }
+    	            } catch (error) {
+    	                // Error creating permanent team
+    	            }
+    	        }
+    	    }
+    	    
+    	    // Process template teams (only create if not deleted)
+    	    if (hasTemplate) {
+    	        for (const nameConfig of appwriteConfig.templateTeams) {
+    	            // Resolve team name (static or $x path)
+    	            const teamName = await resolvePersonalTeamName(nameConfig);
+    	            if (!teamName) {
+    	                // Data source may not be loaded yet - skip for now, will retry on next load
+    	                continue;
+    	            }
+    	            
+    	            // Skip if this template team was previously deleted by the user
+    	            if (deletedTeams.includes(teamName)) {
+    	                continue;
+    	            }
+    	            
+    	            // Check if user already has this template team (by name matching)
+    	            // Find ALL teams with this name to detect duplicates
+    	            const matchingTeams = store.teams?.filter(team => team.name === teamName) || [];
+    	            if (matchingTeams.length > 0) {
+    	                // If there are duplicates, log a warning and use the first one
+    	                if (matchingTeams.length > 1) {
+    	                    console.warn(`[Indux Appwrite Auth] Found ${matchingTeams.length} duplicate template teams with name "${teamName}". Using the first one.`);
+    	                    console.warn('[Indux Appwrite Auth] Duplicate team IDs:', matchingTeams.map(t => t.$id));
+    	                }
+    	                existingTeams.push(matchingTeams[0]);
+    	                continue;
+    	            }
+    	            
+    	            // Template team doesn't exist - create it (mandatory for all users)
+    	            try {
+    	                // Pass empty array to use creatorRole logic from config
+    	                const result = await store.createTeam(null, teamName, []);
+    	                
+    	                if (result.success) {
+    	                    createdTeams.push(result.team);
+    	                }
+    	            } catch (error) {
+    	                // Error creating template team
+    	            }
+    	        }
+    	    }
+    	    
+    	    // Set currentTeam to first default team if not already set
+    	    if (!store.currentTeam) {
+    	        const allDefaultTeams = [...existingTeams, ...createdTeams];
+    	        if (allDefaultTeams.length > 0) {
+    	            store.currentTeam = allDefaultTeams[0];
+    	        }
+    	    }
+    	    
+    	    return {
+    	        success: true,
+    	        created: createdTeams.length > 0,
+    	        teams: [...existingTeams, ...createdTeams],
+    	        createdCount: createdTeams.length
+    	    };
+    	}
+
+    	// Initialize when Alpine is ready
+    	document.addEventListener('alpine:init', () => {
+    	    try {
+    	        initializeTeamsDefaults();
+    	    } catch (error) {
+    	        // Failed to initialize teams defaults
+    	    }
+    	});
+
+    	// Also try immediately if Alpine is already available
+    	if (typeof Alpine !== 'undefined') {
+    	    try {
+    	        initializeTeamsDefaults();
+    	    } catch (error) {
+    	        // Alpine might not be fully initialized yet, that's okay
+    	    }
+    	}
+
+    	// Export defaults interface
+    	window.InduxAppwriteAuthTeamsDefaults = {
+    	    initialize: initializeTeamsDefaults,
+    	    ensureDefaultTeams: ensureDefaultTeams,
+    	    resolvePersonalTeamName: resolvePersonalTeamName
+    	};
+
+
+
+    	/* Auth teams - Default roles (permanent and template) */
+
+    	// Add default roles methods to auth store
+    	function initializeTeamsRolesDefaults() {
+    	    if (typeof Alpine === 'undefined') {
+    	        return;
+    	    }
+
+    	    const config = window.InduxAppwriteAuthConfig;
+    	    if (!config) {
+    	        return;
+    	    }
+
+    	    // Wait for store to be initialized
+    	    const waitForStore = () => {
+    	        const store = Alpine.store('auth');
+    	        if (store && !store.isRolePermanent) {
+    	            // Initialize cache if needed
+    	            if (!store._rolePermanentCache) store._rolePermanentCache = {};
+    	            
+    	            // Check if a role is permanent (cannot be deleted)
+    	            store.isRolePermanent = async function(teamId, roleName) {
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                // permanentRoles is now an object: { "RoleName": ["permission1", ...] }
+    	                if (!appwriteConfig?.permanentRoles || typeof appwriteConfig.permanentRoles !== 'object') {
+    	                    return false;
+    	                }
+    	                const isPermanent = roleName in appwriteConfig.permanentRoles;
+    	                // Cache the result
+    	                if (!this._rolePermanentCache[teamId]) this._rolePermanentCache[teamId] = {};
+    	                this._rolePermanentCache[teamId][roleName] = isPermanent;
+    	                return isPermanent;
+    	            };
+    	            
+    	            // Synchronous check using cache (for Alpine reactivity)
+    	            store.isRolePermanentSync = function(teamId, roleName) {
+    	                if (!teamId || !roleName || !this._rolePermanentCache) return false;
+    	                return this._rolePermanentCache[teamId]?.[roleName] === true;
+    	            };
+    	            
+    	            // Check if a role is a template role (can be deleted)
+    	            store.isRoleTemplate = async function(teamId, roleName) {
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                // templateRoles is now an object: { "RoleName": ["permission1", ...] }
+    	                if (!appwriteConfig?.templateRoles || typeof appwriteConfig.templateRoles !== 'object') {
+    	                    return false;
+    	                }
+    	                return roleName in appwriteConfig.templateRoles;
+    	            };
+    	            
+    	            // Get deleted template roles for a team
+    	            // NOTE: Deleted template roles are stored in team preferences (not localStorage) so they're shared across all team members
+    	            store.getDeletedTemplateRoles = async function(teamId) {
+    	                if (!teamId) {
+    	                    return [];
+    	                }
+    	                
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                if (!appwriteConfig?.templateRoles || typeof appwriteConfig.templateRoles !== 'object') {
+    	                    return [];
+    	                }
+    	                
+    	                // Get list of deleted template roles from team preferences (shared across all team members)
+    	                let deletedRoles = [];
+    	                try {
+    	                    if (this._appwrite && this._appwrite.teams) {
+    	                        const prefs = await this._appwrite.teams.getPrefs({ teamId });
+    	                        // Deleted template roles are stored in team preferences under 'deletedTemplateRoles'
+    	                        if (prefs && prefs.deletedTemplateRoles && Array.isArray(prefs.deletedTemplateRoles)) {
+    	                            deletedRoles = prefs.deletedTemplateRoles;
+    	                        }
+    	                    }
+    	                } catch (e) {
+    	                    // If team was deleted (404), silently return empty array (expected behavior)
+    	                    if (e.message && e.message.includes('could not be found')) {
+    	                        return [];
+    	                    }
+    	                    // For other errors, fall back to localStorage (for backwards compatibility)
+    	                    try {
+    	                        const userId = this.user?.$id;
+    	                        if (userId) {
+    	                            const key = `indux:deleted-roles:${userId}:${teamId}`;
+    	                            deletedRoles = JSON.parse(localStorage.getItem(key) || '[]');
+    	                        }
+    	                    } catch (e2) {
+    	                        // Silently ignore localStorage errors
+    	                    }
+    	                }
+    	                
+    	                // Filter to only include roles that are actually template roles
+    	                const templateRoleNames = Object.keys(appwriteConfig.templateRoles);
+    	                return deletedRoles.filter(roleName => templateRoleNames.includes(roleName));
+    	            };
+    	            
+    	            // Reapply a deleted template role
+    	            store.reapplyTemplateRole = async function(teamId, roleName) {
+    	                if (!teamId || !roleName) {
+    	                    return { success: false, error: 'Team ID and role name are required' };
+    	                }
+    	                
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                if (!appwriteConfig?.templateRoles || typeof appwriteConfig.templateRoles !== 'object') {
+    	                    return { success: false, error: 'Template roles are not configured' };
+    	                }
+    	                
+    	                const templateRole = appwriteConfig.templateRoles[roleName];
+    	                if (!templateRole || !Array.isArray(templateRole)) {
+    	                    return { success: false, error: `Template role "${roleName}" does not exist` };
+    	                }
+    	                
+    	                try {
+    	                    // Get current team preferences
+    	                    const currentPrefs = await this._appwrite.teams.getPrefs({ teamId });
+    	                    const currentRoles = currentPrefs?.roles ? { ...currentPrefs.roles } : {};
+    	                    
+    	                    // Check if role already exists
+    	                    if (currentRoles[roleName]) {
+    	                        return { success: false, error: 'This role already exists' };
+    	                    }
+    	                    
+    	                    // Add the template role
+    	                    const updatedRoles = {
+    	                        ...currentRoles,
+    	                        [roleName]: templateRole
+    	                    };
+    	                    
+    	                    // Remove from deleted list in team preferences (shared across all team members)
+    	                    let deletedRoles = [];
+    	                    if (currentPrefs && currentPrefs.deletedTemplateRoles && Array.isArray(currentPrefs.deletedTemplateRoles)) {
+    	                        deletedRoles = currentPrefs.deletedTemplateRoles.filter(r => r !== roleName);
+    	                    }
+    	                    
+    	                    const updatedPrefs = {
+    	                        ...currentPrefs,
+    	                        roles: updatedRoles,
+    	                        deletedTemplateRoles: deletedRoles // Update deleted list in team preferences
+    	                    };
+    	                    await this._appwrite.teams.updatePrefs({
+    	                        teamId: teamId,
+    	                        prefs: updatedPrefs
+    	                    });
+    	                    
+    	                    // Also remove from localStorage for backwards compatibility (if it exists)
+    	                    try {
+    	                        const userId = this.user?.$id;
+    	                        if (userId) {
+    	                            const key = `indux:deleted-roles:${userId}:${teamId}`;
+    	                            const deleted = JSON.parse(localStorage.getItem(key) || '[]');
+    	                            const updated = deleted.filter(name => name !== roleName);
+    	                            localStorage.setItem(key, JSON.stringify(updated));
+    	                        }
+    	                    } catch (e) {
+    	                        // Ignore localStorage errors (team preferences is the source of truth)
+    	                    }
+    	                    
+    	                    // Refresh cache for this team
+    	                    if (this.getAllRoles) {
+    	                        const allRoles = await this.getAllRoles(teamId);
+    	                        const rolesCopy = allRoles ? { ...allRoles } : {};
+    	                        if (!this._allRolesCacheByTeam) this._allRolesCacheByTeam = {};
+    	                        this._allRolesCacheByTeam[teamId] = { ...rolesCopy };
+    	                        
+    	                        // Pre-cache permanent role status
+    	                        if (!this._rolePermanentCache) this._rolePermanentCache = {};
+    	                        if (!this._rolePermanentCache[teamId]) this._rolePermanentCache[teamId] = {};
+    	                        for (const rName of Object.keys(rolesCopy)) {
+    	                            if (this.isRolePermanent) {
+    	                                await this.isRolePermanent(teamId, rName);
+    	                            }
+    	                        }
+    	                    }
+    	                    
+    	                    // Refresh permission cache
+    	                    if (this.refreshPermissionCache) {
+    	                        await this.refreshPermissionCache();
+    	                    }
+    	                    
+    	                    return { success: true };
+    	                } catch (error) {
+    	                    return { success: false, error: error.message };
+    	                }
+    	            };
+    	            
+    	            // Ensure default roles are applied to a team
+    	            store.ensureDefaultRoles = async function(teamId) {
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                if (!appwriteConfig || !teamId) {
+    	                    return { success: false, error: 'Invalid config or team ID' };
+    	                }
+    	                
+    	                // permanentRoles and templateRoles are now objects: { "RoleName": ["permission1", ...] }
+    	                const permanentRoles = appwriteConfig.permanentRoles || {};
+    	                const templateRoles = appwriteConfig.templateRoles || {};
+    	                
+    	                // Get list of deleted template roles for this team (don't recreate them)
+    	                // Use getDeletedTemplateRoles which reads from team preferences (shared across all team members)
+    	                let deletedRoles = [];
+    	                if (this.getDeletedTemplateRoles) {
+    	                    try {
+    	                        deletedRoles = await this.getDeletedTemplateRoles(teamId);
+    	                    } catch (e) {
+    	                        // Failed to load deleted roles list
+    	                    }
+    	                }
+    	                
+    	                // Merge permanent and template roles into one object
+    	                const allDefaultRoles = { ...permanentRoles };
+    	                // Only include template roles that haven't been deleted
+    	                for (const [roleName, permissions] of Object.entries(templateRoles)) {
+    	                    if (!deletedRoles.includes(roleName)) {
+    	                        allDefaultRoles[roleName] = permissions;
+    	                    }
+    	                }
+    	                
+    	                if (Object.keys(allDefaultRoles).length === 0) {
+    	                    return { success: true, applied: false };
+    	                }
+    	                
+    	                try {
+    	                    // Get current team preferences
+    	                    const currentPrefs = await this._appwrite.teams.getPrefs({ teamId });
+    	                    const currentRoles = currentPrefs?.roles ? { ...currentPrefs.roles } : {};
+    	                    
+    	                    let rolesUpdated = false;
+    	                    const updatedRoles = { ...currentRoles };
+    	                    
+    	                    // Apply default roles that don't already exist
+    	                    for (const [roleName, permissions] of Object.entries(allDefaultRoles)) {
+    	                        if (!updatedRoles[roleName] && Array.isArray(permissions)) {
+    	                            updatedRoles[roleName] = permissions;
+    	                            rolesUpdated = true;
+    	                        }
+    	                    }
+    	                    
+    	                    // Only update if roles were added
+    	                    if (rolesUpdated) {
+    	                        const updatedPrefs = {
+    	                            ...currentPrefs,
+    	                            roles: updatedRoles
+    	                        };
+    	                        await this._appwrite.teams.updatePrefs({
+    	                            teamId: teamId,
+    	                            prefs: updatedPrefs
+    	                        });
+    	                        
+    	                        // Refresh cache for this team
+    	                        if (this.getAllRoles) {
+    	                            const allRoles = await this.getAllRoles(teamId);
+    	                            const rolesCopy = allRoles ? { ...allRoles } : {};
+    	                            if (!this._allRolesCacheByTeam) this._allRolesCacheByTeam = {};
+    	                            this._allRolesCacheByTeam[teamId] = rolesCopy;
+    	                            
+    	                            // Pre-cache permanent role status for all roles
+    	                            if (!this._rolePermanentCache) this._rolePermanentCache = {};
+    	                            if (!this._rolePermanentCache[teamId]) this._rolePermanentCache[teamId] = {};
+    	                            for (const roleName of Object.keys(rolesCopy)) {
+    	                                if (this.isRolePermanent) {
+    	                                    await this.isRolePermanent(teamId, roleName);
+    	                                }
+    	                            }
+    	                        }
+    	                        
+    	                        return { success: true, applied: true };
+    	                    }
+    	                    
+    	                    return { success: true, applied: false };
+    	                } catch (error) {
+    	                    return { success: false, error: error.message };
+    	                }
+    	            };
+    	        } else if (!store) {
+    	            setTimeout(waitForStore, 50);
+    	        }
+    	    };
+
+    	    setTimeout(waitForStore, 100);
+    	}
+
+    	// Initialize when Alpine is ready
+    	document.addEventListener('alpine:init', () => {
+    	    initializeTeamsRolesDefaults();
+    	});
+
+    	// Also try immediately if Alpine is already available
+    	if (typeof Alpine !== 'undefined') {
+    	    try {
+    	        initializeTeamsRolesDefaults();
+    	    } catch (error) {
+    	        // Alpine might not be fully initialized yet, that's okay
+    	    }
+    	}
+
+    	// Export for use in other modules
+    	window.InduxAppwriteAuthTeamsRolesDefaults = {
+    	    initialize: initializeTeamsRolesDefaults
+    	};
+
+
+
+    	/* Auth teams - Role abstraction layer */
+
+    	// Valid owner permission values (must map precisely to Appwrite owner capabilities)
+    	const OWNER_PERMISSIONS = [
+    	    'inviteMembers',   // Can invite team members
+    	    'updateMembers',   // Can update member roles
+    	    'removeMembers',   // Can remove team members
+    	    'renameTeam',      // Can rename the team
+    	    'deleteTeam',      // Can delete the team
+    	    'manageRoles'      // Can create, update, rename, and delete custom roles
+    	];
+
+    	// Get all owner permissions
+    	function getOwnerPermissions() {
+    	    return [...OWNER_PERMISSIONS];
+    	}
+
+    	// Validate role configuration from manifest
+    	function validateRoleConfig(memberRoles, creatorRole) {
+    	    const errors = [];
+    	    const warnings = [];
+
+    	    // If teams not enabled, roles are ignored (graceful degradation)
+    	    // This validation assumes teams are enabled
+
+    	    // Validate memberRoles structure
+    	    if (memberRoles && typeof memberRoles !== 'object') {
+    	        errors.push('memberRoles must be an object');
+    	        return { valid: false, errors, warnings };
+    	    }
+
+    	    if (!memberRoles || Object.keys(memberRoles).length === 0) {
+    	        // No roles defined - this is valid (will use Appwrite default: everyone is owner)
+    	        return { valid: true, errors: [], warnings: [] };
+    	    }
+
+    	    // Validate each role
+    	    for (const [roleName, permissions] of Object.entries(memberRoles)) {
+    	        if (!Array.isArray(permissions)) {
+    	            errors.push(`Role "${roleName}" must have a permissions array`);
+    	            continue;
+    	        }
+
+    	        // Validate owner permissions (warn about invalid ones, but allow custom permissions)
+    	        for (const permission of permissions) {
+    	            if (typeof permission !== 'string') {
+    	                errors.push(`Role "${roleName}" has invalid permission type. Permissions must be strings.`);
+    	            }
+    	        }
+    	    }
+
+    	    // Validate creatorRole reference
+    	    if (creatorRole) {
+    	        if (typeof creatorRole !== 'string') {
+    	            errors.push('creatorRole must be a string reference to a memberRoles key');
+    	        } else if (!memberRoles || !memberRoles[creatorRole]) {
+    	            errors.push(`creatorRole "${creatorRole}" does not exist in memberRoles`);
+    	        }
+    	    }
+
+    	    if (errors.length > 0) {
+    	        return { valid: false, errors, warnings };
+    	    }
+
+    	    return { valid: true, errors: [], warnings };
+    	}
+
+    	// Check if a role requires owner permissions (has any owner permission)
+    	function roleRequiresOwner(roleName, memberRoles) {
+    	    if (!memberRoles || !memberRoles[roleName]) {
+    	        return false;
+    	    }
+
+    	    const permissions = memberRoles[roleName] || [];
+    	    
+    	    // If role has any owner permission, it requires owner role
+    	    return permissions.some(perm => OWNER_PERMISSIONS.includes(perm));
+    	}
+
+    	// Check if a role has ALL owner permissions (effectively replaces "owner" in UI)
+    	function roleHasAllOwnerPermissions(roleName, memberRoles) {
+    	    if (!memberRoles || !memberRoles[roleName]) {
+    	        return false;
+    	    }
+
+    	    const permissions = memberRoles[roleName] || [];
+    	    
+    	    // Check if role has all owner permissions
+    	    return OWNER_PERMISSIONS.every(perm => permissions.includes(perm));
+    	}
+
+    	// Get user-generated roles from team preferences
+    	async function getUserGeneratedRoles(teamId, appwrite) {
+    	    if (!appwrite || !appwrite.teams) {
+    	        return null;
+    	    }
+
+    	    try {
+    	        const prefs = await appwrite.teams.getPrefs({ teamId });
+    	        return prefs?.roles || null;
+    	    } catch (error) {
+    	        // Team preferences might not have roles yet, or team might be deleted (404)
+    	        // Silently return null for deleted teams (expected behavior)
+    	        if (error.message && error.message.includes('could not be found')) {
+    	            return null;
+    	        }
+    	        // For other errors, also return null (team preferences might not exist yet)
+    	        return null;
+    	    }
+    	}
+
+    	// Merge manifest roles with user-generated roles (user-generated overrides manifest)
+    	function mergeRoles(manifestRoles, userGeneratedRoles) {
+    	    if (!manifestRoles && !userGeneratedRoles) {
+    	        return null;
+    	    }
+
+    	    // Start with manifest roles
+    	    const merged = manifestRoles ? { ...manifestRoles } : {};
+
+    	    // Override with user-generated roles (if enabled)
+    	    if (userGeneratedRoles && typeof userGeneratedRoles === 'object') {
+    	        Object.assign(merged, userGeneratedRoles);
+    	    }
+
+    	    return merged;
+    	}
+
+    	// Normalize custom roles for Appwrite (add "owner" if any role requires it)
+    	function normalizeRolesForAppwrite(customRoles, memberRoles, userGeneratedRoles = null) {
+    	    if (!Array.isArray(customRoles)) {
+    	        return customRoles;
+    	    }
+
+    	    // Merge manifest and user-generated roles
+    	    const allRoles = mergeRoles(memberRoles, userGeneratedRoles);
+
+    	    // If no roles config, return as-is (will use Appwrite's default behavior)
+    	    if (!allRoles || Object.keys(allRoles).length === 0) {
+    	        return customRoles;
+    	    }
+
+    	    // Check if any custom role requires owner
+    	    const requiresOwner = customRoles.some(role => roleRequiresOwner(role, allRoles));
+    	    
+    	    // If owner is already in the list, don't duplicate
+    	    if (requiresOwner && !customRoles.includes('owner')) {
+    	        return [...customRoles, 'owner'];
+    	    }
+
+    	    return customRoles;
+    	}
+
+    	// Normalize Appwrite roles for display (filter "owner" if a custom role replaces it)
+    	function normalizeRolesForDisplay(appwriteRoles, memberRoles, userGeneratedRoles = null) {
+    	    if (!Array.isArray(appwriteRoles)) {
+    	        return appwriteRoles;
+    	    }
+
+    	    // Merge manifest and user-generated roles
+    	    const allRoles = mergeRoles(memberRoles, userGeneratedRoles);
+
+    	    // If custom roles are defined, always filter out "owner" (it's a background Appwrite role)
+    	    // "owner" is automatically added by Appwrite for permissions, but shouldn't be displayed
+    	    if (allRoles && Object.keys(allRoles).length > 0) {
+    	        return appwriteRoles.filter(role => role !== 'owner');
+    	    }
+
+    	    // If no custom roles config, show "owner" as-is (legacy behavior)
+    	    return appwriteRoles;
+    	}
+
+    	// Get the primary role for display (first custom role, or "owner" if no custom roles)
+    	function getPrimaryDisplayRole(appwriteRoles, memberRoles, userGeneratedRoles = null) {
+    	    const displayRoles = normalizeRolesForDisplay(appwriteRoles, memberRoles, userGeneratedRoles);
+    	    
+    	    if (displayRoles.length === 0) {
+    	        return null;
+    	    }
+
+    	    // Return first role (typically the most important)
+    	    return displayRoles[0];
+    	}
+
+    	// Check if a user has a specific permission based on their roles
+    	function hasPermission(userRoles, permission, memberRoles, userGeneratedRoles = null) {
+    	    if (!Array.isArray(userRoles)) {
+    	        return false;
+    	    }
+
+    	    // Merge manifest and user-generated roles
+    	    const allRoles = mergeRoles(memberRoles, userGeneratedRoles);
+
+    	    // If no custom roles config, owner has all permissions (including manageRoles)
+    	    if (!allRoles || Object.keys(allRoles).length === 0) {
+    	        // Owner always has all permissions when no custom roles are defined
+    	        return userRoles.includes('owner');
+    	    }
+
+    	    // IMPORTANT: When custom roles are defined, we ONLY check custom roles, NOT the owner role.
+    	    // This is because Appwrite automatically grants "owner" role to users with custom roles
+    	    // that have native permissions, but we want to restrict them to ONLY the permissions
+    	    // explicitly defined in their custom role(s).
+    	    
+    	    // Get user's custom roles (excluding "owner")
+    	    const customRoles = userRoles.filter(role => role !== 'owner');
+    	    
+    	    // If user has no custom roles (only "owner" or empty), grant all permissions
+    	    // This handles edge cases where:
+    	    // - User's role was deleted
+    	    // - User was never assigned a custom role
+    	    if (customRoles.length === 0) {
+    	        // User has no custom roles, so they should have all owner permissions
+    	        return true;
+    	    }
+    	    
+    	    // Check if any of the user's custom roles has this permission
+    	    for (const roleName of customRoles) {
+    	        const rolePermissions = allRoles[roleName];
+    	        if (rolePermissions && Array.isArray(rolePermissions) && rolePermissions.includes(permission)) {
+    	            return true;
+    	        }
+    	    }
+
+    	    // User has custom roles but none of them grant this permission
+    	    return false;
+    	}
+
+    	// Get creator role permissions (with fallback logic)
+    	function getCreatorRolePermissions(memberRoles, creatorRole) {
+    	    // If creatorRole specified and exists in memberRoles
+    	    if (creatorRole && memberRoles && memberRoles[creatorRole]) {
+    	        return memberRoles[creatorRole];
+    	    }
+
+    	    // If no creatorRole specified, find role with all owner permissions
+    	    if (memberRoles) {
+    	        for (const [roleName, permissions] of Object.entries(memberRoles)) {
+    	            if (roleHasAllOwnerPermissions(roleName, memberRoles)) {
+    	                return permissions;
+    	            }
+    	        }
+    	        // If no role has all permissions, use first role
+    	        const firstRole = Object.keys(memberRoles)[0];
+    	        if (firstRole) {
+    	            return memberRoles[firstRole];
+    	        }
+    	    }
+
+    	    // Fallback: return empty array (will use Appwrite default: owner)
+    	    return [];
+    	}
+
+    	// Initialize role abstraction
+    	function initializeTeamsRoles() {
+    	    if (typeof Alpine === 'undefined') {
+    	        return;
+    	    }
+
+    	    const config = window.InduxAppwriteAuthConfig;
+    	    if (!config) {
+    	        return;
+    	    }
+
+    	    // Wait for store to be initialized
+    	    const waitForStore = () => {
+    	        const store = Alpine.store('auth');
+    	        if (store && !store._rolesInitialized) {
+    	            // Add role abstraction methods to store
+    	            store.getOwnerPermissions = function() {
+    	                return getOwnerPermissions();
+    	            };
+
+    	            store.validateRoleConfig = async function() {
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                const memberRoles = appwriteConfig?.memberRoles || null;
+    	                const creatorRole = appwriteConfig?.creatorRole || null;
+    	                return validateRoleConfig(memberRoles, creatorRole);
+    	            };
+
+    	            store.roleRequiresOwner = async function(roleName) {
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                const memberRoles = appwriteConfig?.memberRoles || null;
+    	                return roleRequiresOwner(roleName, memberRoles);
+    	            };
+
+    	            store.roleHasAllOwnerPermissions = async function(roleName) {
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                const memberRoles = appwriteConfig?.memberRoles || null;
+    	                return roleHasAllOwnerPermissions(roleName, memberRoles);
+    	            };
+
+    	            store.getUserGeneratedRoles = async function(teamId) {
+    	                if (!this._appwrite) {
+    	                    return null;
+    	                }
+    	                return await getUserGeneratedRoles(teamId, this._appwrite);
+    	            };
+
+    	            store.getAllRoles = async function(teamId) {
+    	                // Check if team still exists before trying to access preferences
+    	                if (teamId && this.teams && !this.teams.find(t => t.$id === teamId)) {
+    	                    // Team was deleted, return only memberRoles (no user-generated roles)
+    	                    const appwriteConfig = await config.getAppwriteConfig();
+    	                    return appwriteConfig?.memberRoles || null;
+    	                }
+    	                
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                let memberRoles = appwriteConfig?.memberRoles || null;
+    	                
+    	                // Filter out deleted template roles from memberRoles
+    	                if (memberRoles && teamId && window.InduxAppwriteAuthTeamsRolesDefaults && this.getDeletedTemplateRoles) {
+    	                    const deletedRoles = await this.getDeletedTemplateRoles(teamId);
+    	                    if (deletedRoles && deletedRoles.length > 0) {
+    	                        // Create a filtered copy of memberRoles without deleted template roles
+    	                        const filteredMemberRoles = { ...memberRoles };
+    	                        for (const deletedRoleName of deletedRoles) {
+    	                            delete filteredMemberRoles[deletedRoleName];
+    	                        }
+    	                        memberRoles = filteredMemberRoles;
+    	                    }
+    	                }
+    	                
+    	                // Always check for user-generated roles (stored in team preferences)
+    	                let userRoles = null;
+    	                if (teamId && this._appwrite) {
+    	                    userRoles = await this.getUserGeneratedRoles(teamId);
+    	                }
+    	                
+    	                return mergeRoles(memberRoles, userRoles);
+    	            };
+
+    	            store.normalizeRolesForAppwrite = async function(customRoles, teamId = null) {
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                const memberRoles = appwriteConfig?.memberRoles || null;
+    	                
+    	                // Always check for user-generated roles (stored in team preferences)
+    	                let userRoles = null;
+    	                if (teamId && this._appwrite) {
+    	                    userRoles = await this.getUserGeneratedRoles(teamId);
+    	                }
+    	                
+    	                return normalizeRolesForAppwrite(customRoles, memberRoles, userRoles);
+    	            };
+
+    	            store.normalizeRolesForDisplay = async function(appwriteRoles, teamId = null) {
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                const memberRoles = appwriteConfig?.memberRoles || null;
+    	                
+    	                // Always check for user-generated roles (stored in team preferences)
+    	                let userRoles = null;
+    	                if (teamId && this._appwrite) {
+    	                    userRoles = await this.getUserGeneratedRoles(teamId);
+    	                }
+    	                
+    	                return normalizeRolesForDisplay(appwriteRoles, memberRoles, userRoles);
+    	            };
+
+    	            store.getPrimaryDisplayRole = async function(appwriteRoles, teamId = null) {
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                const memberRoles = appwriteConfig?.memberRoles || null;
+    	                
+    	                // Always check for user-generated roles (stored in team preferences)
+    	                let userRoles = null;
+    	                if (teamId && this._appwrite) {
+    	                    userRoles = await this.getUserGeneratedRoles(teamId);
+    	                }
+    	                
+    	                return getPrimaryDisplayRole(appwriteRoles, memberRoles, userRoles);
+    	            };
+
+    	            store.hasPermission = async function(userRoles, permission, teamId = null) {
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                const memberRoles = appwriteConfig?.memberRoles || null;
+    	                
+    	                // Always check for user-generated roles (stored in team preferences)
+    	                let userGenRoles = null;
+    	                if (teamId && this._appwrite) {
+    	                    userGenRoles = await this.getUserGeneratedRoles(teamId);
+    	                }
+    	                
+    	                return hasPermission(userRoles, permission, memberRoles, userGenRoles);
+    	            };
+
+    	            store.getCreatorRolePermissions = async function() {
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                const memberRoles = appwriteConfig?.memberRoles || null;
+    	                const creatorRole = appwriteConfig?.creatorRole || null;
+    	                return getCreatorRolePermissions(memberRoles, creatorRole);
+    	            };
+
+    	            // Check if custom roles are configured
+    	            store.hasCustomRoles = async function() {
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                const memberRoles = appwriteConfig?.memberRoles || null;
+    	                return memberRoles && Object.keys(memberRoles).length > 0;
+    	            };
+
+    	            // Check if user can manage roles (has manageRoles permission)
+    	            store.canManageRoles = async function() {
+    	                if (!this.currentTeam || !this.currentTeamMemberships || !this.user) {
+    	                    return false;
+    	                }
+    	                return await this.hasTeamPermission('manageRoles');
+    	            };
+    	            
+    	            // Alias for backwards compatibility
+    	            store.canCreateRoles = store.canManageRoles;
+
+    	            store._rolesInitialized = true;
+    	        } else if (!store) {
+    	            setTimeout(waitForStore, 50);
+    	        }
+    	    };
+
+    	    setTimeout(waitForStore, 100);
+    	}
+
+    	// Initialize when Alpine is ready
+    	document.addEventListener('alpine:init', () => {
+    	    try {
+    	        initializeTeamsRoles();
+    	    } catch (error) {
+    	        // Failed to initialize teams roles
+    	    }
+    	});
+
+    	// Also try immediately if Alpine is already available
+    	if (typeof Alpine !== 'undefined') {
+    	    try {
+    	        initializeTeamsRoles();
+    	    } catch (error) {
+    	        // Alpine might not be fully initialized yet, that's okay
+    	    }
+    	}
+
+    	// Export roles interface
+    	window.InduxAppwriteAuthTeamsRoles = {
+    	    initialize: initializeTeamsRoles,
+    	    getOwnerPermissions,
+    	    validateRoleConfig,
+    	    roleRequiresOwner,
+    	    roleHasAllOwnerPermissions,
+    	    getUserGeneratedRoles,
+    	    mergeRoles,
+    	    normalizeRolesForAppwrite,
+    	    normalizeRolesForDisplay,
+    	    getPrimaryDisplayRole,
+    	    hasPermission,
+    	    getCreatorRolePermissions
+    	};
+
+
+    	/* Auth teams - User-generated roles management */
+
+    	// Add user-generated role methods to auth store
+    	function initializeTeamsUserRoles() {
+    	    if (typeof Alpine === 'undefined') {
+    	        return;
+    	    }
+
+    	    const config = window.InduxAppwriteAuthConfig;
+    	    if (!config) {
+    	        return;
+    	    }
+
+    	    // Wait for store to be initialized
+    	    const waitForStore = () => {
+    	        const store = Alpine.store('auth');
+    	        if (store && !store.createUserRole) {
+    	            // Create user-generated role
+    	            store.createUserRole = async function(teamId, roleName, permissions) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                if (!this.isAuthenticated) {
+    	                    return { success: false, error: 'You must be signed in to create roles' };
+    	                }
+
+    	                // Check if user has manageRoles permission
+    	                if (!this.hasTeamPermission || !await this.hasTeamPermission('manageRoles')) {
+    	                    return { success: false, error: 'You do not have permission to create roles' };
+    	                }
+
+    	                if (!roleName || !roleName.trim()) {
+    	                    return { success: false, error: 'Role name is required' };
+    	                }
+
+    	                if (!Array.isArray(permissions)) {
+    	                    return { success: false, error: 'Permissions must be an array' };
+    	                }
+
+    	                this.inProgress = true;
+    	                this.error = null;
+
+    	                try {
+    	                    // Get current team preferences (preserve all existing prefs)
+    	                    const currentPrefs = await this._appwrite.teams.getPrefs({ teamId });
+    	                    // Ensure we have a fresh copy of roles, not a shared reference
+    	                    const currentRoles = currentPrefs?.roles ? { ...currentPrefs.roles } : {};
+
+    	                    // Check if role already exists
+    	                    if (currentRoles[roleName]) {
+    	                        return { success: false, error: `Role "${roleName}" already exists` };
+    	                    }
+
+    	                    // Add new role
+    	                    const updatedRoles = {
+    	                        ...currentRoles,
+    	                        [roleName]: permissions
+    	                    };
+
+    	                    // Update team preferences (preserve all other preferences)
+    	                    const updatedPrefs = {
+    	                        ...currentPrefs,
+    	                        roles: updatedRoles
+    	                    };
+    	                    await this._appwrite.teams.updatePrefs({
+    	                        teamId: teamId,
+    	                        prefs: updatedPrefs
+    	                    });
+
+    	                    // Refresh permission cache to update UI
+    	                    if (this.refreshPermissionCache) {
+    	                        await this.refreshPermissionCache();
+    	                    }
+    	                    
+    	                    // Also update per-team cache for this specific team
+    	                    if (this.getAllRoles) {
+    	                        const allRoles = await this.getAllRoles(teamId);
+    	                        const rolesCopy = allRoles ? { ...allRoles } : {};
+    	                        if (!this._allRolesCacheByTeam) this._allRolesCacheByTeam = {};
+    	                        this._allRolesCacheByTeam[teamId] = rolesCopy;
+    	                    }
+
+    	                    return { success: true, role: { name: roleName, permissions } };
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    return { success: false, error: error.message };
+    	                } finally {
+    	                    this.inProgress = false;
+    	                }
+    	            };
+    	            
+    	            // Convenience method: create role using newRoleName and newRolePermissions properties
+    	            store.createRoleFromInputs = async function(teamId) {
+    	                if (!teamId) {
+    	                    return { success: false, error: 'Team ID is required' };
+    	                }
+    	                
+    	                // Ensure role name is a string
+    	                const roleName = String(this.newRoleName || '').trim();
+    	                // newRolePermissions is now an array (from checkboxes)
+    	                const permissions = Array.isArray(this.newRolePermissions) 
+    	                    ? this.newRolePermissions.filter(p => p && typeof p === 'string')
+    	                    : [];
+    	                
+    	                if (!roleName) {
+    	                    return { success: false, error: 'Role name is required' };
+    	                }
+    	                
+    	                const result = await this.createUserRole(teamId, roleName, permissions);
+    	                if (result.success) {
+    	                    this.newRoleName = ''; // Clear inputs
+    	                    this.newRolePermissions = []; // Clear permissions array
+    	                }
+    	                return result;
+    	            };
+
+    	            // Update user-generated role (permissions only)
+    	            store.updateUserRole = async function(teamId, roleName, permissions) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                if (!this.isAuthenticated) {
+    	                    return { success: false, error: 'You must be signed in to update roles' };
+    	                }
+
+    	                // Check if user has manageRoles permission
+    	                if (!this.hasTeamPermission || !await this.hasTeamPermission('manageRoles')) {
+    	                    return { success: false, error: 'You do not have permission to update roles' };
+    	                }
+
+    	                if (!roleName || !roleName.trim()) {
+    	                    return { success: false, error: 'Role name is required' };
+    	                }
+
+    	                if (!Array.isArray(permissions)) {
+    	                    return { success: false, error: 'Permissions must be an array' };
+    	                }
+
+    	                this.inProgress = true;
+    	                this.error = null;
+
+    	                try {
+    	                    // Get current team preferences (preserve all existing prefs)
+    	                    const currentPrefs = await this._appwrite.teams.getPrefs({ teamId });
+    	                    // Ensure we have a fresh copy of roles, not a shared reference
+    	                    const currentRoles = currentPrefs?.roles ? { ...currentPrefs.roles } : {};
+
+    	                    // Check if role exists
+    	                    if (!currentRoles[roleName]) {
+    	                        return { success: false, error: `Role "${roleName}" does not exist` };
+    	                    }
+
+    	                    // Update role permissions
+    	                    const updatedRoles = {
+    	                        ...currentRoles,
+    	                        [roleName]: permissions
+    	                    };
+
+    	                    // Update team preferences (preserve all other preferences)
+    	                    const updatedPrefs = {
+    	                        ...currentPrefs,
+    	                        roles: updatedRoles
+    	                    };
+    	                    await this._appwrite.teams.updatePrefs({
+    	                        teamId: teamId,
+    	                        prefs: updatedPrefs
+    	                    });
+
+    	                    // Refresh permission cache to update UI
+    	                    if (this.refreshPermissionCache) {
+    	                        await this.refreshPermissionCache();
+    	                    }
+    	                    
+    	                    // Also update per-team cache for this specific team (create new object reference for reactivity)
+    	                    if (this.getAllRoles) {
+    	                        const allRoles = await this.getAllRoles(teamId);
+    	                        const rolesCopy = allRoles ? { ...allRoles } : {};
+    	                        if (!this._allRolesCacheByTeam) this._allRolesCacheByTeam = {};
+    	                        this._allRolesCacheByTeam[teamId] = { ...rolesCopy };
+    	                        
+    	                        // Also update _allRolesCache if this is the current team
+    	                        if (this.currentTeam && this.currentTeam.$id === teamId) {
+    	                            this._allRolesCache = { ...rolesCopy };
+    	                        }
+    	                    }
+
+    	                    return { success: true, role: { name: roleName, permissions } };
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    return { success: false, error: error.message };
+    	                } finally {
+    	                    this.inProgress = false;
+    	                }
+    	            };
+    	            
+    	            // Rename a user-generated role
+    	            store.renameUserRole = async function(teamId, oldRoleName, newRoleName) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                if (!this.isAuthenticated) {
+    	                    return { success: false, error: 'You must be signed in to rename roles' };
+    	                }
+
+    	                // Check if user has manageRoles permission
+    	                if (!this.hasTeamPermission || !await this.hasTeamPermission('manageRoles')) {
+    	                    return { success: false, error: 'You do not have permission to rename roles' };
+    	                }
+
+    	                oldRoleName = String(oldRoleName || '').trim();
+    	                newRoleName = String(newRoleName || '').trim();
+
+    	                if (!oldRoleName || !newRoleName) {
+    	                    return { success: false, error: 'Both old and new role names are required' };
+    	                }
+
+    	                if (oldRoleName === newRoleName) {
+    	                    return { success: false, error: 'New role name must be different from the current name' };
+    	                }
+
+    	                // Check if role is permanent (cannot be renamed)
+    	                if (this.isRolePermanent && await this.isRolePermanent(teamId, oldRoleName)) {
+    	                    return { success: false, error: 'Permanent roles cannot be renamed' };
+    	                }
+
+    	                this.inProgress = true;
+    	                this.error = null;
+
+    	                try {
+    	                    // Get current team preferences (preserve all existing prefs)
+    	                    const currentPrefs = await this._appwrite.teams.getPrefs({ teamId });
+    	                    // Ensure we have a fresh copy of roles, not a shared reference
+    	                    const currentRoles = currentPrefs?.roles ? { ...currentPrefs.roles } : {};
+
+    	                    // Check if old role exists
+    	                    if (!currentRoles[oldRoleName]) {
+    	                        return { success: false, error: `Role "${oldRoleName}" does not exist` };
+    	                    }
+
+    	                    // Check if new role name already exists
+    	                    if (currentRoles[newRoleName]) {
+    	                        return { success: false, error: `Role "${newRoleName}" already exists` };
+    	                    }
+
+    	                    // Get permissions from old role
+    	                    const permissions = Array.isArray(currentRoles[oldRoleName]) 
+    	                        ? [...currentRoles[oldRoleName]] 
+    	                        : [];
+
+    	                    // Create updated roles object: remove old, add new
+    	                    const updatedRoles = { ...currentRoles };
+    	                    delete updatedRoles[oldRoleName];
+    	                    updatedRoles[newRoleName] = permissions;
+
+    	                    // Update team preferences (preserve all other preferences)
+    	                    const updatedPrefs = {
+    	                        ...currentPrefs,
+    	                        roles: updatedRoles
+    	                    };
+    	                    await this._appwrite.teams.updatePrefs({
+    	                        teamId: teamId,
+    	                        prefs: updatedPrefs
+    	                    });
+
+    	                    // Update all memberships that have the old role name to use the new role name
+    	                    // This prevents data drift where role names in memberships don't match role definitions
+    	                    try {
+    	                        if (this.listMemberships) {
+    	                            const membershipsResult = await this.listMemberships(teamId);
+    	                            if (membershipsResult && membershipsResult.success && membershipsResult.memberships) {
+    	                                const memberships = membershipsResult.memberships;
+    	                                let updatedCount = 0;
+    	                                
+    	                                for (const membership of memberships) {
+    	                                    if (membership.roles && Array.isArray(membership.roles)) {
+    	                                        // Check if membership has the old role name
+    	                                        const hasOldRole = membership.roles.includes(oldRoleName);
+    	                                        
+    	                                        if (hasOldRole) {
+    	                                            // Replace old role name with new role name
+    	                                            const updatedRoles = membership.roles.map(role => 
+    	                                                role === oldRoleName ? newRoleName : role
+    	                                            );
+    	                                            
+    	                                            // Update membership with new roles
+    	                                            if (this.updateMembership) {
+    	                                                await this.updateMembership(teamId, membership.$id, updatedRoles);
+    	                                                updatedCount++;
+    	                                            }
+    	                                        }
+    	                                    }
+    	                                }
+    	                            }
+    	                        }
+    	                    } catch (membershipError) {
+    	                        // Log error but don't fail the rename operation
+    	                    }
+
+    	                    // Refresh permission cache to update UI
+    	                    if (this.refreshPermissionCache) {
+    	                        await this.refreshPermissionCache();
+    	                    }
+    	                    
+    	                    // Refresh memberships to update UI with new role names
+    	                    if (this.listMemberships && this.currentTeam && this.currentTeam.$id === teamId) {
+    	                        await this.listMemberships(teamId);
+    	                    }
+    	                    
+    	                    // Also update per-team cache for this specific team (create new object reference for reactivity)
+    	                    if (this.getAllRoles) {
+    	                        const allRoles = await this.getAllRoles(teamId);
+    	                        const rolesCopy = allRoles ? { ...allRoles } : {};
+    	                        if (!this._allRolesCacheByTeam) this._allRolesCacheByTeam = {};
+    	                        this._allRolesCacheByTeam[teamId] = { ...rolesCopy };
+    	                        
+    	                        // Also update _allRolesCache if this is the current team
+    	                        if (this.currentTeam && this.currentTeam.$id === teamId) {
+    	                            this._allRolesCache = { ...rolesCopy };
+    	                        }
+    	                    }
+
+    	                    return { success: true, role: { name: newRoleName, permissions } };
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    return { success: false, error: error.message };
+    	                } finally {
+    	                    this.inProgress = false;
+    	                }
+    	            };
+
+    	            // Delete user-generated role
+    	            store.deleteUserRole = async function(teamId, roleName) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                if (!this.isAuthenticated) {
+    	                    return { success: false, error: 'You must be signed in to delete roles' };
+    	                }
+
+    	                // Check if user has manageRoles permission
+    	                if (!this.hasTeamPermission || !await this.hasTeamPermission('manageRoles')) {
+    	                    return { success: false, error: 'You do not have permission to delete roles' };
+    	                }
+
+    	                if (!roleName || !roleName.trim()) {
+    	                    return { success: false, error: 'Role name is required' };
+    	                }
+    	                
+    	                // Check if role is permanent (cannot be deleted)
+    	                if (this.isRolePermanent && await this.isRolePermanent(teamId, roleName)) {
+    	                    return { success: false, error: 'This role cannot be deleted' };
+    	                }
+
+    	                this.inProgress = true;
+    	                this.error = null;
+
+    	                try {
+    	                    // Check if role is assigned to any members (UI/platform requirement)
+    	                    if (this.listMemberships) {
+    	                        const membershipsResult = await this.listMemberships(teamId);
+    	                        if (membershipsResult.success) {
+    	                            const memberships = membershipsResult.memberships || [];
+    	                            const roleInUse = memberships.some(m => 
+    	                                m.roles && Array.isArray(m.roles) && m.roles.includes(roleName)
+    	                            );
+    	                            
+    	                            if (roleInUse) {
+    	                                return { 
+    	                                    success: false, 
+    	                                    error: `Cannot delete role "${roleName}" - it is assigned to one or more team members. Please reassign members to other roles first.` 
+    	                                };
+    	                            }
+    	                        }
+    	                    }
+
+    	                    // Get current team preferences (preserve all existing prefs)
+    	                    const currentPrefs = await this._appwrite.teams.getPrefs({ teamId });
+    	                    // Ensure we have a fresh copy of roles, not a shared reference
+    	                    const currentRoles = currentPrefs?.roles ? { ...currentPrefs.roles } : {};
+
+    	                    // Check if role exists in team preferences OR if it's a template role (which might only exist in manifest)
+    	                    const roleExistsInPrefs = !!currentRoles[roleName];
+    	                    let isTemplateRole = false;
+    	                    if (!roleExistsInPrefs && window.InduxAppwriteAuthTeamsRolesDefaults && this.isRoleTemplate) {
+    	                        isTemplateRole = await this.isRoleTemplate(teamId, roleName);
+    	                    }
+    	                    
+    	                    if (!roleExistsInPrefs && !isTemplateRole) {
+    	                        return { success: false, error: `Role "${roleName}" does not exist` };
+    	                    }
+
+    	                    // Track deleted template role (don't recreate it, but allow reapplying)
+    	                    // Note: isTemplateRole was already checked above if role doesn't exist in prefs
+    	                    if (!isTemplateRole && window.InduxAppwriteAuthTeamsRolesDefaults && this.isRoleTemplate) {
+    	                        isTemplateRole = await this.isRoleTemplate(teamId, roleName);
+    	                    }
+    	                    if (isTemplateRole) {
+    	                        // Store deletion in team preferences (shared across all team members)
+    	                        // This ensures all team members see the role as deleted, not just the user who deleted it
+    	                        try {
+    	                            // Get current team preferences
+    	                            const currentPrefs = await this._appwrite.teams.getPrefs({ teamId });
+    	                            
+    	                            // Get existing deleted template roles list
+    	                            let deletedRoles = [];
+    	                            if (currentPrefs && currentPrefs.deletedTemplateRoles && Array.isArray(currentPrefs.deletedTemplateRoles)) {
+    	                                deletedRoles = [...currentPrefs.deletedTemplateRoles];
+    	                            }
+    	                            
+    	                            // Add role to deleted list if not already there
+    	                            if (!deletedRoles.includes(roleName)) {
+    	                                deletedRoles.push(roleName);
+    	                                
+    	                                // Update team preferences with deleted roles list
+    	                                const updatedPrefs = {
+    	                                    ...currentPrefs,
+    	                                    deletedTemplateRoles: deletedRoles
+    	                                };
+    	                                
+    	                                await this._appwrite.teams.updatePrefs({
+    	                                    teamId: teamId,
+    	                                    prefs: updatedPrefs
+    	                                });
+    	                            }
+    	                        } catch (e) {
+    	                            // Fallback to localStorage for backwards compatibility
+    	                            try {
+    	                                const userId = this.user?.$id;
+    	                                if (userId) {
+    	                                    const key = `indux:deleted-roles:${userId}:${teamId}`;
+    	                                    const deleted = JSON.parse(localStorage.getItem(key) || '[]');
+    	                                    if (!deleted.includes(roleName)) {
+    	                                        deleted.push(roleName);
+    	                                        localStorage.setItem(key, JSON.stringify(deleted));
+    	                                    }
+    	                                }
+    	                            } catch (e2) {
+    	                                // Failed to track deleted role in localStorage
+    	                            }
+    	                        }
+    	                    }
+
+    	                    // Remove role from team preferences (if it exists there)
+    	                    const updatedRoles = { ...currentRoles };
+    	                    if (roleExistsInPrefs) {
+    	                        delete updatedRoles[roleName];
+    	                    }
+
+    	                    // Update team preferences only if role existed in prefs (preserve all other preferences)
+    	                    if (roleExistsInPrefs) {
+    	                        const updatedPrefs = {
+    	                            ...currentPrefs,
+    	                            roles: updatedRoles
+    	                        };
+    	                        await this._appwrite.teams.updatePrefs({
+    	                            teamId: teamId,
+    	                            prefs: updatedPrefs
+    	                        });
+    	                    }
+
+    	                    // Update per-team cache for this specific team (create new object reference for reactivity)
+    	                    if (this.getAllRoles) {
+    	                        const allRoles = await this.getAllRoles(teamId);
+    	                        const rolesCopy = allRoles ? { ...allRoles } : {};
+    	                        if (!this._allRolesCacheByTeam) this._allRolesCacheByTeam = {};
+    	                        // Create new object reference to ensure Alpine reactivity
+    	                        this._allRolesCacheByTeam[teamId] = { ...rolesCopy };
+    	                        
+    	                        // Also update _allRolesCache if this is the current team
+    	                        if (this.currentTeam && this.currentTeam.$id === teamId) {
+    	                            this._allRolesCache = { ...rolesCopy };
+    	                        }
+    	                        
+    	                        // Update permanent role cache for remaining roles
+    	                        if (!this._rolePermanentCache) this._rolePermanentCache = {};
+    	                        if (!this._rolePermanentCache[teamId]) this._rolePermanentCache[teamId] = {};
+    	                        if (this.isRolePermanent) {
+    	                            for (const rName of Object.keys(rolesCopy)) {
+    	                                await this.isRolePermanent(teamId, rName);
+    	                            }
+    	                            // Remove deleted role from cache
+    	                            if (this._rolePermanentCache[teamId][roleName] !== undefined) {
+    	                                delete this._rolePermanentCache[teamId][roleName];
+    	                            }
+    	                        }
+    	                    }
+    	                    
+    	                    // Refresh permission cache to update UI (after cache updates)
+    	                    if (this.refreshPermissionCache) {
+    	                        await this.refreshPermissionCache();
+    	                    }
+
+    	                    return { success: true };
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    return { success: false, error: error.message };
+    	                } finally {
+    	                    this.inProgress = false;
+    	                }
+    	            };
+
+    	            // Check if role is user-generated (stored in team preferences, not in manifest)
+    	            store.isUserGeneratedRole = async function(teamId, roleName) {
+    	                if (!this._appwrite) {
+    	                    return false;
+    	                }
+
+    	                try {
+    	                    const userRoles = await this.getUserGeneratedRoles(teamId);
+    	                    return userRoles && userRoles[roleName] !== undefined;
+    	                } catch (error) {
+    	                    return false;
+    	                }
+    	            };
+    	        } else if (!store) {
+    	            setTimeout(waitForStore, 50);
+    	        }
+    	    };
+
+    	    setTimeout(waitForStore, 100);
+    	}
+
+    	// Initialize when Alpine is ready
+    	document.addEventListener('alpine:init', () => {
+    	    try {
+    	        initializeTeamsUserRoles();
+    	    } catch (error) {
+    	        // Failed to initialize teams user roles
+    	    }
+    	});
+
+    	// Also try immediately if Alpine is already available
+    	if (typeof Alpine !== 'undefined') {
+    	    try {
+    	        initializeTeamsUserRoles();
+    	    } catch (error) {
+    	        // Alpine might not be fully initialized yet, that's okay
+    	    }
+    	}
+
+    	// Export user roles interface
+    	window.InduxAppwriteAuthTeamsUserRoles = {
+    	    initialize: initializeTeamsUserRoles
+    	};
+
+
+
+    	/* Auth teams - Membership operations */
+
+    	// Add membership methods to auth store
+    	function initializeTeamsMembers() {
+    	    if (typeof Alpine === 'undefined') {
+    	        return;
+    	    }
+
+    	    const config = window.InduxAppwriteAuthConfig;
+    	    if (!config) {
+    	        return;
+    	    }
+
+    	    // Wait for store to be initialized
+    	    const waitForStore = () => {
+    	        const store = Alpine.store('auth');
+    	        if (store && !store.inviteMember) {
+    	            // Invite member to team
+    	            store.inviteMember = async function(teamId, roles, email = null, userId = null, phone = null, url = null, name = null) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                if (!this.isAuthenticated) {
+    	                    return { success: false, error: 'You must be signed in to invite members' };
+    	                }
+
+    	                if (!email && !userId && !phone) {
+    	                    return { success: false, error: 'You must provide email, userId, or phone' };
+    	                }
+
+    	                // Use current URL as default redirect if not provided
+    	                if (!url) {
+    	                    const currentUrl = new URL(window.location.href);
+    	                    url = `${currentUrl.origin}${currentUrl.pathname}`;
+    	                }
+
+    	                this.inProgress = true;
+    	                this.error = null;
+
+    	                try {
+    	                    // Ensure roles is an array
+    	                    let rolesArray = Array.isArray(roles) ? roles : (roles ? [roles] : []);
+    	                    
+    	                    // Normalize roles for Appwrite (add "owner" if custom roles require it)
+    	                    let normalizedRoles = rolesArray;
+    	                    if (this.normalizeRolesForAppwrite && rolesArray.length > 0) {
+    	                        normalizedRoles = await this.normalizeRolesForAppwrite(rolesArray, teamId);
+    	                    }
+    	                    
+    	                    // If no roles provided, use default "owner" role (Appwrite requires at least one role)
+    	                    if (!normalizedRoles || normalizedRoles.length === 0) {
+    	                        normalizedRoles = ['owner'];
+    	                    }
+
+    	                    // Build the membership creation params (only include defined values)
+    	                    const membershipParams = {
+    	                        teamId: teamId,
+    	                        roles: normalizedRoles
+    	                    };
+    	                    
+    	                    // Only include email, userId, or phone if provided (not empty strings)
+    	                    if (email && email.trim()) {
+    	                        membershipParams.email = email.trim();
+    	                    } else if (userId && userId.trim()) {
+    	                        membershipParams.userId = userId.trim();
+    	                    } else if (phone && phone.trim()) {
+    	                        membershipParams.phone = phone.trim();
+    	                    }
+    	                    
+    	                    // Include optional parameters if provided
+    	                    if (url && url.trim()) {
+    	                        membershipParams.url = url.trim();
+    	                    }
+    	                    if (name && name.trim()) {
+    	                        membershipParams.name = name.trim();
+    	                    }
+
+    	                    const result = await this._appwrite.teams.createMembership(membershipParams);
+
+    	                    return { success: true, membership: result };
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    return { success: false, error: error.message };
+    	                } finally {
+    	                    this.inProgress = false;
+    	                }
+    	            };
+
+    	            // List team memberships
+    	            store.listMemberships = async function(teamId, queries = [], search = '') {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                if (!this.isAuthenticated) {
+    	                    return { success: false, error: 'You must be signed in to list memberships' };
+    	                }
+
+    	                try {
+    	                    const params = {
+    	                        teamId: teamId,
+    	                        queries: queries
+    	                    };
+    	                    if (search && search.trim().length > 0) {
+    	                        params.search = search;
+    	                    }
+    	                    const result = await this._appwrite.teams.listMemberships(params);
+    	                    let memberships = result.memberships || [];
+    	                    
+    	                    // Enhance memberships with user email if missing
+    	                    // Appwrite membership objects have 'email' for pending invites, confirmed members need user lookup
+    	                    for (const membership of memberships) {
+    	                        // Log all membership properties to debug
+    	                        const allProps = Object.keys(membership);
+    	                        const allPropValues = {};
+    	                        allProps.forEach(prop => {
+    	                            const value = membership[prop];
+    	                            // Only log string/number values, skip objects/arrays
+    	                            if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    	                                allPropValues[prop] = value;
+    	                            } else if (value && typeof value === 'object') {
+    	                                allPropValues[prop] = Array.isArray(value) ? `[Array(${value.length})]` : '[Object]';
+    	                            }
+    	                        });
+    	                        
+    	                        // For pending invites, email should already be in membership.email
+    	                        // For confirmed members, we need to look it up
+    	                        if (!membership.email && !membership.userEmail) {
+    	                            try {
+    	                                // For the current user, use the auth store's user object
+    	                                if (this.user && this.user.$id === membership.userId && this.user.email) {
+    	                                    membership.email = this.user.email;
+    	                                    membership.userEmail = this.user.email;
+    	                                } else if (membership.userId && membership.confirm === true) {
+    	                                    // For confirmed members, try to fetch user details
+    	                                    // Note: This requires 'users.read' permission
+    	                                    try {
+    	                                        // Check if users service is available
+    	                                        if (!this._appwrite || !this._appwrite.users || typeof this._appwrite.users.get !== 'function') {
+    	                                            console.warn('[Indux Appwrite Auth] Users service not available on Appwrite client');
+    	                                        } else {
+    	                                            const user = await this._appwrite.users.get({ userId: membership.userId });
+    	                                            if (user && user.email) {
+    	                                                membership.email = user.email;
+    	                                                membership.userEmail = user.email;
+    	                                            } else {
+    	                                                console.warn('[Indux Appwrite Auth] User fetched but no email found');
+    	                                            }
+    	                                        }
+    	                                    } catch (e) {
+    	                                        console.warn('[Indux Appwrite Auth] Failed to fetch user:', e.message);
+    	                                        // Silently fail if we can't fetch user (permission issue or user deleted)
+    	                                    }
+    	                                } else if (membership.confirm === false) {
+    	                                    // For pending invites, try to get email from membership object
+    	                                    // Appwrite may store it in different properties
+    	                                    const possibleEmailProps = ['email', 'userEmail', 'inviteeEmail', 'invitedEmail', 'userName'];
+    	                                    let foundEmail = null;
+    	                                    for (const prop of possibleEmailProps) {
+    	                                        const value = membership[prop];
+    	                                        if (value && typeof value === 'string' && value.includes('@')) {
+    	                                            foundEmail = value;
+    	                                            break;
+    	                                        }
+    	                                    }
+    	                                    if (foundEmail) {
+    	                                        membership.email = foundEmail;
+    	                                        membership.userEmail = foundEmail;
+    	                                    } else {
+    	                                        // If still not found and we have userId, try fetching user
+    	                                        if (membership.userId) {
+    	                                            try {
+    	                                                // Check if users service is available
+    	                                                if (!this._appwrite || !this._appwrite.users || typeof this._appwrite.users.get !== 'function') {
+    	                                                    console.warn('[Indux Appwrite Auth] Users service not available for pending invite lookup');
+    	                                                } else {
+    	                                                    const user = await this._appwrite.users.get({ userId: membership.userId });
+    	                                                    if (user && user.email) {
+    	                                                        membership.email = user.email;
+    	                                                        membership.userEmail = user.email;
+    	                                                    }
+    	                                                }
+    	                                            } catch (e) {
+    	                                                console.warn('[Indux Appwrite Auth] Failed to fetch user for pending invite:', e.message);
+    	                                            }
+    	                                        } else {
+    	                                            console.warn('[Indux Appwrite Auth] Pending invite has no email and no userId');
+    	                                        }
+    	                                    }
+    	                                }
+    	                            } catch (e) {
+    	                                // Silently continue if user lookup fails
+    	                            }
+    	                        }
+    	                        // Ensure both properties are set for consistency
+    	                        if (membership.email && !membership.userEmail) {
+    	                            membership.userEmail = membership.email;
+    	                        }
+    	                        if (membership.userEmail && !membership.email) {
+    	                            membership.email = membership.userEmail;
+    	                        }
+    	                    }
+    	                    
+    	                    // Normalize roles for display (filter "owner" if custom role replaces it)
+    	                    if (this.normalizeRolesForDisplay) {
+    	                        for (const membership of memberships) {
+    	                            if (membership.roles && Array.isArray(membership.roles)) {
+    	                                membership.displayRoles = await this.normalizeRolesForDisplay(membership.roles, teamId);
+    	                            }
+    	                        }
+    	                    }
+    	                    
+    	                    // Update currentTeamMemberships if this is the current team
+    	                    // Use spread operator to create new array reference for Alpine reactivity
+    	                    if (this.currentTeam && this.currentTeam.$id === teamId) {
+    	                        this.currentTeamMemberships = [...memberships];
+    	                        // Refresh permission cache after loading memberships
+    	                        if (this.refreshPermissionCache) {
+    	                            await this.refreshPermissionCache();
+    	                        }
+    	                    }
+
+    	                    return { success: true, memberships: memberships, total: result.total || 0 };
+    	                } catch (error) {
+    	                    // Handle "team not found" errors gracefully (e.g., team was just deleted)
+    	                    if (error.message && error.message.includes('could not be found')) {
+    	                        // Silently return empty memberships for deleted teams
+    	                        if (this.currentTeam && this.currentTeam.$id === teamId) {
+    	                            this.currentTeamMemberships = [];
+    	                        }
+    	                        return { success: true, memberships: [], total: 0 };
+    	                    }
+    	                    this.error = error.message;
+    	                    return { success: false, error: error.message };
+    	                }
+    	            };
+
+    	            // Get membership
+    	            store.getMembership = async function(teamId, membershipId) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                if (!this.isAuthenticated) {
+    	                    return { success: false, error: 'You must be signed in to get membership details' };
+    	                }
+
+    	                try {
+    	                    const result = await this._appwrite.teams.getMembership({
+    	                        teamId: teamId,
+    	                        membershipId: membershipId
+    	                    });
+
+    	                    return { success: true, membership: result };
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    return { success: false, error: error.message };
+    	                }
+    	            };
+
+    	            // Update membership roles
+    	            store.updateMembership = async function(teamId, membershipId, roles) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                if (!this.isAuthenticated) {
+    	                    return { success: false, error: 'You must be signed in to update membership' };
+    	                }
+
+    	                // Check if user has updateMembers permission (required for updating other members' roles)
+    	                // Users can always update their own roles
+    	                const isUpdatingSelf = this.user && this.currentTeamMemberships?.some(
+    	                    m => m.$id === membershipId && m.userId === this.user.$id
+    	                );
+    	                
+    	                if (!isUpdatingSelf) {
+    	                    // Updating another member - requires permission
+    	                    if (!this.hasTeamPermission || !await this.hasTeamPermission('updateMembers')) {
+    	                        return { success: false, error: 'You do not have permission to update member roles' };
+    	                    }
+    	                }
+
+    	                this.inProgress = true;
+    	                this.error = null;
+
+    	                try {
+    	                    // Normalize roles for Appwrite (add "owner" if custom roles require it)
+    	                    let normalizedRoles = roles;
+    	                    if (this.normalizeRolesForAppwrite) {
+    	                        normalizedRoles = await this.normalizeRolesForAppwrite(roles, teamId);
+    	                    }
+
+    	                    const result = await this._appwrite.teams.updateMembership({
+    	                        teamId: teamId,
+    	                        membershipId: membershipId,
+    	                        roles: normalizedRoles
+    	                    });
+
+    	                    // Check if this was the current user's membership (before refreshing)
+    	                    const isCurrentUser = this.user && result.membership && result.membership.userId === this.user.$id;
+
+    	                    // Refresh memberships if this was the current team
+    	                    if (this.currentTeam && this.currentTeam.$id === teamId && this.listMemberships) {
+    	                        await this.listMemberships(teamId);
+    	                    }
+    	                    
+    	                    // Refresh permission cache if this was the current user's membership
+    	                    // (This must happen after listMemberships so currentTeamMemberships is updated)
+    	                    if (isCurrentUser && this.currentTeam && this.currentTeam.$id === teamId && this.refreshPermissionCache) {
+    	                        await this.refreshPermissionCache();
+    	                    }
+
+    	                    return { success: true, membership: result };
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    return { success: false, error: error.message };
+    	                } finally {
+    	                    this.inProgress = false;
+    	                }
+    	            };
+
+    	            // Accept team invitation
+    	            store.acceptInvite = async function(teamId, membershipId, userId, secret) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                if (!this.isAuthenticated) {
+    	                    console.warn('[Indux Appwrite Auth] acceptInvite: User not authenticated');
+    	                    return { success: false, error: 'You must be signed in to accept an invitation' };
+    	                }
+
+    	                this.inProgress = true;
+    	                this.error = null;
+
+    	                try {
+    	                    const result = await this._appwrite.teams.updateMembershipStatus({
+    	                        teamId: teamId,
+    	                        membershipId: membershipId,
+    	                        userId: userId,
+    	                        secret: secret
+    	                    });
+
+    	                    // Refresh teams list to ensure the new team appears
+    	                    if (this.listTeams) {
+    	                        await this.listTeams();
+    	                    } else {
+    	                        console.warn('[Indux Appwrite Auth] acceptInvite: listTeams method not available');
+    	                    }
+    	                    
+    	                    // If this is now the current team, refresh memberships
+    	                    if (this.currentTeam && this.currentTeam.$id === teamId && this.listMemberships) {
+    	                        await this.listMemberships(teamId);
+    	                    }
+
+    	                    return { success: true, membership: result };
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    return { success: false, error: error.message };
+    	                } finally {
+    	                    this.inProgress = false;
+    	                }
+    	            };
+
+    	            // Delete membership (leave team or remove member)
+    	            store.deleteMembership = async function(teamId, membershipId) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                if (!this.isAuthenticated) {
+    	                    return { success: false, error: 'You must be signed in to delete membership' };
+    	                }
+
+    	                // Check if user has removeMembers permission (unless removing themselves)
+    	                // Note: Users can always leave a team themselves, but need permission to remove others
+    	                const isRemovingSelf = this.user && this.currentTeamMemberships?.some(
+    	                    m => m.$id === membershipId && m.userId === this.user.$id
+    	                );
+    	                
+    	                if (!isRemovingSelf) {
+    	                    // Removing another member - requires permission
+    	                    if (!this.hasTeamPermission || !await this.hasTeamPermission('removeMembers')) {
+    	                        return { success: false, error: 'You do not have permission to remove members' };
+    	                    }
+    	                }
+
+    	                this.inProgress = true;
+    	                this.error = null;
+
+    	                try {
+    	                    await this._appwrite.teams.deleteMembership({
+    	                        teamId: teamId,
+    	                        membershipId: membershipId
+    	                    });
+
+    	                    // Refresh memberships if this was the current team (do this first to update UI immediately)
+    	                    if (this.currentTeam && this.currentTeam.$id === teamId && this.listMemberships) {
+    	                        await this.listMemberships(teamId);
+    	                    }
+    	                    
+    	                    // Refresh teams list (this will also trigger realtime updates for other users)
+    	                    if (this.listTeams) {
+    	                        await this.listTeams();
+    	                    }
+
+    	                    return { success: true };
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    return { success: false, error: error.message };
+    	                } finally {
+    	                    this.inProgress = false;
+    	                }
+    	            };
+    	        } else if (!store) {
+    	            setTimeout(waitForStore, 50);
+    	        }
+    	    };
+
+    	    setTimeout(waitForStore, 100);
+    	}
+
+    	// Initialize when Alpine is ready
+    	document.addEventListener('alpine:init', () => {
+    	    try {
+    	        initializeTeamsMembers();
+    	    } catch (error) {
+    	        // Failed to initialize teams members
+    	    }
+    	});
+
+    	// Also try immediately if Alpine is already available
+    	if (typeof Alpine !== 'undefined') {
+    	    try {
+    	        initializeTeamsMembers();
+    	    } catch (error) {
+    	        // Alpine might not be fully initialized yet, that's okay
+    	    }
+    	}
+
+    	// Export members interface
+    	window.InduxAppwriteAuthTeamsMembers = {
+    	    initialize: initializeTeamsMembers
+    	};
+
+
+
+    	/* Auth teams - Callback handlers */
+
+    	// Handle team invitation callbacks via events
+    	function handleTeamCallbacks() {
+    	    // Handle team invitation callback
+    	    window.addEventListener('indux:auth:callback:team', async (event) => {
+    	        const store = Alpine.store('auth');
+    	        if (!store) {
+    	            return;
+    	        }
+    	        
+    	        const callbackInfo = event.detail;
+    	        
+    	        store.inProgress = true;
+    	        store.error = null;
+
+    	        try {
+    	            // Accept the invitation
+    	            if (store.acceptInvite) {
+    	                const result = await store.acceptInvite(
+    	                    callbackInfo.teamId,
+    	                    callbackInfo.membershipId,
+    	                    callbackInfo.userId,
+    	                    callbackInfo.secret
+    	                );
+
+    	                if (result.success) {
+    	                    window.dispatchEvent(new CustomEvent('indux:auth:team:invite-accepted', {
+    	                        detail: { membership: result.membership }
+    	                    }));
+    	                } else {
+    	                    store.error = result.error;
+    	                }
+    	            }
+    	        } catch (error) {
+    	            store.error = error.message;
+    	        } finally {
+    	            store.inProgress = false;
+    	        }
+    	    });
+    	}
+
+    	// Initialize when Alpine is ready
+    	document.addEventListener('alpine:init', () => {
+    	    try {
+    	        handleTeamCallbacks();
+    	    } catch (error) {
+    	        // Failed to initialize team callbacks
+    	    }
+    	});
+
+    	// Also try immediately if Alpine is already available
+    	if (typeof Alpine !== 'undefined') {
+    	    try {
+    	        handleTeamCallbacks();
+    	    } catch (error) {
+    	        // Alpine might not be fully initialized yet, that's okay
+    	    }
+    	}
+
+    	// Export callbacks interface
+    	window.InduxAppwriteAuthTeamsCallbacks = {
+    	    handleCallbacks: handleTeamCallbacks
+    	};
+
+
+
+    	/* Auth teams - Convenience methods for UI */
+
+    	// Add convenience methods to auth store
+    	function initializeTeamsConvenience() {
+    	    if (typeof Alpine === 'undefined') {
+    	        return;
+    	    }
+
+    	    const config = window.InduxAppwriteAuthConfig;
+    	    if (!config) {
+    	        return;
+    	    }
+
+    	    // Wait for store to be initialized
+    	    const waitForStore = () => {
+    	        const store = Alpine.store('auth');
+    	        if (store) {
+    	            // Ensure cache properties are initialized (methods are already in store)
+    	            if (!store._permissionCache) store._permissionCache = {};
+    	            if (store._userRoleCache === undefined) store._userRoleCache = null;
+    	            if (!store._allRolesCache) store._allRolesCache = null;
+    	            if (!store._allRolesCacheByTeam) store._allRolesCacheByTeam = {};
+    	            if (!store._userGeneratedRolesCache) store._userGeneratedRolesCache = {};
+    	            
+    	            // Update permission cache when team changes
+    	            const updatePermissionCache = async function() {
+    	                if (!this.currentTeam || !this.currentTeamMemberships || !this.user) {
+    	                    this._permissionCache = {};
+    	                    this._userRoleCache = null;
+    	                    this._allRolesCache = null;
+    	                    this._userGeneratedRolesCache = {};
+    	                    // Don't clear _allRolesCacheByTeam - keep cached roles for all teams
+    	                    return;
+    	                }
+    	                
+    	                const teamId = this.currentTeam.$id;
+    	                const permissions = ['inviteMembers', 'updateMembers', 'removeMembers', 'renameTeam', 'deleteTeam', 'manageRoles'];
+    	                
+    	                // Cache permissions
+    	                for (const perm of permissions) {
+    	                    if (this.hasTeamPermission) {
+    	                        const hasPerm = await this.hasTeamPermission(perm);
+    	                        this._permissionCache[perm] = hasPerm;
+    	                    } else {
+    	                        this._permissionCache[perm] = false;
+    	                    }
+    	                }
+    	                
+    	                // Cache user role
+    	                if (this.getUserRole) {
+    	                    this._userRoleCache = await this.getUserRole();
+    	                } else {
+    	                    this._userRoleCache = null;
+    	                }
+    	                
+    	                // Cache all roles
+    	                if (this.getAllRoles) {
+    	                    const allRoles = await this.getAllRoles(teamId);
+    	                    // Create new object reference to ensure Alpine reactivity
+    	                    const rolesCopy = allRoles ? { ...allRoles } : {};
+    	                    this._allRolesCache = rolesCopy;
+    	                    // Also cache by team ID for per-team lookups (create new object reference)
+    	                    if (!this._allRolesCacheByTeam) this._allRolesCacheByTeam = {};
+    	                    this._allRolesCacheByTeam[teamId] = { ...rolesCopy };
+    	                    
+    	                    // Pre-populate permanent role cache for all roles (for isRoleDeletable to work)
+    	                    if (!this._rolePermanentCache) this._rolePermanentCache = {};
+    	                    if (!this._rolePermanentCache[teamId]) this._rolePermanentCache[teamId] = {};
+    	                    if (this.isRolePermanent) {
+    	                        for (const roleName of Object.keys(rolesCopy)) {
+    	                            // Pre-cache permanent status for all roles
+    	                            await this.isRolePermanent(teamId, roleName);
+    	                        }
+    	                    }
+    	                    
+    	                    // Cache which roles are user-generated (always check, no feature flag needed)
+    	                    this._userGeneratedRolesCache = {};
+    	                    if (this._allRolesCache && this.isUserGeneratedRole) {
+    	                        for (const roleName of Object.keys(this._allRolesCache)) {
+    	                            this._userGeneratedRolesCache[roleName] = await this.isUserGeneratedRole(teamId, roleName);
+    	                        }
+    	                    }
+    	                } else {
+    	                    this._allRolesCache = {};
+    	                    if (!this._allRolesCacheByTeam) this._allRolesCacheByTeam = {};
+    	                    this._allRolesCacheByTeam[teamId] = {};
+    	                }
+    	            };
+    	            
+    	            // Public method to refresh permission cache
+    	            if (!store.refreshPermissionCache) {
+    	                store.refreshPermissionCache = async function() {
+    	                    await updatePermissionCache.call(this);
+    	                };
+    	            }
+    	            
+    	            if (!store.createTeamFromName) {
+    	            // Convenience method: create team using newTeamName property
+    	            store.createTeamFromName = async function() {
+    	                // Ensure newTeamName is a string and has content
+    	                const teamNameValue = String(this.newTeamName || '').trim();
+    	                if (!teamNameValue) {
+    	                    return { success: false, error: 'Team name is required' };
+    	                }
+    	                
+    	                const result = await this.createTeam(null, teamNameValue, []);
+    	                if (result.success) {
+    	                    this.newTeamName = ''; // Clear input
+    	                }
+    	                return result;
+    	            };
+    	            
+    	            // Convenience method: update current team name using updateTeamNameInput property
+    	            store.updateCurrentTeamName = async function() {
+    	                if (!this.currentTeam || !this.currentTeam.$id) {
+    	                    return { success: false, error: 'No team selected' };
+    	                }
+    	                
+    	                // Ensure updateTeamNameInput is a string and has content
+    	                const teamNameValue = String(this.updateTeamNameInput || '').trim();
+    	                if (!teamNameValue) {
+    	                    return { success: false, error: 'Team name is required' };
+    	                }
+    	                
+    	                const teamId = this.currentTeam.$id;
+    	                const result = await this.updateTeamName(teamId, teamNameValue);
+    	                
+    	                if (result.success) {
+    	                    this.updateTeamNameInput = ''; // Clear input
+    	                    // Note: updateTeamName() already calls listTeams() and updates currentTeam
+    	                }
+    	                return result;
+    	            };
+    	            
+    	            // Convenience method: invite to current team using inviteEmail and inviteRoles properties
+    	            store.inviteToCurrentTeam = async function() {
+    	                if (!this.currentTeam) {
+    	                    return { success: false, error: 'No team selected' };
+    	                }
+    	                
+    	                // Ensure email is a string
+    	                const email = String(this.inviteEmail || '').trim();
+    	                
+    	                // Email is required for invitations
+    	                if (!email) {
+    	                    return { success: false, error: 'Email is required' };
+    	                }
+    	                
+    	                // Use inviteRoles array directly (already an array)
+    	                const roles = Array.isArray(this.inviteRoles) 
+    	                    ? this.inviteRoles.filter(r => r && typeof r === 'string')
+    	                    : [];
+    	                
+    	                // If no roles specified, use empty array (will default to "owner" in inviteMember)
+    	                const result = await this.inviteMember(this.currentTeam.$id, roles, email);
+    	                if (result.success) {
+    	                    this.inviteEmail = ''; // Clear inputs
+    	                    this.inviteRoles = []; // Clear roles array
+    	                    if (this.listMemberships) {
+    	                        await this.listMemberships(this.currentTeam.$id); // Refresh memberships
+    	                    }
+    	                }
+    	                return result;
+    	            };
+    	            
+    	            // Role management methods for invite (similar to permission management)
+    	            store.toggleInviteRole = function(roleName) {
+    	                if (!roleName || typeof roleName !== 'string') return;
+    	                if (!this.inviteRoles) this.inviteRoles = [];
+    	                const index = this.inviteRoles.indexOf(roleName);
+    	                if (index === -1) {
+    	                    // Add role (create new array for reactivity)
+    	                    this.inviteRoles = [...this.inviteRoles, roleName];
+    	                } else {
+    	                    // Remove role (create new array for reactivity)
+    	                    this.inviteRoles = this.inviteRoles.filter(r => r !== roleName);
+    	                }
+    	            };
+    	            
+    	            store.isInviteRoleSelected = function(roleName) {
+    	                if (!this.inviteRoles || !Array.isArray(this.inviteRoles)) return false;
+    	                return this.inviteRoles.includes(roleName);
+    	            };
+    	            
+    	            store.addCustomInviteRoles = function(inputValue) {
+    	                if (!inputValue || typeof inputValue !== 'string') return;
+    	                if (!this.inviteRoles) this.inviteRoles = [];
+    	                
+    	                // Parse comma-separated roles
+    	                const newRoles = inputValue.split(',')
+    	                    .map(r => r.trim())
+    	                    .filter(r => r && typeof r === 'string');
+    	                
+    	                // Add each role if not already present
+    	                const updated = [...this.inviteRoles];
+    	                for (const role of newRoles) {
+    	                    if (!updated.includes(role)) {
+    	                        updated.push(role);
+    	                    }
+    	                }
+    	                
+    	                // Create new array reference for reactivity
+    	                this.inviteRoles = updated;
+    	            };
+    	            
+    	            store.clearInviteRoles = function() {
+    	                this.inviteRoles = [];
+    	            };
+    	            
+    	            // Member editing methods (for existing members)
+    	            store.startEditingMember = async function(teamId, membershipId, currentRoles) {
+    	                if (!teamId || !membershipId) return;
+    	                
+    	                // Initialize editing state
+    	                this.editingMember = {
+    	                    teamId: teamId,
+    	                    membershipId: membershipId,
+    	                    roles: Array.isArray(currentRoles) ? [...currentRoles] : []
+    	                };
+    	                
+    	                // Initialize role selection with current roles
+    	                this.inviteRoles = Array.isArray(currentRoles) ? [...currentRoles] : [];
+    	            };
+    	            
+    	            store.cancelEditingMember = function() {
+    	                this.editingMember = null;
+    	                this.inviteRoles = [];
+    	            };
+    	            
+    	            store.saveEditingMember = async function() {
+    	                if (!this.editingMember) {
+    	                    return { success: false, error: 'No member being edited' };
+    	                }
+    	                
+    	                const { teamId, membershipId } = this.editingMember;
+    	                const roles = Array.isArray(this.inviteRoles) 
+    	                    ? this.inviteRoles.filter(r => r && typeof r === 'string')
+    	                    : [];
+    	                
+    	                // Update membership roles (this will refresh memberships and permission cache if needed)
+    	                const result = await this.updateMembership(teamId, membershipId, roles);
+    	                
+    	                if (result.success) {
+    	                    this.cancelEditingMember();
+    	                    // Note: updateMembership already refreshes memberships and permission cache
+    	                }
+    	                
+    	                return result;
+    	            };
+    	            
+    	            // Convenience method: delete/remove a member
+    	            store.deleteMember = async function(teamId, membershipId) {
+    	                if (!teamId || !membershipId) {
+    	                    return { success: false, error: 'Team ID and membership ID are required' };
+    	                }
+    	                
+    	                // Check permission
+    	                if (!this.hasTeamPermissionSync || !this.hasTeamPermissionSync('removeMembers')) {
+    	                    return { success: false, error: 'You do not have permission to remove members' };
+    	                }
+    	                
+    	                const result = await this.deleteMembership(teamId, membershipId);
+    	                return result;
+    	            };
+    	            
+    	            // Convenience method: leave a team (user removes themselves)
+    	            store.leaveTeam = async function(teamId, membershipId) {
+    	                if (!teamId || !membershipId) {
+    	                    return { success: false, error: 'Team ID and membership ID are required' };
+    	                }
+    	                
+    	                // Verify this is the current user's membership
+    	                const isCurrentUser = this.user && this.currentTeamMemberships?.some(
+    	                    m => m.$id === membershipId && m.userId === this.user.$id
+    	                );
+    	                
+    	                if (!isCurrentUser) {
+    	                    return { success: false, error: 'You can only leave teams you are a member of' };
+    	                }
+    	                
+    	                // Delete membership (users can always leave themselves)
+    	                const result = await this.deleteMembership(teamId, membershipId);
+    	                
+    	                // If leaving the current team, clear it and select another team if available
+    	                if (result.success && this.currentTeam && this.currentTeam.$id === teamId) {
+    	                    this.currentTeam = null;
+    	                    this.currentTeamMemberships = [];
+    	                    
+    	                    // Select the first available team if any remain
+    	                    if (this.teams && this.teams.length > 0) {
+    	                        const remainingTeam = this.teams.find(t => t.$id !== teamId);
+    	                        if (remainingTeam) {
+    	                            if (this.viewTeam) {
+    	                                await this.viewTeam(remainingTeam);
+    	                            } else {
+    	                                this.currentTeam = remainingTeam;
+    	                            }
+    	                        }
+    	                    }
+    	                }
+    	                
+    	                return result;
+    	            };
+    	            
+    	            // Convenience method: view team (sets current team and loads memberships)
+    	            store.viewTeam = async function(team) {
+    	                this.currentTeam = team;
+    	                // Reset rename input to current team name when viewing a team
+    	                if (team && team.name) {
+    	                    this.updateTeamNameInput = team.name;
+    	                } else {
+    	                    this.updateTeamNameInput = '';
+    	                }
+    	                if (team && team.$id && this.listMemberships) {
+    	                    const result = await this.listMemberships(team.$id);
+    	                    if (result.success) {
+    	                        this.currentTeamMemberships = result.memberships || [];
+    	                    }
+    	                }
+    	                return { success: true };
+    	            };
+    	            
+    	            // Check if current user is an owner of the current team
+    	            store.isCurrentTeamOwner = function() {
+    	                if (!this.currentTeam || !this.currentTeamMemberships || !this.user) {
+    	                    return false;
+    	                }
+    	                const userMembership = this.currentTeamMemberships.find(
+    	                    m => m.userId === this.user.$id
+    	                );
+    	                return userMembership && userMembership.roles && userMembership.roles.includes('owner');
+    	            };
+    	            
+    	            // Check if a team can be deleted (checks both immutable status and permissions)
+    	            store.isTeamDeletable = function(team) {
+    	                if (!team || !team.$id) {
+    	                    return false;
+    	                }
+    	                // Check if team is immutable/permanent
+    	                if (this._teamImmutableCache && this._teamImmutableCache[team.$id]) {
+    	                    return false;
+    	                }
+    	                // If checking current team, also check permissions
+    	                if (this.currentTeam && this.currentTeam.$id === team.$id) {
+    	                    return (this._permissionCache && this._permissionCache.deleteTeam) || false;
+    	                }
+    	                // For other teams, assume deletable if not immutable
+    	                return true;
+    	            };
+    	            
+    	            // Check if a team can be renamed (checks permissions for current team)
+    	            store.isTeamRenamable = function(team) {
+    	                if (!team || !team.$id) {
+    	                    return false;
+    	                }
+    	                // If checking current team, check permissions
+    	                if (this.currentTeam && this.currentTeam.$id === team.$id) {
+    	                    return (this._permissionCache && this._permissionCache.renameTeam) || false;
+    	                }
+    	                // For other teams, assume renamable (permissions will be checked when team becomes current)
+    	                return true;
+    	            };
+    	            
+    	            // Check if a role can be deleted (checks if it's permanent) - synchronous version for Alpine
+    	            store.isRoleDeletable = function(teamId, roleName) {
+    	                if (!teamId || !roleName) {
+    	                    return false;
+    	                }
+    	                // Permanent roles cannot be deleted
+    	                if (this.isRolePermanentSync && this.isRolePermanentSync(teamId, roleName)) {
+    	                    return false;
+    	                }
+    	                // Template roles and user-generated roles can be deleted
+    	                return true;
+    	            };
+    	            
+    	            // Check if a role is currently being edited - cleaner state check
+    	            store.isRoleBeingEdited = function(teamId, roleName) {
+    	                if (!this.editingRole || !teamId || !roleName) {
+    	                    return false;
+    	                }
+    	                return this.editingRole.teamId === teamId && 
+    	                       this.editingRole.oldRoleName === roleName;
+    	            };
+    	            
+    	            // Permission convenience methods (synchronous for Alpine bindings)
+    	            // Note: These override async versions from roles.js for use in Alpine bindings
+    	            store.canManageRolesSync = function() {
+    	                return this.hasTeamPermissionSync && this.hasTeamPermissionSync('manageRoles');
+    	            };
+    	            
+    	            // Alias for cleaner HTML (overrides async version for Alpine bindings)
+    	            store.canManageRoles = store.canManageRolesSync;
+    	            
+    	            store.canInviteMembers = function() {
+    	                return this.hasTeamPermissionSync && this.hasTeamPermissionSync('inviteMembers');
+    	            };
+    	            
+    	            store.canUpdateMembers = function() {
+    	                return this.hasTeamPermissionSync && this.hasTeamPermissionSync('updateMembers');
+    	            };
+    	            
+    	            store.canRemoveMembers = function() {
+    	                return this.hasTeamPermissionSync && this.hasTeamPermissionSync('removeMembers');
+    	            };
+    	            
+    	            store.canRenameTeam = function() {
+    	                return this.hasTeamPermissionSync && this.hasTeamPermissionSync('renameTeam');
+    	            };
+    	            
+    	            store.canDeleteTeam = function() {
+    	                return this.hasTeamPermissionSync && this.hasTeamPermissionSync('deleteTeam');
+    	            };
+    	            
+    	            // Combined action disabled check (combines inProgress and permission)
+    	            store.isActionDisabled = function(permission) {
+    	                if (this.inProgress) return true;
+    	                if (permission && this.hasTeamPermissionSync) {
+    	                    return !this.hasTeamPermissionSync(permission);
+    	                }
+    	                return false;
+    	            };
+    	            
+    	            // Get member display name (extracts complex logic)
+    	            store.getMemberDisplayName = function(membership) {
+    	                if (!membership) return 'Unknown user';
+    	                if (membership.userId === this.user?.$id) {
+    	                    return this.user?.name || this.user?.email || 'You';
+    	                }
+    	                return membership.userName || 
+    	                       membership.email || 
+    	                       membership.userEmail || 
+    	                       (membership.confirm === false ? 'Pending invitation' : 'Unknown user');
+    	            };
+    	            
+    	            // Get member email (extracts complex logic)
+    	            store.getMemberEmail = function(membership) {
+    	                if (!membership) return 'No email';
+    	                return membership.email || 
+    	                       membership.userEmail || 
+    	                       (membership.userId === this.user?.$id ? (this.user?.email || '') : '') || 
+    	                       'No email';
+    	            };
+    	            
+    	            // Get all available permissions (standard + custom from existing roles)
+    	            store.getAllAvailablePermissions = async function(teamId) {
+    	                const permissions = new Set();
+    	                
+    	                // Add standard owner permissions (from roles module)
+    	                // These are defined in indux.appwrite.auth.teams.roles.js
+    	                const standardPermissions = [
+    	                    'inviteMembers',
+    	                    'removeMembers',
+    	                    'renameTeam',
+    	                    'deleteTeam',
+    	                    'manageRoles'
+    	                ];
+    	                standardPermissions.forEach(p => permissions.add(p));
+    	                
+    	                // Add permissions from existing roles in this team
+    	                if (teamId && this.getAllRoles) {
+    	                    const allRoles = await this.getAllRoles(teamId);
+    	                    if (allRoles && typeof allRoles === 'object') {
+    	                        for (const rolePermissions of Object.values(allRoles)) {
+    	                            if (Array.isArray(rolePermissions)) {
+    	                                rolePermissions.forEach(p => permissions.add(p));
+    	                            }
+    	                        }
+    	                    }
+    	                }
+    	                
+    	                // Also check permanent and template roles from config
+    	                const config = window.InduxAppwriteAuthConfig;
+    	                if (config) {
+    	                    const appwriteConfig = await config.getAppwriteConfig();
+    	                    const permanentRoles = appwriteConfig?.permanentRoles || {};
+    	                    const templateRoles = appwriteConfig?.templateRoles || {};
+    	                    
+    	                    for (const rolePermissions of Object.values(permanentRoles)) {
+    	                        if (Array.isArray(rolePermissions)) {
+    	                            rolePermissions.forEach(p => permissions.add(p));
+    	                        }
+    	                    }
+    	                    
+    	                    for (const rolePermissions of Object.values(templateRoles)) {
+    	                        if (Array.isArray(rolePermissions)) {
+    	                            rolePermissions.forEach(p => permissions.add(p));
+    	                        }
+    	                    }
+    	                }
+    	                
+    	                return Array.from(permissions).sort();
+    	            };
+    	            
+    	            // Permission management methods for role creation
+    	            store.togglePermission = function(permission) {
+    	                if (!permission || typeof permission !== 'string') return;
+    	                if (!this.newRolePermissions) this.newRolePermissions = [];
+    	                const index = this.newRolePermissions.indexOf(permission);
+    	                if (index === -1) {
+    	                    // Add permission (create new array for reactivity)
+    	                    this.newRolePermissions = [...this.newRolePermissions, permission];
+    	                } else {
+    	                    // Remove permission (create new array for reactivity)
+    	                    this.newRolePermissions = this.newRolePermissions.filter(p => p !== permission);
+    	                }
+    	            };
+    	            
+    	            store.isPermissionSelected = function(permission) {
+    	                if (!this.newRolePermissions || !Array.isArray(this.newRolePermissions)) return false;
+    	                return this.newRolePermissions.includes(permission);
+    	            };
+    	            
+    	            store.addCustomPermissions = function(inputValue) {
+    	                if (!inputValue || typeof inputValue !== 'string') return;
+    	                if (!this.newRolePermissions) this.newRolePermissions = [];
+    	                
+    	                // Parse comma-separated permissions
+    	                const newPerms = inputValue.split(',')
+    	                    .map(p => p.trim())
+    	                    .filter(p => p && typeof p === 'string');
+    	                
+    	                // Add each permission if not already present
+    	                const updated = [...this.newRolePermissions];
+    	                for (const perm of newPerms) {
+    	                    if (!updated.includes(perm)) {
+    	                        updated.push(perm);
+    	                    }
+    	                }
+    	                
+    	                // Create new array reference for reactivity
+    	                this.newRolePermissions = updated;
+    	            };
+    	            
+    	            store.removePermission = function(permission) {
+    	                if (!permission || !this.newRolePermissions || !Array.isArray(this.newRolePermissions)) return;
+    	                this.newRolePermissions = this.newRolePermissions.filter(p => p !== permission);
+    	            };
+    	            
+    	            store.clearPermissions = function() {
+    	                this.newRolePermissions = [];
+    	            };
+    	            
+    	            // Role editing methods (for existing roles)
+    	            store.startEditingRole = async function(teamId, roleName) {
+    	                if (!teamId || !roleName) return;
+    	                
+    	                // Get current role permissions
+    	                const allRoles = this.allTeamRoles({ $id: teamId });
+    	                const permissions = allRoles && allRoles[roleName] ? [...allRoles[roleName]] : [];
+    	                
+    	                // Ensure allAvailablePermissions is populated (for dropdown)
+    	                if (!this.allAvailablePermissions || this.allAvailablePermissions.length === 0) {
+    	                    if (this.getAllAvailablePermissions) {
+    	                        await this.getAllAvailablePermissions(teamId);
+    	                    }
+    	                }
+    	                
+    	                // Set editing state
+    	                this.editingRole = {
+    	                    teamId: teamId,
+    	                    oldRoleName: roleName,
+    	                    newRoleName: roleName,
+    	                    permissions: permissions
+    	                };
+    	                
+    	                // Initialize permission selection with current permissions
+    	                this.newRolePermissions = [...permissions];
+    	            };
+    	            
+    	            store.cancelEditingRole = function() {
+    	                this.editingRole = null;
+    	                this.newRolePermissions = [];
+    	            };
+    	            
+    	            store.saveEditingRole = async function() {
+    	                if (!this.editingRole) {
+    	                    return { success: false, error: 'No role being edited' };
+    	                }
+    	                
+    	                const { teamId, oldRoleName, newRoleName } = this.editingRole;
+    	                const permissions = Array.isArray(this.newRolePermissions) 
+    	                    ? this.newRolePermissions.filter(p => p && typeof p === 'string')
+    	                    : [];
+    	                
+    	                let result;
+    	                
+    	                // If name changed, rename the role
+    	                if (oldRoleName !== newRoleName && newRoleName.trim()) {
+    	                    result = await this.renameUserRole(teamId, oldRoleName, newRoleName.trim());
+    	                    if (!result.success) {
+    	                        return result;
+    	                    }
+    	                }
+    	                
+    	                // Update permissions (use new name if renamed, otherwise old name)
+    	                const roleNameToUpdate = newRoleName.trim() || oldRoleName;
+    	                result = await this.updateUserRole(teamId, roleNameToUpdate, permissions);
+    	                
+    	                if (result.success) {
+    	                    this.cancelEditingRole();
+    	                }
+    	                
+    	                return result;
+    	            };
+    	            
+    	            // Format team date (createdAt or updatedAt)
+    	            store.formatTeamDate = function(dateString) {
+    	                if (!dateString) return '';
+    	                try {
+    	                    const date = new Date(dateString);
+    	                    if (isNaN(date.getTime())) return dateString; // Return original if invalid
+    	                    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    	                } catch (e) {
+    	                    return dateString; // Return original if parsing fails
+    	                }
+    	            };
+    	            
+    	            // Get formatted createdAt for a team
+    	            store.teamCreatedAt = function(team) {
+    	                if (!team) return '';
+    	                return this.formatTeamDate(team.$createdAt || team.createdAt);
+    	            };
+    	            
+    	            // Get formatted updatedAt for a team
+    	            store.teamUpdatedAt = function(team) {
+    	                if (!team) return '';
+    	                return this.formatTeamDate(team.$updatedAt || team.updatedAt);
+    	            };
+    	            
+    	            // Get current user's roles in the current team
+    	            store.getCurrentTeamRoles = function() {
+    	                if (!this.currentTeam || !this.currentTeamMemberships || !this.user) {
+    	                    return [];
+    	                }
+    	                const userMembership = this.currentTeamMemberships.find(
+    	                    m => m.userId === this.user.$id
+    	                );
+    	                return userMembership?.roles || [];
+    	            };
+    	            
+    	            // Check if current user has a specific permission in the current team
+    	            // Uses role abstraction layer to check permissions based on custom roles
+    	            store.hasTeamPermission = async function(permission) {
+    	                if (!this.currentTeam || !this.currentTeamMemberships || !this.user) {
+    	                    return false;
+    	                }
+    	                
+    	                const userRoles = this.getCurrentTeamRoles();
+    	                const teamId = this.currentTeam?.$id;
+    	                if (this.hasPermission) {
+    	                    return await this.hasPermission(userRoles, permission, teamId);
+    	                }
+    	                
+    	                // Fallback: check owner role directly
+    	                return userRoles.includes('owner');
+    	            };
+    	            
+    	            // Synchronous version for Alpine.js bindings (uses permission cache)
+    	            store.hasTeamPermissionSync = function(permission) {
+    	                if (!this.currentTeam || !this.currentTeamMemberships || !this.user) {
+    	                    return false;
+    	                }
+    	                
+    	                // Use cached permissions if available (updated by updatePermissionCache)
+    	                if (this._permissionCache && typeof this._permissionCache[permission] === 'boolean') {
+    	                    return this._permissionCache[permission];
+    	                }
+    	                
+    	                // Fallback: check if user has no custom roles (should have all permissions)
+    	                // This matches the logic in hasPermission: if customRoles.length === 0, return true
+    	                const userRoles = this.getCurrentTeamRoles();
+    	                const customRoles = userRoles.filter(role => role !== 'owner');
+    	                
+    	                // If user has no custom roles (only "owner" or empty), grant all permissions
+    	                // This handles users with "No Role" who should have all owner permissions
+    	                if (customRoles.length === 0) {
+    	                    return true;
+    	                }
+    	                
+    	                // If user has custom roles but cache is missing, return false (shouldn't happen if cache is working)
+    	                return false;
+    	            };
+
+    	            // Check if current user has a specific role
+    	            store.hasRole = function(roleName) {
+    	                if (!this.currentTeam || !this.currentTeamMemberships || !this.user) {
+    	                    return false;
+    	                }
+    	                const userRoles = this.getCurrentTeamRoles();
+    	                return userRoles.includes(roleName);
+    	            };
+
+    	            // Get current user's primary role in current team
+    	            store.getUserRole = async function() {
+    	                if (!this.currentTeam || !this.currentTeamMemberships || !this.user) {
+    	                    return null;
+    	                }
+    	                const userRoles = this.getCurrentTeamRoles();
+    	                const teamId = this.currentTeam?.$id;
+    	                if (this.getPrimaryDisplayRole) {
+    	                    return await this.getPrimaryDisplayRole(userRoles, teamId);
+    	                }
+    	                return userRoles[0] || null;
+    	            };
+
+    	            // Get current user's all roles in current team
+    	            store.getUserRoles = async function() {
+    	                if (!this.currentTeam || !this.currentTeamMemberships || !this.user) {
+    	                    return [];
+    	                }
+    	                const userRoles = this.getCurrentTeamRoles();
+    	                const teamId = this.currentTeam?.$id;
+    	                if (this.normalizeRolesForDisplay) {
+    	                    return await this.normalizeRolesForDisplay(userRoles, teamId);
+    	                }
+    	                return userRoles;
+    	            };
+
+    	            } // End of if (!store.createTeamFromName)
+    	            
+    	            // Note: hasPermission from roles module takes (userRoles, permission, teamId)
+    	            // hasTeamPermission is the convenience wrapper for current team
+    	            
+    	            // Update cache when team is viewed (wrap existing viewTeam if it exists)
+    	            if (store.viewTeam && !store._viewTeamWrapped) {
+    	                const originalViewTeam = store.viewTeam;
+    	                store.viewTeam = async function(team) {
+    	                    const result = await originalViewTeam.call(this, team);
+    	                    // Update cache after viewing team (which loads memberships)
+    	                    if (updatePermissionCache) {
+    	                        await updatePermissionCache.call(this);
+    	                    }
+    	                    // Update available permissions for autocomplete
+    	                    if (this.getAllAvailablePermissions && team && team.$id) {
+    	                        this.allAvailablePermissions = await this.getAllAvailablePermissions(team.$id);
+    	                    }
+    	                    return result;
+    	                };
+    	                store._viewTeamWrapped = true; // Prevent double-wrapping
+    	            }
+    	        } else if (!store) {
+    	            setTimeout(waitForStore, 50);
+    	        }
+    	    };
+
+    	    setTimeout(waitForStore, 100);
+    	}
+
+    	// Initialize when Alpine is ready
+    	document.addEventListener('alpine:init', () => {
+    	    try {
+    	        initializeTeamsConvenience();
+    	    } catch (error) {
+    	        // Failed to initialize teams convenience
+    	    }
+    	});
+
+    	// Also try immediately if Alpine is already available
+    	if (typeof Alpine !== 'undefined') {
+    	    try {
+    	        initializeTeamsConvenience();
+    	    } catch (error) {
+    	        // Alpine might not be fully initialized yet, that's okay
+    	    }
+    	}
+
+    	// Export convenience interface
+    	window.InduxAppwriteAuthTeamsConvenience = {
+    	    initialize: initializeTeamsConvenience
+    	};
+
+
+
+    	/* Auth anonymous */
+
+    	// Add anonymous session methods to auth store
+    	function initializeAnonymous() {
+    	    if (typeof Alpine === 'undefined') {
+    	        return;
+    	    }
+
+    	    const config = window.InduxAppwriteAuthConfig;
+    	    if (!config) {
+    	        return;
+    	    }
+
+    	    // Wait for store to be initialized
+    	    const waitForStore = () => {
+    	        const store = Alpine.store('auth');
+    	        if (store && !store._createAnonymousSession) {
+    	            // Add anonymous session method to store (internal, used by store itself)
+    	            store._createAnonymousSession = async function() {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                // Check if guest sessions are enabled (auto or manual)
+    	                if (!this._guestAuto && !this._guestManual) {
+    	                    return { success: false, error: 'Guest sessions are not enabled' };
+    	                }
+
+    	                try {
+    	                    const session = await this._appwrite.account.createAnonymousSession();
+    	                    this.session = session;
+    	                    this.user = await this._appwrite.account.get();
+    	                    this.isAuthenticated = true;
+    	                    this.isAnonymous = true;
+    	                    
+    	                    // Sync state to localStorage for cross-tab synchronization
+    	                    if (this._syncStateToStorage) {
+    	                        this._syncStateToStorage(this);
+    	                    }
+
+    	                    window.dispatchEvent(new CustomEvent('indux:auth:anonymous', {
+    	                        detail: { user: this.user }
+    	                    }));
+
+    	                    return { success: true, user: this.user };
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    this.isAuthenticated = false;
+    	                    this.isAnonymous = false;
+    	                    return { success: false, error: error.message };
+    	                }
+    	            };
+    	        } else if (!store) {
+    	            // Wait a bit more for store to initialize
+    	            setTimeout(waitForStore, 50);
+    	        }
+    	    };
+
+    	    // Start waiting after a short delay to ensure store is ready
+    	    setTimeout(waitForStore, 100);
+    	}
+
+    	// Initialize when Alpine is ready
+    	document.addEventListener('alpine:init', () => {
+    	    try {
+    	        initializeAnonymous();
+    	    } catch (error) {
+    	        // Failed to initialize anonymous
+    	    }
+    	});
+
+    	// Export anonymous interface
+    	window.InduxAppwriteAuthAnonymous = {
+    	    initialize: initializeAnonymous
+    	};
+
+    	/* Auth magic links */
+
+    	// Add magic link methods to auth store
+    	function initializeMagicLinks() {
+    	    if (typeof Alpine === 'undefined') {
+    	        return;
+    	    }
+
+    	    const config = window.InduxAppwriteAuthConfig;
+    	    if (!config) {
+    	        return;
+    	    }
+
+    	    // Wait for store to be initialized
+    	    const waitForStore = () => {
+    	        const store = Alpine.store('auth');
+    	        if (store && !store.createMagicLink) {
+    	            // Add magic link methods to store
+    	            store.createMagicLink = async function(email, redirectUrl = window.location.href) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                // Don't allow magic link request if already signed in (non-anonymous)
+    	                if (this.isAuthenticated && !this.isAnonymous) {
+    	                    return { success: false, error: 'Already signed in. Please logout first.' };
+    	                }
+
+    	                // Check if magic links are enabled
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                if (appwriteConfig && !appwriteConfig.magic) {
+    	                    return { success: false, error: 'Magic link authentication is not enabled' };
+    	                }
+
+    	                // Use origin + pathname for redirect URL to avoid query params
+    	                // This prevents Appwrite from adding parameters to URLs that already have query strings
+    	                const currentUrl = new URL(window.location.href);
+    	                const cleanRedirectUrl = redirectUrl === window.location.href 
+    	                    ? `${currentUrl.origin}${currentUrl.pathname}` 
+    	                    : redirectUrl;
+
+    	                this.inProgress = true;
+    	                this.error = null;
+    	                // Clear expired flag when requesting new link
+    	                this.magicLinkExpired = false;
+
+    	                try {
+    	                    // Check if account method exists
+    	                    if (!this._appwrite || !this._appwrite.account) {
+    	                        return { success: false, error: 'Account instance not available' };
+    	                    }
+
+    	                    const account = this._appwrite.account;
+
+    	                    // Try createMagicURLSession first (standard method)
+    	                    if (typeof account.createMagicURLSession === 'function') {
+    	                        const token = await account.createMagicURLSession('unique()', email, cleanRedirectUrl);
+    	                        this.magicLinkSent = true;
+    	                        this.magicLinkExpired = false;
+    	                        this.error = null;
+    	                        window.dispatchEvent(new CustomEvent('indux:auth:magic-link-sent', {
+    	                            detail: { email }
+    	                        }));
+    	                        return { success: true, message: 'Magic link sent to email', token };
+    	                    }
+    	                    
+    	                    // Fallback: try createMagicURLToken (alternative method name)
+    	                    if (typeof account.createMagicURLToken === 'function') {
+    	                        const token = await account.createMagicURLToken('unique()', email, redirectUrl);
+    	                        this.magicLinkSent = true;
+    	                        this.magicLinkExpired = false;
+    	                        this.error = null;
+    	                        window.dispatchEvent(new CustomEvent('indux:auth:magic-link-sent', {
+    	                            detail: { email }
+    	                        }));
+    	                        return { success: true, message: 'Magic link sent to email', token };
+    	                    }
+
+    	                    // If neither method exists, return helpful error
+    	                    return { 
+    	                        success: false, 
+    	                        error: 'Magic link method not available. Please ensure you are using the latest Appwrite SDK.' 
+    	                    };
+    	                } catch (error) {
+    	                    this.error = error.message;
+    	                    this.magicLinkSent = false;
+    	                    this.magicLinkExpired = false;
+    	                    return { success: false, error: error.message };
+    	                } finally {
+    	                    this.inProgress = false;
+    	                }
+    	            };
+
+    	            // Convenience method: send magic link and automatically clear email on success
+    	            // Accepts: email input element, selector string, Alpine reactive object {email}, email string, or nothing (auto-find)
+    	            store.sendMagicLink = async function(emailInputOrRef, redirectUrl = window.location.href) {
+    	                let email = null;
+    	                let emailInputElement = null;
+    	                let emailDataObj = null;
+    	                
+    	                // If no argument provided, try to auto-find the email input
+    	                if (emailInputOrRef === undefined || emailInputOrRef === null) {
+    	                    // Try to find the email input in the current context
+    	                    // First, try to find the closest email input relative to the event target
+    	                    let eventTarget = null;
+    	                    if (typeof window !== 'undefined' && window.event) {
+    	                        eventTarget = window.event.target;
+    	                    }
+    	                    
+    	                    // If we have an event target, look for email input in the same form/parent
+    	                    if (eventTarget) {
+    	                        const form = eventTarget.closest('form');
+    	                        if (form) {
+    	                            emailInputElement = form.querySelector('input[type="email"]');
+    	                            if (emailInputElement) {
+    	                                email = emailInputElement.value;
+    	                            }
+    	                        } else {
+    	                            // Look for email input in the same parent container
+    	                            const parent = eventTarget.parentElement;
+    	                            if (parent) {
+    	                                emailInputElement = parent.querySelector('input[type="email"]');
+    	                                if (emailInputElement) {
+    	                                    email = emailInputElement.value;
+    	                                }
+    	                            }
+    	                        }
+    	                    }
+    	                    
+    	                    // Fallback: find first email input in document
+    	                    if (!emailInputElement) {
+    	                        emailInputElement = document.querySelector('input[type="email"]');
+    	                        if (emailInputElement) {
+    	                            email = emailInputElement.value;
+    	                        }
+    	                    }
+    	                }
+    	                // Handle different input types
+    	                else if (typeof emailInputOrRef === 'string') {
+    	                    // Could be a selector or direct email string
+    	                    // Try as selector first (most common case)
+    	                    try {
+    	                        const element = document.querySelector(emailInputOrRef);
+    	                        if (element && (element.tagName === 'INPUT' && element.type === 'email')) {
+    	                            emailInputElement = element;
+    	                            email = element.value;
+    	                        } else {
+    	                            // Treat as direct email string
+    	                            email = emailInputOrRef;
+    	                        }
+    	                    } catch (e) {
+    	                        // Invalid selector, treat as email string
+    	                        email = emailInputOrRef;
+    	                    }
+    	                } else if (emailInputOrRef && typeof emailInputOrRef === 'object') {
+    	                    // Could be DOM element or Alpine reactive object
+    	                    if (emailInputOrRef.tagName === 'INPUT' || emailInputOrRef.matches?.('input[type="email"]')) {
+    	                        // DOM input element
+    	                        emailInputElement = emailInputOrRef;
+    	                        email = emailInputElement.value;
+    	                    } else if ('email' in emailInputOrRef) {
+    	                        // Alpine reactive object { email }
+    	                        email = emailInputOrRef.email;
+    	                        emailDataObj = emailInputOrRef;
+    	                    } else {
+    	                        return { success: false, error: 'Invalid email input. Provide an input element, selector, {email} object, email string, or nothing (auto-find).' };
+    	                    }
+    	                }
+    	                
+    	                if (!email || !email.trim()) {
+    	                    return { success: false, error: 'Email is required' };
+    	                }
+    	                
+    	                const result = await this.createMagicLink(email.trim(), redirectUrl);
+    	                
+    	                // Clear email on success
+    	                if (result.success) {
+    	                    // Use a microtask to ensure Alpine processes the update smoothly
+    	                    Promise.resolve().then(() => {
+    	                        if (emailInputElement) {
+    	                            // Clear DOM input element
+    	                            emailInputElement.value = '';
+    	                            // Trigger input event for Alpine reactivity (if x-model is bound, it will update)
+    	                            emailInputElement.dispatchEvent(new Event('input', { bubbles: true }));
+    	                        } else if (emailDataObj) {
+    	                            // Clear Alpine reactive object
+    	                            emailDataObj.email = '';
+    	                        }
+    	                        // If we auto-found the input and it has x-model, the input event will update Alpine
+    	                        // This handles the case where x-model="email" is bound to the input
+    	                    });
+    	                }
+    	                
+    	                return result;
+    	            };
+
+    	            // Handle magic link callback
+    	            store.handleMagicLinkCallback = async function(userId, secret) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                this.inProgress = true;
+    	                this.error = null;
+    	                this.magicLinkExpired = false;
+    	                this.magicLinkSent = false;
+
+    	                try {
+    	                    // Delete any existing anonymous sessions first
+    	                    if (this.session && this.isAnonymous) {
+    	                        try {
+    	                            await this._appwrite.account.deleteSession(this.session.$id);
+    	                        } catch (deleteError) {
+    	                            // Could not delete anonymous session
+    	                        }
+    	                    }
+
+    	                    // Create session from magic link credentials
+    	                    const session = await this._appwrite.account.createSession(userId, secret);
+    	                    this.session = session;
+    	                    this.user = await this._appwrite.account.get();
+    	                    this.isAuthenticated = true;
+    	                    this.isAnonymous = false;
+    	                    this.magicLinkSent = false;
+    	                    this.magicLinkExpired = false;
+    	                    this.error = null;
+
+    	                    // Clear stored callback on success
+    	                    try {
+    	                        sessionStorage.removeItem('indux:magic-link:callback');
+    	                    } catch (e) {
+    	                        // Ignore
+    	                    }
+
+    	                    // Sync state
+    	                    if (this._syncStateToStorage) {
+    	                        this._syncStateToStorage(this);
+    	                    }
+
+    	                    // Load teams if enabled
+    	                    const appwriteConfig = await config.getAppwriteConfig();
+    	                    if (appwriteConfig?.teams && this.listTeams) {
+    	                        try {
+    	                            await this.listTeams();
+    	                            // Auto-create default teams if enabled
+    	                            if ((appwriteConfig.permanentTeams || appwriteConfig.templateTeams) && window.InduxAppwriteAuthTeamsDefaults?.ensureDefaultTeams) {
+    	                                await window.InduxAppwriteAuthTeamsDefaults.ensureDefaultTeams(this);
+    	                            }
+    	                        } catch (teamsError) {
+    	                            console.warn('[Indux Appwrite Auth] Failed to load teams after magic link login:', teamsError);
+    	                            // Don't fail login if teams fail to load
+    	                        }
+    	                    }
+
+    	                    window.dispatchEvent(new CustomEvent('indux:auth:login', {
+    	                        detail: { user: this.user }
+    	                    }));
+
+    	                    return { success: true, user: this.user };
+    	                } catch (error) {
+    	                    // Categorize errors
+    	                    const errorMessage = error.message || '';
+    	                    const errorCode = error.code || error.statusCode || '';
+    	                    const isRateLimit = errorCode === 429 || errorMessage.includes('Rate limit') || errorMessage.includes('429');
+    	                    const isExpiredOrInvalid = !isRateLimit && errorMessage && (
+    	                        errorMessage.includes('expired') ||
+    	                        errorMessage.includes('Invalid token') ||
+    	                        errorMessage.includes('invalid') ||
+    	                        errorMessage.includes('not found') ||
+    	                        errorMessage.includes('404') ||
+    	                        errorMessage.includes('prohibited') ||
+    	                        errorCode === 404
+    	                    );
+
+    	                    if (isRateLimit) {
+    	                        // Store callback for retry
+    	                        try {
+    	                            sessionStorage.setItem('indux:magic-link:callback', JSON.stringify({ userId, secret }));
+    	                        } catch (e) {
+    	                            // Ignore
+    	                        }
+    	                        this.error = 'Rate limit exceeded. Please wait a moment and refresh the page.';
+    	                        this.isAuthenticated = false;
+    	                        this.isAnonymous = false;
+    	                        this.magicLinkExpired = false;
+    	                    } else if (isExpiredOrInvalid) {
+    	                        try {
+    	                            sessionStorage.removeItem('indux:magic-link:callback');
+    	                        } catch (e) {
+    	                            // Ignore
+    	                        }
+    	                        this.magicLinkExpired = true;
+    	                        this.magicLinkSent = false;
+    	                        this.error = null;
+    	                    } else {
+    	                        try {
+    	                            sessionStorage.removeItem('indux:magic-link:callback');
+    	                        } catch (e) {
+    	                            // Ignore
+    	                        }
+    	                        this.error = error.message;
+    	                        this.magicLinkExpired = false;
+    	                        this.magicLinkSent = false;
+    	                    }
+
+    	                    this.isAuthenticated = false;
+    	                    this.isAnonymous = false;
+    	                    
+    	                    // Sync state
+    	                    if (this._syncStateToStorage) {
+    	                        this._syncStateToStorage(this);
+    	                    }
+
+    	                    return { success: false, error: error.message };
+    	                } finally {
+    	                    this.inProgress = false;
+    	                }
+    	            };
+    	        } else if (!store) {
+    	            // Wait a bit more for store to initialize
+    	            setTimeout(waitForStore, 50);
+    	        }
+    	    };
+
+    	    // Start waiting after a short delay to ensure store is ready
+    	    setTimeout(waitForStore, 100);
+    	}
+
+    	// Handle magic link callbacks via events
+    	function handleMagicLinkCallbacks() {
+    	    // Handle expired magic link
+    	    window.addEventListener('indux:auth:callback:expired', async (event) => {
+    	        const store = Alpine.store('auth');
+    	        if (!store) return;
+    	        
+    	        event.detail;
+    	        
+    	        // Check if user is already authenticated - preserve session
+    	        let hasExistingSession = false;
+    	        if (store.isAuthenticated && store.user) {
+    	            hasExistingSession = true;
+    	        } else if (store._appwrite) {
+    	            // Only check if we don't have existing state (prevents rate limits)
+    	            try {
+    	                const user = await store._appwrite.account.get();
+    	                if (user) {
+    	                    hasExistingSession = true;
+    	                    store.user = user;
+    	                    store.isAuthenticated = true;
+    	                    // Try to get session info
+    	                    try {
+    	                        const sessionsResponse = await store._appwrite.account.listSessions();
+    	                        const allSessions = sessionsResponse.sessions || [];
+    	                        const currentSession = allSessions.find(s => s.current === true) || allSessions[0];
+    	                        if (currentSession) {
+    	                            store.session = currentSession;
+    	                            store.isAnonymous = currentSession.provider === 'anonymous';
+    	                        }
+    	                    } catch (sessionError) {
+    	                        // Session fetch failed, but user exists
+    	                        console.warn('[Indux Appwrite Auth] Could not get session info:', sessionError);
+    	                    }
+    	                }
+    	            } catch (userError) {
+    	                // No existing session
+    	                hasExistingSession = false;
+    	            }
+    	        }
+    	        
+    	        // Set expired flag (always true for expired links)
+    	        store.magicLinkExpired = true;
+    	        store.magicLinkSent = false;
+    	        store.error = null;
+    	        
+    	        // Only clear state if no existing session
+    	        if (!hasExistingSession) {
+    	            store.isAuthenticated = false;
+    	            store.isAnonymous = false;
+    	            store.user = null;
+    	            store.session = null;
+    	        }
+    	        
+    	            store.inProgress = false;
+    	        
+    	        // Sync state
+    	        if (store._syncStateToStorage) {
+    	            store._syncStateToStorage(store);
+    	        }
+    	        
+    	        // Force Alpine reactivity
+    	        requestAnimationFrame(() => {
+    	            const authStore = Alpine.store('auth');
+    	            if (authStore) {
+    	                void authStore.isAuthenticated;
+    	                void authStore.magicLinkExpired;
+    	                void authStore.user;
+    	            }
+    	        });
+    	    });
+    	    
+    	    // Handle valid magic link callback
+    	    window.addEventListener('indux:auth:callback:magic', async (event) => {
+    	        const store = Alpine.store('auth');
+    	        if (!store) return;
+    	        
+    	        const callbackInfo = event.detail;
+    	        
+    	        // Store callback for retry if rate limited
+    	        try {
+    	            sessionStorage.setItem('indux:magic-link:callback', JSON.stringify({ 
+    	                userId: callbackInfo.userId, 
+    	                secret: callbackInfo.secret 
+    	            }));
+    	        } catch (e) {
+    	            console.warn('[Indux Appwrite Auth] Could not store callback:', e);
+    	        }
+    	        
+    	        // Handle the callback
+    	        await store.handleMagicLinkCallback(callbackInfo.userId, callbackInfo.secret);
+    	    });
+    	}
+
+    	// Initialize when Alpine is ready
+    	document.addEventListener('alpine:init', () => {
+    	    try {
+    	        initializeMagicLinks();
+    	        handleMagicLinkCallbacks();
+    	    } catch (error) {
+    	        // Failed to initialize magic links
+    	    }
+    	});
+
+    	// Export magic links interface
+    	window.InduxAppwriteAuthMagicLinks = {
+    	    initialize: initializeMagicLinks,
+    	    handleCallbacks: handleMagicLinkCallbacks
+    	};
+
+    	/* Auth OAuth */
+
+    	// Add OAuth methods to auth store
+    	function initializeOAuth() {
+    	    if (typeof Alpine === 'undefined') {
+    	        return;
+    	    }
+
+    	    const config = window.InduxAppwriteAuthConfig;
+    	    if (!config) {
+    	        return;
+    	    }
+
+    	    // Wait for store to be initialized
+    	    const waitForStore = () => {
+    	        const store = Alpine.store('auth');
+    	        if (store && !store.loginOAuth) {
+    	            // Add OAuth method to store
+    	            // Note: Appwrite accepts any provider string (google, github, etc.) and validates on their side
+    	            // No need to maintain a registry of supported providers
+    	            store.loginOAuth = async function(provider, successUrl = window.location.href, failureUrl = window.location.href) {
+    	                if (!this._appwrite) {
+    	                    this._appwrite = await config.getAppwriteClient();
+    	                }
+    	                if (!this._appwrite) {
+    	                    return { success: false, error: 'Appwrite not configured' };
+    	                }
+
+    	                // Check if OAuth is enabled
+    	                const appwriteConfig = await config.getAppwriteConfig();
+    	                if (appwriteConfig && !appwriteConfig.oauth) {
+    	                    return { success: false, error: 'OAuth authentication is not enabled' };
+    	                }
+
+    	                // Use origin + pathname for success/failure URLs to avoid query params
+    	                const currentUrl = new URL(window.location.href);
+    	                const cleanSuccessUrl = `${currentUrl.origin}${currentUrl.pathname}`;
+    	                const cleanFailureUrl = `${currentUrl.origin}${currentUrl.pathname}`;
+
+    	                // Delete any existing anonymous sessions before OAuth
+    	                // This prevents conflicts where anonymous sessions might interfere with OAuth
+    	                // Appwrite will create a new account for OAuth if needed
+    	                if (this.isAnonymous && this.session) {
+    	                    try {
+    	                        await this._appwrite.account.deleteSession(this.session.$id);
+    	                        this.session = null;
+    	                        this.user = null;
+    	                        this.isAuthenticated = false;
+    	                        this.isAnonymous = false;
+    	                    } catch (error) {
+    	                        console.warn('[Indux Appwrite Auth] Failed to delete anonymous session before OAuth:', error);
+    	                        // Continue anyway - OAuth should still work
+    	                    }
+    	                }
+
+    	                // Set flag in sessionStorage to detect OAuth callback (cleared after callback)
+    	                sessionStorage.setItem('indux:oauth:redirect', 'true');
+    	                
+    	                // Store the provider name so we can retrieve it after callback
+    	                // session.provider returns "oauth2" generically, but we know the specific provider
+    	                this._oauthProvider = provider;
+    	                // Use localStorage for provider (persists across redirects, cleared on logout)
+    	                // sessionStorage can be cleared by some browsers during OAuth redirects
+    	                try {
+    	                    localStorage.setItem('indux:oauth:provider', provider);
+    	                } catch (e) {
+    	                    // Fallback to sessionStorage if localStorage fails
+    	                    sessionStorage.setItem('indux:oauth:provider', provider);
+    	                }
+
+    	                this.inProgress = true;
+    	                this.error = null;
+
+    	                try {
+    	                    // Use createOAuth2Token (like the working implementation)
+    	                    // This returns a token/redirect URL that we manually navigate to
+    	                    // After OAuth, Appwrite redirects back with userId and secret in URL params
+    	                    const token = await this._appwrite.account.createOAuth2Token(
+    	                        provider,
+    	                        cleanSuccessUrl,
+    	                        cleanFailureUrl,
+    	                        ['email'] // Scopes
+    	                    );
+    	                    
+    	                    // Check for redirectUrl - Appwrite may return it in various formats
+    	                    // Try multiple property names and formats
+    	                    let redirectUrl = null;
+    	                    
+    	                    if (typeof token === 'string') {
+    	                        redirectUrl = token;
+    	                    } else if (token?.redirectUrl) {
+    	                        redirectUrl = token.redirectUrl;
+    	                    } else if (token?.url) {
+    	                        redirectUrl = token.url;
+    	                    } else if (token && typeof token === 'object') {
+    	                        // Try to find any URL-like property in the object
+    	                        const possibleUrl = Object.values(token).find(v => typeof v === 'string' && (v.startsWith('http://') || v.startsWith('https://')));
+    	                        if (possibleUrl) {
+    	                            redirectUrl = possibleUrl;
+    	                        }
+    	                    }
+    	                    
+    	                    // Clear error state before redirect (whether we found URL or not)
+    	                    // This prevents any error flash before redirect
+    	                    this.error = null;
+    	                    
+    	                    if (redirectUrl) {
+    	                        // Use requestAnimationFrame to ensure Alpine processes the error clearing
+    	                        // before redirect happens, preventing error flash
+    	                        requestAnimationFrame(() => {
+    	                            window.location.href = redirectUrl;
+    	                        });
+    	                        // Return immediately - redirect will happen asynchronously
+    	                        return { success: true, redirectUrl: redirectUrl };
+    	                    } else {
+    	                        // If we can't find redirect URL, log it but don't show error to user
+    	                        // The redirect might still work via Appwrite's internal handling
+    	                        console.warn('[Indux Appwrite Auth] Could not extract redirect URL from token:', token);
+    	                        // Don't set error - just return failure silently
+    	                        // This prevents error flash when redirect might still succeed
+    	                        this.inProgress = false;
+    	                        return { success: false, error: 'Could not extract redirect URL' };
+    	                    }
+    	                } catch (error) {
+    	                    // Don't show "No redirect URL" errors - they're usually false positives
+    	                    // Only show other meaningful errors
+    	                    if (!error.message.includes('No redirect URL') && !error.message.includes('redirect')) {
+    	                        this.error = error.message;
+    	                        this.inProgress = false;
+    	                    } else {
+    	                        // For redirect-related errors, just log and don't show to user
+    	                        console.warn('[Indux Appwrite Auth] OAuth redirect error (suppressed from UI):', error.message);
+    	                        this.error = null;
+    	                        this.inProgress = false;
+    	                    }
+    	                    return { success: false, error: error.message };
+    	                }
+    	            };
+    	        } else if (!store) {
+    	            // Wait a bit more for store to initialize
+    	            setTimeout(waitForStore, 50);
+    	        }
+    	    };
+
+    	    // Start waiting after a short delay to ensure store is ready
+    	    setTimeout(waitForStore, 100);
+    	}
+
+    	// Handle OAuth callbacks via events
+    	function handleOAuthCallbacks() {
+    	    // Handle OAuth callback
+    	    window.addEventListener('indux:auth:callback:oauth', async (event) => {
+    	        const store = Alpine.store('auth');
+    	        if (!store) return;
+    	        
+    	        const callbackInfo = event.detail;
+    	        
+    	        // Clear OAuth redirect flag
+    	        sessionStorage.removeItem('indux:oauth:redirect');
+    	        
+    	        // Restore OAuth provider name from localStorage (set during loginOAuth)
+    	        // Try localStorage first (persists across redirects), fallback to sessionStorage
+    	        let storedProvider = null;
+    	        try {
+    	            storedProvider = localStorage.getItem('indux:oauth:provider');
+    	        } catch (e) {
+    	            // If localStorage fails, try sessionStorage
+    	            storedProvider = sessionStorage.getItem('indux:oauth:provider');
+    	        }
+    	        if (storedProvider) {
+    	            store._oauthProvider = storedProvider;
+    	            // Keep it in localStorage (cleared on logout)
+    	            // This allows us to show the correct provider name even after page refresh
+    	        } else {
+    	            console.warn('[Indux Appwrite Auth] No OAuth provider found in storage');
+    	        }
+    	        
+    	        // OAuth uses userId/secret just like magic links - create session manually
+    	        // The "prohibited" error means session already exists, so try to fetch user first
+    	        if (!store._appwrite) {
+    	            store._appwrite = await window.InduxAppwriteAuthConfig.getAppwriteClient();
+    	        }
+    	        
+    	        if (!store._appwrite) {
+    	            store.error = 'Appwrite not configured';
+    	            return;
+    	        }
+    	        
+    	        store.inProgress = true;
+    	        store.error = null;
+    	        store.magicLinkExpired = false;
+    	        store.magicLinkSent = false;
+    	        
+    	        try {
+    	            // Delete any existing anonymous sessions first
+    	            if (store.session && store.isAnonymous) {
+    	                try {
+    	                    await store._appwrite.account.deleteSession(store.session.$id);
+    	                } catch (deleteError) {
+    	                    // Could not delete anonymous session
+    	                }
+    	            }
+    	            
+    	            // Try to create session from OAuth credentials
+    	            try {
+    	                const session = await store._appwrite.account.createSession(callbackInfo.userId, callbackInfo.secret);
+    	                store.session = session;
+    	                store.user = await store._appwrite.account.get();
+    	                store.isAuthenticated = true;
+    	                store.isAnonymous = false;
+    	                store.magicLinkSent = false;
+    	                store.magicLinkExpired = false;
+    	                store.error = null;
+    	            } catch (createError) {
+    	                // If "prohibited" error, session already exists - just fetch user
+    	                const isProhibited = createError.message?.includes('prohibited');
+    	                if (isProhibited) {
+    	                    store.user = await store._appwrite.account.get();
+    	                    try {
+    	                        const sessionsResponse = await store._appwrite.account.listSessions();
+    	                        const allSessions = sessionsResponse.sessions || [];
+    	                        const oauthSession = allSessions.find(s => s.provider !== 'anonymous' && s.provider !== 'magic-url') || allSessions.find(s => s.current === true);
+    	                        if (oauthSession) {
+    	                            store.session = oauthSession;
+    	                        } else if (allSessions.length > 0) {
+    	                            store.session = allSessions[0];
+    	                        } else {
+    	                            store.session = await store._appwrite.account.getSession('current');
+    	                        }
+    	                    } catch (sessionError) {
+    	                        console.warn('[Indux Appwrite Auth] Could not get session info:', sessionError);
+    	                    }
+    	                    store.isAuthenticated = true;
+    	                    store.isAnonymous = false;
+    	                    store.magicLinkSent = false;
+    	                    store.magicLinkExpired = false;
+    	                    store.error = null;
+    	                } else {
+    	                    throw createError;
+    	                }
+    	            }
+    	            
+    	            // Sync state
+    	            if (store._syncStateToStorage) {
+    	                store._syncStateToStorage(store);
+    	            }
+    	            
+    	            // Load teams if enabled
+    	            const appwriteConfig = await window.InduxAppwriteAuthConfig.getAppwriteConfig();
+    	            if (appwriteConfig?.teams && store.listTeams) {
+    	                try {
+    	                    await store.listTeams();
+    	                    // Auto-create default teams if enabled
+    	                    if ((appwriteConfig.permanentTeams || appwriteConfig.templateTeams) && window.InduxAppwriteAuthTeamsDefaults?.ensureDefaultTeams) {
+    	                        await window.InduxAppwriteAuthTeamsDefaults.ensureDefaultTeams(store);
+    	                    }
+    	                } catch (teamsError) {
+    	                    console.warn('[Indux Appwrite Auth] Failed to load teams after OAuth login:', teamsError);
+    	                    // Don't fail login if teams fail to load
+    	                }
+    	            }
+    	            
+    	            window.dispatchEvent(new CustomEvent('indux:auth:login', {
+    	                detail: { user: store.user }
+    	            }));
+    	        } catch (error) {
+    	            store.error = error.message;
+    	            store.isAuthenticated = false;
+    	            store.isAnonymous = false;
+    	            
+    	            // Sync state
+    	            if (store._syncStateToStorage) {
+    	                store._syncStateToStorage(store);
+    	            }
+    	        } finally {
+    	            store.inProgress = false;
+    	        }
+    	    });
+    	}
+
+    	// Initialize when Alpine is ready
+    	document.addEventListener('alpine:init', () => {
+    	    try {
+    	        initializeOAuth();
+    	        handleOAuthCallbacks();
+    	    } catch (error) {
+    	        // Failed to initialize OAuth
+    	    }
+    	});
+
+    	// Export OAuth interface
+    	window.InduxAppwriteAuthOAuth = {
+    	    initialize: initializeOAuth,
+    	    handleCallbacks: handleOAuthCallbacks
+    	};
+
+    	/* Auth callbacks */
+
+    	// Handle authentication callbacks from URL parameters
+    	// This module coordinates callback detection and delegates to method-specific handlers
+
+    	function initializeCallbacks() {
+    	    const config = window.InduxAppwriteAuthConfig;
+    	    if (!config) {
+    	        return;
+    	    }
+
+    	    // Check for callback in URL or sessionStorage
+    	    function detectCallback() {
+    	        const urlParams = new URLSearchParams(window.location.search);
+    	        const userId = urlParams.get('userId');
+    	        const secret = urlParams.get('secret');
+    	        const expire = urlParams.get('expire');
+    	        
+    	        // Check for stored callback (from rate limit retry)
+    	        let storedCallback = null;
+    	        try {
+    	            const stored = sessionStorage.getItem('indux:magic-link:callback');
+    	            if (stored) {
+    	                storedCallback = JSON.parse(stored);
+    	            }
+    	        } catch (e) {
+    	            // Ignore parse errors
+    	        }
+    	        
+    	        // Check OAuth redirect flag
+    	        const isOAuthCallback = sessionStorage.getItem('indux:oauth:redirect') === 'true';
+    	        
+    	        // Check for team invitation (teamId and membershipId in URL)
+    	        const teamId = urlParams.get('teamId');
+    	        const membershipId = urlParams.get('membershipId');
+    	        const isTeamInvite = !!(teamId && membershipId && userId && secret);
+    	        
+    	        const callbackInfo = {
+    	            userId: userId || storedCallback?.userId,
+    	            secret: secret || storedCallback?.secret,
+    	            expire: expire,
+    	            teamId: teamId,
+    	            membershipId: membershipId,
+    	            isOAuth: isOAuthCallback,
+    	            isTeamInvite: isTeamInvite,
+    	            hasCallback: !!(userId || storedCallback?.userId) && !!(secret || storedCallback?.secret),
+    	            hasExpired: !!expire && !userId && !secret
+    	        };
+    	        
+    	        return callbackInfo;
+    	    }
+
+    	    // Clean up URL parameters
+    	    function cleanupUrl() {
+    	        const url = new URL(window.location.href);
+    	        const paramsToRemove = ['userId', 'secret', 'expire', 'project', 'teamId', 'membershipId'];
+    	        paramsToRemove.forEach(param => {
+    	            while (url.searchParams.has(param)) {
+    	                url.searchParams.delete(param);
+    	            }
+    	        });
+    	        url.hash = '';
+    	        window.history.replaceState({}, '', url.toString());
+    	    }
+
+    	    // Process callback - delegates to method-specific handlers
+    	    async function processCallback(callbackInfo) {
+    	        const store = Alpine.store('auth');
+    	        if (!store || !store._appwrite) {
+    	            return { handled: false };
+    	        }
+
+    	        store._appwrite;
+
+    	        // Clean up URL immediately
+    	        cleanupUrl();
+
+    	        // Handle expired magic link
+    	        if (callbackInfo.hasExpired) {
+    	            // Dispatch event for magic link handler
+    	            window.dispatchEvent(new CustomEvent('indux:auth:callback:expired', {
+    	                detail: callbackInfo
+    	            }));
+    	            return { handled: true, type: 'expired' };
+    	        }
+
+    	        // Handle valid callback (userId + secret)
+    	        if (callbackInfo.hasCallback) {
+    	            if (callbackInfo.isTeamInvite) {
+    	                // Team invitation callback - dispatch event
+    	                window.dispatchEvent(new CustomEvent('indux:auth:callback:team', {
+    	                    detail: callbackInfo
+    	                }));
+    	                return { handled: true, type: 'team' };
+    	            } else if (callbackInfo.isOAuth) {
+    	                // OAuth callback - dispatch event
+    	                window.dispatchEvent(new CustomEvent('indux:auth:callback:oauth', {
+    	                    detail: callbackInfo
+    	                }));
+    	                return { handled: true, type: 'oauth' };
+    	            } else {
+    	                // Magic link callback - dispatch event
+    	                window.dispatchEvent(new CustomEvent('indux:auth:callback:magic', {
+    	                    detail: callbackInfo
+    	                }));
+    	                return { handled: true, type: 'magic' };
+    	            }
+    	        }
+
+    	        return { handled: false };
+    	    }
+
+    	    // Export callback detection and processing
+    	    window.InduxAppwriteAuthCallbacks = {
+    	        detect: detectCallback,
+    	        process: processCallback,
+    	        cleanupUrl
+    	    };
+    	}
+
+    	// Initialize when config is available
+    	if (window.InduxAppwriteAuthConfig) {
+    	    initializeCallbacks();
+    	} else {
+    	    document.addEventListener('DOMContentLoaded', () => {
+    	        if (window.InduxAppwriteAuthConfig) {
+    	            initializeCallbacks();
+    	        }
+    	    });
+    	}
+    	return indux_appwrite_auth;
     }
 
-    // Preload highlight.js as soon as script loads
-    loadHighlightJS().catch(() => {
-        // Silently ignore errors during preload
-    });
-
-    // Optional optimization: Configure utilities plugin if present
-    if (window.InduxUtilities) {
-        // Tell utilities plugin to ignore code-related DOM changes and classes
-        window.InduxUtilities.addIgnoredClassPattern(/^hljs/);
-        window.InduxUtilities.addIgnoredClassPattern(/^language-/);
-        window.InduxUtilities.addIgnoredClassPattern(/^copy$/);
-        window.InduxUtilities.addIgnoredClassPattern(/^copied$/);
-        window.InduxUtilities.addIgnoredClassPattern(/^lines$/);
-        window.InduxUtilities.addIgnoredClassPattern(/^selected$/);
-        
-        window.InduxUtilities.addIgnoredElementSelector('pre');
-        window.InduxUtilities.addIgnoredElementSelector('code');
-        window.InduxUtilities.addIgnoredElementSelector('x-code');
-        window.InduxUtilities.addIgnoredElementSelector('x-code-group');
-    }
-
-    // Process existing pre/code blocks
-    async function processExistingCodeBlocks() {
-        try {
-            const hljs = await loadHighlightJS();
-            
-            // Find all pre > code blocks that aren't already processed
-            // Exclude elements with frame class but allow those inside asides (frames)
-            const codeBlocks = document.querySelectorAll('pre > code:not(.hljs):not([data-highlighted="yes"]):not(.frame)');
-            
-            for (const codeBlock of codeBlocks) {
-                try {
-                    
-                    // Skip if the element contains HTML (has child elements)
-                    if (codeBlock.children.length > 0) {
-                        continue;
-                    }
-                    
-                    // Skip if the content looks like HTML (contains tags)
-                    let content = codeBlock.textContent || '';
-                    if (content.includes('<') && content.includes('>') && content.includes('</')) {
-                        // This looks like HTML content, skip highlighting to avoid security warnings
-                        continue;
-                    }
-                    
-                    // Special handling for frames - clean up content
-                    const isInsideFrame = codeBlock.closest('aside');
-                    if (isInsideFrame) {
-                        // Remove leading empty lines and whitespace
-                        content = content.replace(/^\s*\n+/, '');
-                        // Remove trailing empty lines and whitespace
-                        content = content.replace(/\n+\s*$/, '');
-                        // Also trim any remaining leading/trailing whitespace
-                        content = content.trim();
-                        // Update the code block content
-                        codeBlock.textContent = content;
-                    }
-                    
-                    const pre = codeBlock.parentElement;
-                    
-                    // Add title if present
-                    if (pre.hasAttribute('name') || pre.hasAttribute('title')) {
-                        const title = pre.getAttribute('name') || pre.getAttribute('title');
-                        const header = document.createElement('header');
-                        
-                        const titleElement = document.createElement('div');
-                        titleElement.textContent = title;
-                        header.appendChild(titleElement);
-                        
-                        pre.insertBefore(header, codeBlock);
-                    }
-                    
-                    // Add line numbers if requested
-                    if (pre.hasAttribute('numbers')) {
-                        const codeText = codeBlock.textContent;
-                        const lines = codeText.split('\n');
-                        
-                        const linesContainer = document.createElement('div');
-                        linesContainer.className = 'lines';
-                        
-                        for (let i = 0; i < lines.length; i++) {
-                            const lineSpan = document.createElement('span');
-                            lineSpan.textContent = (i + 1).toString();
-                            linesContainer.appendChild(lineSpan);
-                        }
-                        
-                        pre.insertBefore(linesContainer, codeBlock);
-                    }
-                    
-                    // Check if element has a supported language class
-                    const languageMatch = codeBlock.className.match(/language-(\w+)/);
-                    if (languageMatch) {
-                        const language = languageMatch[1];
-                        
-                        // Skip non-programming languages
-                        if (language === 'frame') {
-                            continue;
-                        }
-                        
-                        const supportedLanguages = hljs.listLanguages();
-                        const languageAliases = {
-                            'js': 'javascript',
-                            'ts': 'typescript', 
-                            'py': 'python',
-                            'rb': 'ruby',
-                            'sh': 'bash',
-                            'yml': 'yaml'
-                        };
-                        
-                        let actualLanguage = language;
-                        if (languageAliases[language]) {
-                            actualLanguage = languageAliases[language];
-                            // Update the class name to use the correct language
-                            codeBlock.className = codeBlock.className.replace(`language-${language}`, `language-${actualLanguage}`);
-                        }
-                        
-                        // Only highlight if the language is supported
-                        if (!supportedLanguages.includes(actualLanguage)) {
-                            // Skip unsupported languages instead of warning
-                            continue;
-                        }
-                    } else {
-                        // Add default language class if not present
-                        codeBlock.className += ' language-css'; // Default to CSS for the example
-                    }
-                    
-                    // Highlight the code block
-                    hljs.highlightElement(codeBlock);
-                    
-                } catch (error) {
-                    console.warn('[Indux] Failed to process code block:', error);
-                }
-            }
-        } catch (error) {
-            console.warn('[Indux] Failed to process existing code blocks:', error);
-        }
-    }
-
-    // Initialize plugin when either DOM is ready or Alpine is ready
-    function initializeCodePlugin() {
-
-        // X-Code-Group custom element for tabbed code blocks
-        class XCodeGroupElement extends HTMLElement {
-            constructor() {
-                super();
-            }
-
-            static get observedAttributes() {
-                return ['numbers', 'copy'];
-            }
-
-            get numbers() {
-                return this.hasAttribute('numbers');
-            }
-
-            get copy() {
-                return this.hasAttribute('copy');
-            }
-
-            connectedCallback() {
-                // Small delay to ensure x-code elements are initialized
-                setTimeout(() => {
-                    this.setupCodeGroup();
-                }, 0);
-            }
-
-            attributeChangedCallback(name, oldValue, newValue) {
-                if (oldValue !== newValue) {
-                    if (name === 'numbers' || name === 'copy') {
-                        this.updateAttributes();
-                    }
-                }
-            }
-
-            setupCodeGroup() {
-                // Find all x-code elements within this group
-                const codeElements = this.querySelectorAll('x-code');
-                
-                if (codeElements.length === 0) {
-                    return;
-                }
-
-                // Set default tab to first named code element first
-                const firstNamedCode = Array.from(codeElements).find(code => code.getAttribute('name'));
-                if (firstNamedCode) {
-                    const defaultTab = firstNamedCode.getAttribute('name');
-                    this.setAttribute('x-data', `{ codeTabs: '${defaultTab}' }`);
-                }
-
-                // Create header for tabs
-                const header = document.createElement('header');
-                
-                // Process each code element
-                codeElements.forEach((codeElement, index) => {
-                    const name = codeElement.getAttribute('name');
-                    
-                    if (!name) {
-                        return; // Skip if no name attribute
-                    }
-                    
-                    // Create tab button
-                    const tabButton = document.createElement('button');
-                    tabButton.setAttribute('x-on:click', `codeTabs = '${name}'`);
-                    tabButton.setAttribute('x-bind:class', `codeTabs === '${name}' ? 'selected' : ''`);
-                    tabButton.setAttribute('role', 'tab');
-                    tabButton.setAttribute('aria-controls', `code-${name.replace(/\s+/g, '-').toLowerCase()}`);
-                    tabButton.setAttribute('x-bind:aria-selected', `codeTabs === '${name}' ? 'true' : 'false'`);
-                    tabButton.textContent = name;
-                    
-                    // Add keyboard navigation
-                    tabButton.addEventListener('keydown', (e) => {
-                        const tabs = header.querySelectorAll('button[role="tab"]');
-                        const currentIndex = Array.from(tabs).indexOf(tabButton);
-                        
-                        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-                            e.preventDefault();
-                            const nextIndex = e.key === 'ArrowRight' 
-                                ? (currentIndex + 1) % tabs.length
-                                : (currentIndex - 1 + tabs.length) % tabs.length;
-                            tabs[nextIndex].focus();
-                            tabs[nextIndex].click();
-                        }
-                    });
-                    
-                    header.appendChild(tabButton);
-                    
-                    // Set up the code element for tabs
-                    codeElement.setAttribute('x-show', `codeTabs === '${name}'`);
-                    codeElement.setAttribute('id', `code-${name.replace(/\s+/g, '-').toLowerCase()}`);
-                    codeElement.setAttribute('role', 'tabpanel');
-                    codeElement.setAttribute('aria-labelledby', `tab-${name.replace(/\s+/g, '-').toLowerCase()}`);
-                    
-                    // Apply numbers and copy attributes from group if present
-                    if (this.numbers && !codeElement.hasAttribute('numbers')) {
-                        codeElement.setAttribute('numbers', '');
-                    }
-                    if (this.copy && !codeElement.hasAttribute('copy')) {
-                        codeElement.setAttribute('copy', '');
-                    }
-                });
-                
-                // Set up header with proper ARIA attributes
-                header.setAttribute('aria-label', 'Code examples');
-                
-                // Insert header at the beginning
-                this.insertBefore(header, this.firstChild);
-                
-                // Set initial tab IDs after header is added
-                const tabs = header.querySelectorAll('button[role="tab"]');
-                tabs.forEach((tab, index) => {
-                    const name = tab.textContent.replace(/\s+/g, '-').toLowerCase();
-                    tab.setAttribute('id', `tab-${name}`);
-                });
-            }
-
-            updateAttributes() {
-                const codeElements = this.querySelectorAll('x-code');
-                codeElements.forEach(codeElement => {
-                    if (this.numbers) {
-                        codeElement.setAttribute('numbers', '');
-                    } else {
-                        codeElement.removeAttribute('numbers');
-                    }
-                    if (this.copy) {
-                        codeElement.setAttribute('copy', '');
-                    } else {
-                        codeElement.removeAttribute('copy');
-                    }
-                });
-            }
-        }
-
-        // X-Code custom element
-        class XCodeElement extends HTMLElement {
-            constructor() {
-                super();
-            }
-
-            static get observedAttributes() {
-                return ['language', 'numbers', 'title', 'copy'];
-            }
-
-            get language() {
-                return this.getAttribute('language') || 'auto';
-            }
-
-            get numbers() {
-                return this.hasAttribute('numbers');
-            }
-
-            get title() {
-                return this.getAttribute('name') || this.getAttribute('title');
-            }
-
-            get copy() {
-                return this.hasAttribute('copy');
-            }
-
-            get contentElement() {
-                return this.querySelector('code') || this;
-            }
-
-            connectedCallback() {
-                this.setupElement();
-                // Remove tabindex to prevent focusing the container itself
-                // Focus should go to interactive elements like copy button
-                this.highlightCode();
-            }
-
-            attributeChangedCallback(name, oldValue, newValue) {
-                if (oldValue !== newValue) {
-                    if (name === 'language') {
-                        this.highlightCode();
-                    } else if (name === 'numbers') {
-                        this.updateLineNumbers();
-                    } else if (name === 'title') {
-                        this.updateTitle();
-                    } else if (name === 'copy' && typeof this.updateCopyButton === 'function') {
-                        this.updateCopyButton();
-                    }
-                }
-            }
-
-            setupElement() {
-                // Extract content BEFORE adding any UI elements
-                let content = this.extractContent();
-                
-                // Check if we have preserved original content for complete HTML documents
-                const originalContent = this.getAttribute('data-original-content');
-                if (originalContent) {
-                    // Use the preserved original content that includes document-level tags
-                    content = originalContent;
-                    // Remove the data attribute as we no longer need it
-                    this.removeAttribute('data-original-content');
-                }
-                
-                // Create semantically correct structure: pre > code
-                const pre = document.createElement('pre');
-                const code = document.createElement('code');
-                
-                // Use textContent to preserve HTML tags as literal text
-                // This ensures highlight.js treats the content as code, not HTML
-                code.textContent = content;
-                pre.appendChild(code);
-                this.textContent = '';
-                this.appendChild(pre);
-
-                // Create title if present (after pre element is created) - but only if not in a code group
-                if (this.title && !this.closest('x-code-group')) {
-                    const header = document.createElement('header');
-                    
-                    const title = document.createElement('div');
-                    title.textContent = this.title;
-                    header.appendChild(title);
-                    
-                    this.insertBefore(header, pre);
-                }
-
-                // Add line numbers if enabled
-                if (this.numbers) {
-                    this.setupLineNumbers();
-                }
-
-                // Add copy button if enabled (after content extraction)
-                if (this.copy) {
-                    this.setupCopyButton();
-                }
-                
-                // If this is in a code group, ensure copy button comes after title in tab order
-                const codeGroup = this.closest('x-code-group');
-                if (codeGroup && this.copy) {
-                    const copyButton = this.querySelector('.copy');
-                    if (copyButton) {
-                        // Set tabindex to ensure it comes after header buttons in tab order
-                        copyButton.setAttribute('tabindex', '0');
-                    }
-                }
-            }
-
-            extractContent() {
-                // Get the content and preserve original formatting
-                let content = this.textContent;
-                
-                // Preserve intentional line breaks at the beginning and end
-                // Only trim if there are no intentional line breaks
-                const hasLeadingLineBreak = content.startsWith('\n');
-                const hasTrailingLineBreak = content.endsWith('\n');
-                
-                // Trim but preserve intentional line breaks
-                if (hasLeadingLineBreak) {
-                    content = '\n' + content.trimStart();
-                } else {
-                    content = content.trimStart();
-                }
-                
-                if (hasTrailingLineBreak) {
-                    content = content.trimEnd() + '\n';
-                } else {
-                    content = content.trimEnd();
-                }
-                
-                // Check if this is markdown-generated content (has preserved indentation)
-                // Also check if this is inside a frame (aside element)
-                const isInsideFrame = this.closest('aside');
-                const hasPreservedIndentation = content.includes('\n    ') || content.includes('\n\t');
-                
-                // Special handling for frames - remove leading and trailing empty lines
-                if (isInsideFrame) {
-                    // If we have a title and the content starts with it, remove it
-                    if (this.title && content.startsWith(this.title)) {
-                        content = content.substring(this.title.length);
-                        // Remove any leading newline after removing title
-                        content = content.replace(/^\n+/, '');
-                    }
-                    
-                    // Remove leading empty lines and whitespace
-                    content = content.replace(/^\s*\n+/, '');
-                    // Remove trailing empty lines and whitespace
-                    content = content.replace(/\n+\s*$/, '');
-                    // Also trim any remaining leading/trailing whitespace
-                    content = content.trim();
-                }
-                
-                if (!hasPreservedIndentation && content.includes('\n') && !isInsideFrame) {
-                    // Only normalize indentation for non-markdown content
-                    const hasTrailingLineBreakText = content.endsWith('\n');
-                    const lines = content.split('\n');
-                    
-                    // Find the minimum indentation (excluding empty lines and lines with no indentation)
-                    let minIndent = Infinity;
-                    for (const line of lines) {
-                        if (line.trim() !== '') {
-                            const indent = line.length - line.trimStart().length;
-                            if (indent > 0) { // Only consider lines that actually have indentation
-                                minIndent = Math.min(minIndent, indent);
-                            }
-                        }
-                    }
-
-                    // Remove the common indentation from all lines
-                    if (minIndent < Infinity) {
-                        content = lines.map(line => {
-                            if (line.trim() === '') return '';
-                            const indent = line.length - line.trimStart().length;
-                            // Only remove indentation if the line has enough spaces
-                            return indent >= minIndent ? line.slice(minIndent) : line;
-                        }).join('\n');
-                        
-                        // Preserve trailing line break if it was originally there
-                        if (hasTrailingLineBreakText) {
-                            content += '\n';
-                        }
-                    }
-                }
-                
-                // Check if the content was interpreted as HTML (has child nodes)
-                if (this.children.length > 0) {
-                    // Extract the original HTML from the child nodes
-                    content = this.innerHTML;
-                    
-                    // Preserve intentional line breaks at the beginning and end
-                    const hasLeadingLineBreak = content.startsWith('\n');
-                    const hasTrailingLineBreak = content.endsWith('\n');
-                    
-                    // Trim but preserve intentional line breaks
-                    if (hasLeadingLineBreak) {
-                        content = '\n' + content.trimStart();
-                    } else {
-                        content = content.trimStart();
-                    }
-                    
-                    if (hasTrailingLineBreak) {
-                        content = content.trimEnd() + '\n';
-                    } else {
-                        content = content.trimEnd();
-                    }
-
-                    // Remove any copy button that might have been included
-                    content = content.replace(/<button[^>]*class="copy"[^>]*>.*?<\/button>/g, '');
-
-                    // Clean up empty attribute values (data-head="" -> data-head)
-                    content = content.replace(/(\w+)=""/g, '$1');
-
-                    // For HTML content, normalize indentation (but not for frames)
-                    const isInsideFrame = this.closest('aside');
-                    const hasTrailingLineBreakHtml = content.endsWith('\n');
-                    const lines = content.split('\n');
-                    if (lines.length > 1 && !isInsideFrame) {
-                        // Find the minimum indentation
-                        let minIndent = Infinity;
-                        for (const line of lines) {
-                            if (line.trim() !== '') {
-                                const indent = line.length - line.trimStart().length;
-                                if (indent > 0) {
-                                    minIndent = Math.min(minIndent, indent);
-                                }
-                            }
-                        }
-
-                        // Remove the common indentation from all lines
-                        if (minIndent < Infinity) {
-                            content = lines.map(line => {
-                                if (line.trim() === '') return '';
-                                const indent = line.length - line.trimStart().length;
-                                return indent >= minIndent ? line.slice(minIndent) : line;
-                            }).join('\n');
-                            
-                            // Preserve trailing line break if it was originally there
-                            if (hasTrailingLineBreakHtml) {
-                                content += '\n';
-                            }
-                        }
-                    }
-                }
-                
-                return content;
-            }
-
-            async setupLineNumbers() {
-                try {
-                    // Ensure the pre element exists and has content
-                    const pre = this.querySelector('pre');
-
-                    if (pre && !this.querySelector('.lines')) {
-                        // Make sure the pre element is properly set up first
-                        if (!pre.querySelector('code')) {
-                            const code = document.createElement('code');
-                            code.textContent = pre.textContent;
-                            pre.textContent = '';
-                            pre.appendChild(code);
-                        }
-
-                        // Count the lines using the actual DOM content
-                        const codeText = pre.textContent;
-                        const lines = codeText.split('\n');
-
-                        // Create the lines container
-                        const linesContainer = document.createElement('div');
-                        linesContainer.className = 'lines';
-
-                        // Add line number items for all lines (including empty ones)
-                        for (let i = 0; i < lines.length; i++) {
-                            const lineSpan = document.createElement('span');
-                            lineSpan.textContent = (i + 1).toString();
-                            linesContainer.appendChild(lineSpan);
-                        }
-
-                        // Insert line numbers before the pre element
-                        this.insertBefore(linesContainer, pre);
-                    }
-                } catch (error) {
-                    console.warn('[Indux] Failed to setup line numbers:', error);
-                }
-            }
-
-            async setupCopyButton() {
-                try {
-                    const copyButton = document.createElement('button');
-                    copyButton.className = 'copy';
-                    copyButton.setAttribute('aria-label', 'Copy code to clipboard');
-                    copyButton.setAttribute('type', 'button');
-                    
-                    copyButton.addEventListener('click', () => {
-                        this.copyCodeToClipboard();
-                    });
-                    
-                    // Add keyboard support
-                    copyButton.addEventListener('keydown', (e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            this.copyCodeToClipboard();
-                        }
-                    });
-                    
-                    this.appendChild(copyButton);
-                } catch (error) {
-                    console.warn('[Indux] Failed to setup copy button:', error);
-                }
-            }
-
-            async copyCodeToClipboard() {
-                try {
-                    const codeElement = this.contentElement;
-                    const codeText = codeElement.textContent;
-                    
-                    await navigator.clipboard.writeText(codeText);
-                    
-                    // Show copied state using CSS classes
-                    const copyButton = this.querySelector('.copy');
-                    if (copyButton) {
-                        copyButton.classList.add('copied');
-                        setTimeout(() => {
-                            copyButton.classList.remove('copied');
-                        }, 2000);
-                    }
-                } catch (error) {
-                    console.warn('[Indux] Failed to copy code:', error);
-                }
-            }
-
-            updateLineNumbers() {
-                if (this.numbers) {
-                    this.setupLineNumbers();
-                } else {
-                    // Remove line numbers if disabled
-                    const lines = this.querySelector('.lines');
-                    if (lines) {
-                        lines.remove();
-                    }
-                }
-            }
-
-            async highlightCode() {
-                try {
-                    // Ensure highlight.js is loaded
-                    const hljs = await loadHighlightJS();
-                    
-                    const codeElement = this.contentElement;
-                    
-                    // Skip if this element contains HTML (has child elements)
-                    if (codeElement.children.length > 0) {
-                        return;
-                    }
-                    
-                    // Only skip HTML content for auto-detection, not when language is explicitly specified
-                    const content = codeElement.textContent || '';
-                    
-                    // Reset highlighting if already highlighted
-                    if (codeElement.dataset.highlighted === 'yes') {
-                        delete codeElement.dataset.highlighted;
-                        // Clear all highlight.js related classes
-                        codeElement.className = codeElement.className.replace(/\bhljs\b|\blanguage-\w+\b/g, '').trim();
-                    }
-                    
-                    // Set language class if specified
-                    if (this.language && this.language !== 'auto') {
-                        // Skip non-programming languages
-                        if (this.language === 'frame') {
-                            return;
-                        }
-                        
-                        // Check if the language is supported by highlight.js
-                        const supportedLanguages = hljs.listLanguages();
-                        const languageAliases = {
-                            'js': 'javascript',
-                            'ts': 'typescript', 
-                            'py': 'python',
-                            'rb': 'ruby',
-                            'sh': 'bash',
-                            'yml': 'yaml',
-                            'html': 'xml'
-                        };
-                        
-                        let actualLanguage = this.language;
-                        if (languageAliases[this.language]) {
-                            actualLanguage = languageAliases[this.language];
-                        }
-                        
-                        // Only highlight if language is supported, otherwise skip highlighting
-                        if (supportedLanguages.includes(actualLanguage)) {
-                            // Use hljs.highlight() with specific language to avoid auto-detection
-                            const result = hljs.highlight(codeElement.textContent, { language: actualLanguage });
-                            codeElement.innerHTML = result.value;
-                            codeElement.className = `language-${actualLanguage} hljs`;
-                            codeElement.dataset.highlighted = 'yes';
-                        } else {
-                            // Skip unsupported languages
-                            return;
-                        }
-                    } else {
-                        // For auto-detection, only proceed if content doesn't look like HTML
-                        if (content.includes('<') && content.includes('>') && content.includes('</')) {
-                            // Skip HTML-like content to avoid security warnings during auto-detection
-                            return;
-                        }
-                        
-                        // Remove any existing language class for auto-detection
-                        codeElement.className = codeElement.className.replace(/\blanguage-\w+/g, '');
-                        
-                        // Use highlightElement for auto-detection when no specific language
-                        hljs.highlightElement(codeElement);
-                    }
-                    
-                } catch (error) {
-                    console.warn(`[Indux] Failed to highlight code:`, error);
-                }
-            }
-
-            update() {
-                this.highlightCode();
-            }
-
-            updateTitle() {
-                let titleElement = this.querySelector('header div');
-                if (this.title) {
-                    if (!titleElement) {
-                        titleElement = document.createElement('div');
-                        titleElement.textContent = this.title;
-                        this.insertBefore(titleElement, this.firstChild);
-                    }
-                    titleElement.textContent = this.title;
-                } else if (titleElement) {
-                    titleElement.remove();
-                }
-            }
-
-            updateCopyButton() {
-                const existingCopyButton = this.querySelector('.copy');
-                
-                if (this.copy) {
-                    if (!existingCopyButton) {
-                        // Only add copy button if setupElement has already been called
-                        // (i.e., if we have a pre element)
-                        if (this.querySelector('pre')) {
-                            this.setupCopyButton();
-                        }
-                        // Otherwise, the copy button will be added in setupElement()
-                    }
-                } else {
-                    if (existingCopyButton) {
-                        existingCopyButton.remove();
-                    }
-                }
-            }
-        }
-
-        // Initialize the plugin
-        async function initialize() {
-            try {
-                // Register the custom element
-                if (!customElements.get('x-code')) {
-                    customElements.define('x-code', XCodeElement);
-                }
-                if (!customElements.get('x-code-group')) {
-                    customElements.define('x-code-group', XCodeGroupElement);
-                }
-
-                    // Process existing code blocks
-        await processExistingCodeBlocks();
-        
-        // Listen for markdown plugin conversions
-        document.addEventListener('indux:code-blocks-converted', async () => {
-            await processExistingCodeBlocks();
-        });
-        
-        // Also listen for the event on the document body for better coverage
-        document.body.addEventListener('indux:code-blocks-converted', async () => {
-            await processExistingCodeBlocks();
-        });
-
-            } catch (error) {
-                console.error('[Indux] Failed to initialize code plugin:', error);
-            }
-        }
-
-        // Alpine.js directive for code highlighting (only if Alpine is available)
-        if (typeof Alpine !== 'undefined') {
-            Alpine.directive('code', (el, { expression, modifiers }, { effect, evaluateLater }) => {
-                // Create x-code element
-                const codeElement = document.createElement('x-code');
-
-                // Get language from various possible sources
-                let language = 'auto';
-                
-                // Check for language attribute first
-                const languageAttr = el.getAttribute('language');
-                if (languageAttr) {
-                    language = languageAttr;
-                } else if (expression && typeof expression === 'string' && !expression.includes('.')) {
-                    // Fallback to expression if it's a simple string
-                    language = expression;
-                } else if (modifiers.length > 0) {
-                    // Fallback to first modifier
-                    language = modifiers[0];
-                }
-
-                codeElement.setAttribute('language', language);
-
-                // Enable line numbers if specified
-                if (modifiers.includes('numbers') || modifiers.includes('line-numbers') || el.hasAttribute('numbers')) {
-                    codeElement.setAttribute('numbers', '');
-                }
-
-                // Set title from various possible sources
-                const title = el.getAttribute('name') || el.getAttribute('title') || el.getAttribute('data-title');
-                if (title) {
-                    codeElement.setAttribute('name', title);
-                }
-
-                // Move content to x-code element
-                const content = el.textContent.trim();
-                codeElement.textContent = content;
-                el.textContent = '';
-                el.appendChild(codeElement);
-
-                // Handle dynamic content updates only if expression is a variable
-                if (expression && (expression.includes('.') || !['javascript', 'css', 'html', 'python', 'ruby', 'php', 'java', 'c', 'cpp', 'csharp', 'go', 'sql', 'json', 'yaml', 'markdown', 'typescript', 'jsx', 'tsx', 'scss', 'sass', 'less', 'xml', 'markup'].includes(expression))) {
-                    const getContent = evaluateLater(expression);
-                    effect(() => {
-                        getContent((content) => {
-                            if (content && typeof content === 'string') {
-                                codeElement.textContent = content;
-                                codeElement.update();
-                            }
-                        });
-                    });
-                }
-            });
-        }
-
-        // Handle both DOMContentLoaded and alpine:init
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initialize);
-        } else {
-            initialize();
-        }
-
-        // Listen for Alpine initialization (only if Alpine is available)
-        if (typeof Alpine !== 'undefined') {
-            document.addEventListener('alpine:init', initialize);
-        } else {
-            // If Alpine isn't available yet, listen for it to become available
-            document.addEventListener('alpine:init', () => {
-                // Re-register the directive when Alpine becomes available
-                if (typeof Alpine !== 'undefined') {
-                    Alpine.directive('code', (el, { expression, modifiers }, { effect, evaluateLater }) => {
-                        // Create x-code element
-                        const codeElement = document.createElement('x-code');
-
-                        // Get language from various possible sources
-                        let language = 'auto';
-                        
-                        // Check for language attribute first
-                        const languageAttr = el.getAttribute('language');
-                        if (languageAttr) {
-                            language = languageAttr;
-                        } else if (expression && typeof expression === 'string' && !expression.includes('.')) {
-                            // Fallback to expression if it's a simple string
-                            language = expression;
-                        } else if (modifiers.length > 0) {
-                            // Fallback to first modifier
-                            language = modifiers[0];
-                        }
-
-                        codeElement.setAttribute('language', language);
-
-                        // Enable line numbers if specified
-                        if (modifiers.includes('numbers') || modifiers.includes('line-numbers') || el.hasAttribute('numbers')) {
-                            codeElement.setAttribute('numbers', '');
-                        }
-
-                        // Set title from various possible sources
-                        const title = el.getAttribute('name') || el.getAttribute('title') || el.getAttribute('data-title');
-                        if (title) {
-                            codeElement.setAttribute('name', title);
-                        }
-
-                        // Move content to x-code element
-                        const content = el.textContent.trim();
-                        codeElement.textContent = content;
-                        el.textContent = '';
-                        el.appendChild(codeElement);
-
-                        // Handle dynamic content updates only if expression is a variable
-                        if (expression && (expression.includes('.') || !['javascript', 'css', 'html', 'python', 'ruby', 'php', 'java', 'c', 'cpp', 'csharp', 'go', 'sql', 'json', 'yaml', 'markdown', 'typescript', 'jsx', 'tsx', 'scss', 'sass', 'less', 'xml', 'markup'].includes(expression))) {
-                            const getContent = evaluateLater(expression);
-                            effect(() => {
-                                getContent((content) => {
-                                    if (content && typeof content === 'string') {
-                                        codeElement.textContent = content;
-                                        codeElement.update();
-                                    }
-                                });
-                            });
-                        }
-                    });
-                }
-            });
-        }
-    }
-
-    // Initialize the plugin
-    initializeCodePlugin();
+    requireIndux_appwrite_auth();
 
     /* Indux Data Sources */
 
@@ -1928,83 +6854,88 @@ var Indux = (function (exports) {
             });
         }
 
-        // Create a safe proxy for loading state
-        function createLoadingProxy() {
-            return new Proxy({}, {
+        // Create a simple fallback object that returns empty strings for all properties
+        // This prevents infinite recursion by not using a Proxy for nested property access
+        function createSimpleFallback() {
+            const fallback = Object.create(null);
+            
+            // Add primitive conversion methods directly to the object
+            fallback[Symbol.toPrimitive] = function(hint) {
+                return hint === 'number' ? 0 : '';
+            };
+            fallback.valueOf = function() { return ''; };
+            fallback.toString = function() { return ''; };
+            
+            // Add route() function that returns the fallback for chaining
+            fallback.route = function(pathKey) {
+                return fallback;
+            };
+            
+            // For array-like properties, add length
+            Object.defineProperty(fallback, 'length', {
+                value: 0,
+                writable: false,
+                enumerable: false,
+                configurable: false
+            });
+            
+            // Make Symbol.toPrimitive non-enumerable and directly on the object
+            Object.defineProperty(fallback, Symbol.toPrimitive, {
+                value: function(hint) {
+                    return hint === 'number' ? 0 : '';
+                },
+                writable: false,
+                enumerable: false,
+                configurable: false
+            });
+            
+            // Use Proxy only for the initial access - but return the plain object for nested accesses
+            return new Proxy(fallback, {
                 get(target, key) {
-                    // Handle special keys
-                    if (key === Symbol.iterator || key === 'then' || key === 'catch' || key === 'finally') {
+                    // Handle special keys that shouldn't trigger recursion
+                    if (key === Symbol.iterator || key === 'then' || key === 'catch' || key === 'finally' ||
+                        key === Symbol.toStringTag || key === Symbol.hasInstance) {
                         return undefined;
                     }
 
-                    // Handle route() function - always available
-                    if (key === 'route') {
-                        return function(pathKey) {
-                            // Return a safe fallback proxy that returns empty strings for all properties
-                            return new Proxy({}, {
-                                get(target, prop) {
-                                    // Return empty string for any property to prevent expression display
-                                    if (typeof prop === 'string') {
-                                        return '';
-                                    }
-                                    return undefined;
-                                }
-                            });
-                        };
+                    // Handle constructor and prototype
+                    if (key === 'constructor' || key === '__proto__' || key === 'prototype') {
+                        return undefined;
                     }
 
-                    // Handle toPrimitive for text content
-                    if (key === Symbol.toPrimitive) {
-                        return function () { return ''; };
-                    }
-
-                    // Handle valueOf for text content
-                    if (key === 'valueOf') {
-                        return function () { return ''; };
-                    }
-
-                    // Handle toString for text content
-                    if (key === 'toString') {
-                        return function () { return ''; };
-                    }
-
-                    // Handle numeric keys for array access
-                    if (typeof key === 'string' && !isNaN(Number(key))) {
-                        return createLoadingProxy();
-                    }
-
-                    // Return empty string for most properties to prevent expression display
-                    if (typeof key === 'string') {
-                        // For known array properties, return a special proxy with route() function
-                        // This prevents infinite recursion while providing route() functionality
-                        if (key === 'legal' || key === 'docs' || key === 'features' || key === 'items') {
-                            return new Proxy({}, {
-                                get(target, prop) {
-                                    if (prop === 'route') {
-                                        return function(pathKey) {
-                                            // Return a safe fallback proxy that returns empty strings
-                                            return new Proxy({}, {
-                                                get() { return ''; }
-                                            });
-                                        };
-                                    }
-                                    if (prop === 'length') return 0;
-                                    if (typeof prop === 'string' && !isNaN(Number(prop))) {
-                                        return createLoadingProxy();
-                                    }
-                                    return '';
-                                }
-                            });
+                    // If the key exists on the target (like route, toString, valueOf, length, Symbol.toPrimitive), return it
+                    if (key in target || key === Symbol.toPrimitive) {
+                        const value = target[key];
+                        if (value !== undefined) {
+                            return value;
                         }
-                        // For other string properties that might be nested objects/arrays, return loading proxy
-                        // This allows chaining like $x.nested.stuff.people.route('path')
-                        return createLoadingProxy();
                     }
 
-                    // Return empty object for nested properties
-                    return createLoadingProxy();
+                    // For any other property access, return the plain target object (not the proxy)
+                    // This prevents recursion because accessing properties on the plain object won't trigger this proxy's getter
+                    // The plain object will return undefined for missing properties, which Alpine will handle
+                    return target;
+                },
+                has(target, key) {
+                    // Make all string keys appear to exist to prevent Alpine from trying to access them
+                    if (typeof key === 'string') {
+                        return true;
+                    }
+                    return key in target || key === Symbol.toPrimitive;
                 }
             });
+        }
+        
+        // Create a cached singleton fallback object
+        let cachedLoadingProxy = null;
+        
+        // Create a safe proxy for loading state
+        function createLoadingProxy() {
+            // Reuse cached fallback for all nested property accesses
+            if (!cachedLoadingProxy) {
+                cachedLoadingProxy = createSimpleFallback();
+            }
+            return cachedLoadingProxy;
         }
 
         // Create a proxy for array items
@@ -6584,16 +11515,511 @@ var Indux = (function (exports) {
 
     document.addEventListener('alpine:init', initializeUrlParametersPlugin);
 
+    // Utility generators
+    // Functions that generate CSS utilities from CSS variable suffixes
+
+    function createUtilityGenerators() {
+        return {
+            'color-': (suffix, value) => {
+                const utilities = [];
+                const addUtility = (prefix, property, baseValue) => {
+                    utilities.push([`${prefix}-${suffix}`, `${property}: ${baseValue}`]);
+                };
+                addUtility('text', 'color', value);
+                addUtility('bg', 'background-color', value);
+                addUtility('border', 'border-color', value);
+                addUtility('outline', 'outline-color', value);
+                addUtility('ring', 'box-shadow', `0 0 0 1px ${value}`);
+                addUtility('fill', 'fill', value);
+                addUtility('stroke', 'stroke', value);
+                return utilities;
+            },
+            'font-': (suffix, value) => [
+                [`font-${suffix}`, `font-family: ${value}`]
+            ],
+            'text-': (suffix, value) => [
+                [`text-${suffix}`, `font-size: ${value}`]
+            ],
+            'font-weight-': (suffix, value) => [
+                [`font-${suffix}`, `font-weight: ${value}`]
+            ],
+            'tracking-': (suffix, value) => [
+                [`tracking-${suffix}`, `letter-spacing: ${value}`]
+            ],
+            'leading-': (suffix, value) => [
+                [`leading-${suffix}`, `line-height: ${value}`]
+            ],
+            'breakpoint-': (suffix, value) => [
+                [`@${suffix}`, `@media (min-width: ${value})`]
+            ],
+            'container-': (suffix, value) => [
+                [`container-${suffix}`, `max-width: ${value}`],
+                [`@container-${suffix}`, `@container (min-width: ${value})`]
+            ],
+            'spacing-': (suffix, value) => [
+                [`gap-${suffix}`, `gap: ${value}`],
+                [`p-${suffix}`, `padding: ${value}`],
+                [`px-${suffix}`, `padding-left: ${value}; padding-right: ${value}`],
+                [`py-${suffix}`, `padding-top: ${value}; padding-bottom: ${value}`],
+                [`m-${suffix}`, `margin: ${value}`],
+                [`mx-${suffix}`, `margin-left: ${value}; margin-right: ${value}`],
+                [`my-${suffix}`, `margin-top: ${value}; margin-bottom: ${value}`],
+                [`space-x-${suffix}`, `> * + * { margin-left: ${value}; }`],
+                [`space-y-${suffix}`, `> * + * { margin-top: ${value}; }`],
+                [`max-w-${suffix}`, `max-width: ${value}`],
+                [`max-h-${suffix}`, `max-height: ${value}`],
+                [`min-w-${suffix}`, `min-width: ${value}`],
+                [`min-h-${suffix}`, `min-height: ${value}`],
+                [`w-${suffix}`, `width: ${value}`],
+                [`h-${suffix}`, `height: ${value}`]
+            ],
+            'radius-': (suffix, value) => [
+                [`rounded-${suffix}`, `border-radius: ${value}`]
+            ],
+            'shadow-': (suffix, value) => [
+                [`shadow-${suffix}`, `box-shadow: ${value}`]
+            ],
+            'inset-shadow-': (suffix, value) => [
+                [`inset-shadow-${suffix}`, `box-shadow: inset ${value}`]
+            ],
+            'drop-shadow-': (suffix, value) => [
+                [`drop-shadow-${suffix}`, `filter: drop-shadow(${value})`]
+            ],
+            'blur-': (suffix, value) => [
+                [`blur-${suffix}`, `filter: blur(${value})`]
+            ],
+            'perspective-': (suffix, value) => [
+                [`perspective-${suffix}`, `perspective: ${value}`]
+            ],
+            'aspect-': (suffix, value) => [
+                [`aspect-${suffix}`, `aspect-ratio: ${value}`]
+            ],
+            'ease-': (suffix, value) => [
+                [`ease-${suffix}`, `transition-timing-function: ${value}`]
+            ],
+            'animate-': (suffix, value) => [
+                [`animate-${suffix}`, `animation: ${value}`]
+            ],
+            'border-width-': (suffix, value) => [
+                [`border-${suffix}`, `border-width: ${value}`]
+            ],
+            'border-style-': (suffix, value) => [
+                [`border-${suffix}`, `border-style: ${value}`]
+            ],
+            'outline-': (suffix, value) => [
+                [`outline-${suffix}`, `outline-color: ${value}`]
+            ],
+            'outline-width-': (suffix, value) => [
+                [`outline-${suffix}`, `outline-width: ${value}`]
+            ],
+            'outline-style-': (suffix, value) => [
+                [`outline-${suffix}`, `outline-style: ${value}`]
+            ],
+            'ring-': (suffix, value) => [
+                [`ring-${suffix}`, `box-shadow: 0 0 0 ${value} var(--color-ring)`]
+            ],
+            'ring-offset-': (suffix, value) => [
+                [`ring-offset-${suffix}`, `--tw-ring-offset-width: ${value}`]
+            ],
+            'divide-': (suffix, value) => [
+                [`divide-${suffix}`, `border-color: ${value}`]
+            ],
+            'accent-': (suffix, value) => [
+                [`accent-${suffix}`, `accent-color: ${value}`]
+            ],
+            'caret-': (suffix, value) => [
+                [`caret-${suffix}`, `caret-color: ${value}`]
+            ],
+            'decoration-': (suffix, value) => [
+                [`decoration-${suffix}`, `text-decoration-color: ${value}`]
+            ],
+            'placeholder-': (suffix, value) => [
+                [`placeholder-${suffix}`, `&::placeholder { color: ${value} }`]
+            ],
+            'selection-': (suffix, value) => [
+                [`selection-${suffix}`, `&::selection { background-color: ${value} }`]
+            ],
+            'scrollbar-': (suffix, value) => [
+                [`scrollbar-${suffix}`, `scrollbar-color: ${value}`]
+            ]
+        };
+    }
+
+
+
+    // Variants and variant groups
+    // CSS selector mappings for Tailwind variants
+
+    function createVariants() {
+        return {
+            // State variants
+            'hover': ':hover',
+            'focus': ':focus',
+            'focus-visible': ':focus-visible',
+            'focus-within': ':focus-within',
+            'active': ':active',
+            'visited': ':visited',
+            'target': ':target',
+            'first': ':first-child',
+            'last': ':last-child',
+            'only': ':only-child',
+            'odd': ':nth-child(odd)',
+            'even': ':nth-child(even)',
+            'first-of-type': ':first-of-type',
+            'last-of-type': ':last-of-type',
+            'only-of-type': ':only-of-type',
+            'empty': ':empty',
+            'disabled': ':disabled',
+            'enabled': ':enabled',
+            'checked': ':checked',
+            'indeterminate': ':indeterminate',
+            'default': ':default',
+            'required': ':required',
+            'valid': ':valid',
+            'invalid': ':invalid',
+            'in-range': ':in-range',
+            'out-of-range': ':out-of-range',
+            'placeholder-shown': ':placeholder-shown',
+            'autofill': ':autofill',
+            'read-only': ':read-only',
+            'read-write': ':read-write',
+            'optional': ':optional',
+            'user-valid': ':user-valid',
+            'user-invalid': ':user-invalid',
+            'open': ':is([open], :popover-open, :open) &',
+            'closed': ':not(:is([open], :popover-open, :open)) &',
+            'paused': '[data-state="paused"] &',
+            'playing': '[data-state="playing"] &',
+            'muted': '[data-state="muted"] &',
+            'unmuted': '[data-state="unmuted"] &',
+            'collapsed': '[data-state="collapsed"] &',
+            'expanded': '[data-state="expanded"] &',
+            'unchecked': ':not(:checked)',
+            'selected': '[data-state="selected"] &',
+            'unselected': '[data-state="unselected"] &',
+            'details-content': '::details-content',
+            'nth': ':nth-child',
+            'nth-last': ':nth-last-child',
+            'nth-of-type': ':nth-of-type',
+            'nth-last-of-type': ':nth-last-of-type',
+            'has': ':has',
+            'not': ':not',
+
+            // Pseudo-elements
+            'before': '::before',
+            'after': '::after',
+            'first-letter': '::first-letter',
+            'first-line': '::first-line',
+            'marker': '::marker',
+            'selection': '::selection',
+            'file': '::file-selector-button',
+            'backdrop': '::backdrop',
+            'placeholder': '::placeholder',
+            'target-text': '::target-text',
+            'spelling-error': '::spelling-error',
+            'grammar-error': '::grammar-error',
+
+            // Media queries
+            'dark': '.dark &',
+            'light': '.light &',
+
+            // Group variants
+            'group': '.group &',
+            'group-hover': '.group:hover &',
+            'group-focus': '.group:focus &',
+            'group-focus-within': '.group:focus-within &',
+            'group-active': '.group:active &',
+            'group-disabled': '.group:disabled &',
+            'group-visited': '.group:visited &',
+            'group-checked': '.group:checked &',
+            'group-required': '.group:required &',
+            'group-valid': '.group:valid &',
+            'group-invalid': '.group:invalid &',
+            'group-in-range': '.group:in-range &',
+            'group-out-of-range': '.group:out-of-range &',
+            'group-placeholder-shown': '.group:placeholder-shown &',
+            'group-autofill': '.group:autofill &',
+            'group-read-only': '.group:read-only &',
+            'group-read-write': '.group:read-write &',
+            'group-optional': '.group:optional &',
+            'group-user-valid': '.group:user-valid &',
+            'group-user-invalid': '.group:user-invalid &',
+
+            // Peer variants
+            'peer': '.peer ~ &',
+            'peer-hover': '.peer:hover ~ &',
+            'peer-focus': '.peer:focus ~ &',
+            'peer-focus-within': '.peer:focus-within ~ &',
+            'peer-active': '.peer:active ~ &',
+            'peer-disabled': '.peer:disabled ~ &',
+            'peer-visited': '.peer:visited ~ &',
+            'peer-checked': '.peer:checked ~ &',
+            'peer-required': '.peer:required ~ &',
+            'peer-valid': '.peer:valid ~ &',
+            'peer-invalid': '.peer:invalid ~ &',
+            'peer-in-range': '.peer:in-range ~ &',
+            'peer-out-of-range': '.peer:out-of-range ~ &',
+            'peer-placeholder-shown': '.peer:placeholder-shown ~ &',
+            'peer-autofill': '.peer:autofill ~ &',
+            'peer-read-only': '.peer:read-only ~ &',
+            'peer-read-write': '.peer:read-write ~ &',
+            'peer-optional': '.peer:optional ~ &',
+            'peer-user-valid': '.peer:user-valid ~ &',
+            'peer-user-invalid': '.peer:user-invalid &',
+
+            'motion-safe': '@media (prefers-reduced-motion: no-preference)',
+            'motion-reduce': '@media (prefers-reduced-motion: reduce)',
+            'print': '@media print',
+            'portrait': '@media (orientation: portrait)',
+            'landscape': '@media (orientation: landscape)',
+            'contrast-more': '@media (prefers-contrast: more)',
+            'contrast-less': '@media (prefers-contrast: less)',
+            'forced-colors': '@media (forced-colors: active)',
+            'rtl': '&:where(:dir(rtl), [dir="rtl"], [dir="rtl"] *)',
+            'ltr': '&:where(:dir(ltr), [dir="ltr"], [dir="ltr"] *)',
+            '[dir=rtl]': '[dir="rtl"] &',
+            '[dir=ltr]': '[dir="ltr"] &',
+            'pointer-fine': '@media (pointer: fine)',
+            'pointer-coarse': '@media (pointer: coarse)',
+            'pointer-none': '@media (pointer: none)',
+            'any-pointer-fine': '@media (any-pointer: fine)',
+            'any-pointer-coarse': '@media (any-pointer: coarse)',
+            'any-pointer-none': '@media (any-pointer: none)',
+            'scripting-enabled': '@media (scripting: enabled)',
+            'can-hover': '@media (hover: hover)',
+            'can-not-hover': '@media (hover: none)',
+            'any-hover': '@media (any-hover: hover)',
+            'any-hover-none': '@media (any-hover: none)',
+            'any-pointer': '@media (any-pointer: fine)',
+            'any-pointer-coarse': '@media (any-pointer: coarse)',
+            'any-pointer-none': '@media (any-pointer: none)',
+            'color': '@media (color)',
+            'color-gamut': '@media (color-gamut: srgb)',
+            'color-gamut-p3': '@media (color-gamut: p3)',
+            'color-gamut-rec2020': '@media (color-gamut: rec2020)',
+            'monochrome': '@media (monochrome)',
+            'monochrome-color': '@media (monochrome: 0)',
+            'monochrome-grayscale': '@media (monochrome: 1)',
+            'inverted-colors': '@media (inverted-colors: inverted)',
+            'inverted-colors-none': '@media (inverted-colors: none)',
+            'update': '@media (update: fast)',
+            'update-slow': '@media (update: slow)',
+            'update-none': '@media (update: none)',
+            'overflow-block': '@media (overflow-block: scroll)',
+            'overflow-block-paged': '@media (overflow-block: paged)',
+            'overflow-inline': '@media (overflow-inline: scroll)',
+            'overflow-inline-auto': '@media (overflow-inline: auto)',
+            'prefers-color-scheme': '@media (prefers-color-scheme: dark)',
+            'prefers-color-scheme-light': '@media (prefers-color-scheme: light)',
+            'prefers-contrast': '@media (prefers-contrast: more)',
+            'prefers-contrast-less': '@media (prefers-contrast: less)',
+            'prefers-contrast-no-preference': '@media (prefers-contrast: no-preference)',
+            'prefers-reduced-motion': '@media (prefers-reduced-motion: reduce)',
+            'prefers-reduced-motion-no-preference': '@media (prefers-reduced-motion: no-preference)',
+            'prefers-reduced-transparency': '@media (prefers-reduced-transparency: reduce)',
+            'prefers-reduced-transparency-no-preference': '@media (prefers-reduced-transparency: no-preference)',
+            'resolution': '@media (resolution: 1dppx)',
+            'resolution-low': '@media (resolution: 1dppx)',
+            'resolution-high': '@media (resolution: 2dppx)',
+            'scan': '@media (scan: progressive)',
+            'scan-interlace': '@media (scan: interlace)',
+            'scripting': '@media (scripting: enabled)',
+            'scripting-none': '@media (scripting: none)',
+            'scripting-initial-only': '@media (scripting: initial-only)',
+
+            // Container queries
+            'container': '@container',
+            'container-name': '@container',
+
+            // Important modifier
+            '!': '!important',
+
+            // Responsive breakpoints
+            'sm': '@media (min-width: 640px)',
+            'md': '@media (min-width: 768px)',
+            'lg': '@media (min-width: 1024px)',
+            'xl': '@media (min-width: 1280px)',
+            '2xl': '@media (min-width: 1536px)',
+
+            // Supports queries
+            'supports': '@supports',
+
+            // Starting style
+            'starting': '@starting-style',
+
+            // Data attribute variants (common patterns)
+            'data-open': '[data-state="open"] &',
+            'data-closed': '[data-state="closed"] &',
+            'data-checked': '[data-state="checked"] &',
+            'data-unchecked': '[data-state="unchecked"] &',
+            'data-on': '[data-state="on"] &',
+            'data-off': '[data-state="off"] &',
+            'data-visible': '[data-state="visible"] &',
+            'data-hidden': '[data-state="hidden"] &',
+            'data-disabled': '[data-disabled] &',
+            'data-loading': '[data-loading] &',
+            'data-error': '[data-error] &',
+            'data-success': '[data-success] &',
+            'data-warning': '[data-warning] &',
+            'data-selected': '[data-selected] &',
+            'data-highlighted': '[data-highlighted] &',
+            'data-pressed': '[data-pressed] &',
+            'data-expanded': '[data-expanded] &',
+            'data-collapsed': '[data-collapsed] &',
+            'data-active': '[data-active] &',
+            'data-inactive': '[data-inactive] &',
+            'data-valid': '[data-valid] &',
+            'data-invalid': '[data-invalid] &',
+            'data-required': '[data-required] &',
+            'data-optional': '[data-optional] &',
+            'data-readonly': '[data-readonly] &',
+            'data-write': '[data-write] &',
+
+            // Aria attribute variants (common patterns)
+            'aria-expanded': '[aria-expanded="true"] &',
+            'aria-collapsed': '[aria-expanded="false"] &',
+            'aria-pressed': '[aria-pressed="true"] &',
+            'aria-unpressed': '[aria-pressed="false"] &',
+            'aria-checked': '[aria-checked="true"] &',
+            'aria-unchecked': '[aria-checked="false"] &',
+            'aria-selected': '[aria-selected="true"] &',
+            'aria-unselected': '[aria-selected="false"] &',
+            'aria-invalid': '[aria-invalid="true"] &',
+            'aria-valid': '[aria-invalid="false"] &',
+            'aria-required': '[aria-required="true"] &',
+            'aria-optional': '[aria-required="false"] &',
+            'aria-disabled': '[aria-disabled="true"] &',
+            'aria-enabled': '[aria-disabled="false"] &',
+            'aria-hidden': '[aria-hidden="true"] &',
+            'aria-visible': '[aria-hidden="false"] &',
+            'aria-busy': '[aria-busy="true"] &',
+            'aria-available': '[aria-busy="false"] &',
+            'aria-current': '[aria-current="true"] &',
+            'aria-not-current': '[aria-current="false"] &',
+            'aria-live': '[aria-live="polite"] &, [aria-live="assertive"] &',
+            'aria-atomic': '[aria-atomic="true"] &',
+            'aria-relevant': '[aria-relevant="additions"] &, [aria-relevant="removals"] &, [aria-relevant="text"] &, [aria-relevant="all"] &'
+        };
+    }
+
+    function createVariantGroups() {
+        return {
+            'state': ['hover', 'focus', 'active', 'visited', 'target', 'open', 'closed', 'paused', 'playing', 'muted', 'unmuted', 'collapsed', 'expanded', 'unchecked', 'selected', 'unselected'],
+            'child': ['first', 'last', 'only', 'odd', 'even'],
+            'form': ['disabled', 'enabled', 'checked', 'indeterminate', 'required', 'valid', 'invalid'],
+            'pseudo': ['before', 'after', 'first-letter', 'first-line', 'marker', 'selection', 'file', 'backdrop'],
+            'media': ['dark', 'light', 'motion-safe', 'motion-reduce', 'print', 'portrait', 'landscape', 'rtl', 'ltr', 'can-hover', 'can-not-hover', 'any-hover', 'any-hover-none', 'color', 'monochrome', 'inverted-colors', 'inverted-colors-none', 'update', 'update-slow', 'update-none', 'overflow-block', 'overflow-block-paged', 'overflow-inline', 'overflow-inline-auto', 'prefers-color-scheme', 'prefers-color-scheme-light', 'prefers-contrast', 'prefers-contrast-less', 'prefers-contrast-no-preference', 'prefers-reduced-motion', 'prefers-reduced-motion-no-preference', 'prefers-reduced-transparency', 'prefers-reduced-transparency-no-preference', 'resolution', 'resolution-low', 'resolution-high', 'scan', 'scan-interlace', 'scripting', 'scripting-none', 'scripting-initial-only', 'forced-colors', 'contrast-more', 'contrast-less', 'pointer-fine', 'pointer-coarse', 'pointer-none', 'any-pointer-fine', 'any-pointer-coarse', 'any-pointer-none', 'scripting-enabled'],
+            'responsive': ['sm', 'md', 'lg', 'xl', '2xl'],
+            'group': ['group', 'group-hover', 'group-focus', 'group-active', 'group-disabled', 'group-checked', 'group-required', 'group-valid', 'group-invalid'],
+            'peer': ['peer', 'peer-hover', 'peer-focus', 'peer-active', 'peer-disabled', 'peer-checked', 'peer-required', 'peer-valid', 'peer-invalid'],
+            'data': ['data-open', 'data-closed', 'data-checked', 'data-unchecked', 'data-visible', 'data-hidden', 'data-disabled', 'data-loading', 'data-error', 'data-success', 'data-warning', 'data-selected', 'data-highlighted', 'data-pressed', 'data-expanded', 'data-collapsed', 'data-active', 'data-inactive', 'data-valid', 'data-invalid', 'data-required', 'data-optional', 'data-readonly', 'data-write'],
+            'aria': ['aria-expanded', 'aria-collapsed', 'aria-pressed', 'aria-unpressed', 'aria-checked', 'aria-unchecked', 'aria-selected', 'aria-unselected', 'aria-invalid', 'aria-valid', 'aria-required', 'aria-optional', 'aria-disabled', 'aria-enabled', 'aria-hidden', 'aria-visible', 'aria-busy', 'aria-available', 'aria-current', 'aria-not-current', 'aria-live', 'aria-atomic', 'aria-relevant']
+        };
+    }
+
+
+
     /* Indux Utilities */
 
     // Browser runtime compiler
     class TailwindCompiler {
         constructor(options = {}) {
+            this.debug = options.debug === true;
+            this.startTime = performance.now();
+            
+            if (this.debug) {
+                console.log(`[Indux Utilities] Constructor started at ${this.startTime.toFixed(2)}ms`);
+                console.log(`[Indux Utilities] Document readyState: ${document.readyState}`);
+                console.log(`[Indux Utilities] Head exists: ${!!document.head}`);
+            }
 
-            // Create style element immediately
+            // Create critical style element FIRST - must be before any rendering
+            performance.now();
+            this.criticalStyleElement = document.createElement('style');
+            this.criticalStyleElement.id = 'utility-styles-critical';
+            // Insert at the very beginning of head
+            if (document.head) {
+                if (document.head.firstChild) {
+                    document.head.insertBefore(this.criticalStyleElement, document.head.firstChild);
+                } else {
+                    document.head.appendChild(this.criticalStyleElement);
+                }
+                if (this.debug) {
+                    console.log(`[Indux Utilities] Critical style element created and inserted at ${(performance.now() - this.startTime).toFixed(2)}ms`);
+                }
+            } else {
+                // If head doesn't exist yet, wait for it (shouldn't happen, but safety check)
+                if (this.debug) {
+                    console.warn(`[Indux Utilities] Head doesn't exist yet, waiting...`);
+                }
+                const checkHead = setInterval(() => {
+                    if (document.head) {
+                        clearInterval(checkHead);
+                        if (document.head.firstChild) {
+                            document.head.insertBefore(this.criticalStyleElement, document.head.firstChild);
+                        } else {
+                            document.head.appendChild(this.criticalStyleElement);
+                        }
+                        if (this.debug) {
+                            console.log(`[Indux Utilities] Critical style element inserted after wait at ${(performance.now() - this.startTime).toFixed(2)}ms`);
+                        }
+                    }
+                }, 1);
+            }
+            
+            // Initialize options first (needed for regex patterns)
+            this.options = {
+                rootSelector: options.rootSelector || ':root',
+                themeSelector: options.themeSelector || '@theme',
+                debounceTime: options.debounceTime || 50,
+                maxCacheAge: options.maxCacheAge || 24 * 60 * 60 * 1000,
+                debug: options.debug !== false,
+                ...options
+            };
+            
+            // Initialize regex patterns (needed for utility generation)
+            this.regexPatterns = {
+                root: new RegExp(`${this.options.rootSelector}\\s*{([^}]*)}`, 'g'),
+                theme: new RegExp(`${this.options.themeSelector}\\s*{([^}]*)}`, 'g'),
+                variable: /--([\w-]+):\s*([^;]+);/g,
+                tailwindPrefix: /^(color|font|text|font-weight|tracking|leading|breakpoint|container|spacing|radius|shadow|inset-shadow|drop-shadow|blur|perspective|aspect|ease|animate|border-width|border-style|outline|outline-width|outline-style|ring|ring-offset|divide|accent|caret|decoration|placeholder|selection|scrollbar)-/
+            };
+            
+            // Initialize utility generators from component
+            const generators = createUtilityGenerators();
+            // Start with minimal generators needed for synchronous generation
+            this.utilityGenerators = {
+                'color-': generators['color-'],
+                'font-': generators['font-'],
+                'text-': generators['text-'],
+                'font-weight-': generators['font-weight-'],
+                'tracking-': generators['tracking-'],
+                'leading-': generators['leading-'],
+                'spacing-': generators['spacing-'],
+                'radius-': generators['radius-'],
+                'shadow-': generators['shadow-'],
+                'blur-': generators['blur-']
+            };
+            // Add remaining generators
+            Object.assign(this.utilityGenerators, generators);
+            
+            // Initialize variants from component (needed for parseClassName during sync generation)
+            this.variants = createVariants();
+            this.variantGroups = createVariantGroups();
+            
+            // Cache for parsed class names (must be before addCriticalBlockingStylesSync)
+            this.classCache = new Map();
+            
+            // Add critical styles IMMEDIATELY - don't wait for anything
+            this.addCriticalBlockingStylesSync();
+
+            // Create main style element for generated utilities
             this.styleElement = document.createElement('style');
             this.styleElement.id = 'utility-styles';
             document.head.appendChild(this.styleElement);
+            if (this.debug) {
+                console.log(`[Indux Utilities] Main style element created at ${(performance.now() - this.startTime).toFixed(2)}ms`);
+            }
 
             // Initialize properties
             this.tailwindLink = null;
@@ -6632,22 +12058,6 @@ var Indux = (function (exports) {
             this.significantChangeSelectors = [ // Only these DOM additions trigger recompilation
                 '[data-component]', '[x-data]' // Components and Alpine elements
             ];
-            this.options = {
-                rootSelector: options.rootSelector || ':root',
-                themeSelector: options.themeSelector || '@theme',
-                debounceTime: options.debounceTime || 50,
-                maxCacheAge: options.maxCacheAge || 24 * 60 * 60 * 1000,
-                debug: options.debug || true,
-                ...options
-            };
-
-            // Pre-compile regex patterns
-            this.regexPatterns = {
-                root: new RegExp(`${this.options.rootSelector}\\s*{([^}]*)}`, 'g'),
-                theme: new RegExp(`${this.options.themeSelector}\\s*{([^}]*)}`, 'g'),
-                variable: /--([\w-]+):\s*([^;]+);/g,
-                tailwindPrefix: /^(color|font|text|font-weight|tracking|leading|breakpoint|container|spacing|radius|shadow|inset-shadow|drop-shadow|blur|perspective|aspect|ease|animate|border-width|border-style|outline|outline-width|outline-style|ring|ring-offset|divide|accent|caret|decoration|placeholder|selection|scrollbar)-/
-            };
 
             // Pre-define pseudo classes
             this.pseudoClasses = ['hover', 'focus', 'active', 'disabled', 'dark'];
@@ -6655,407 +12065,16 @@ var Indux = (function (exports) {
             // Cache for discovered custom utility classes
             this.customUtilities = new Map();
 
-            // Pre-define utility generators
-            this.utilityGenerators = {
-                'color-': (suffix, value) => {
-                    const utilities = [];
-
-                    // Helper function to generate utility with optional opacity
-                    const addUtility = (prefix, property, baseValue) => {
-                        // Base utility without opacity
-                        utilities.push([`${prefix}-${suffix}`, `${property}: ${baseValue}`]);
-                    };
-
-                    addUtility('text', 'color', value);
-                    addUtility('bg', 'background-color', value);
-                    addUtility('border', 'border-color', value);
-                    addUtility('outline', 'outline-color', value);
-                    addUtility('ring', 'box-shadow', `0 0 0 1px ${value}`);
-                    addUtility('fill', 'fill', value);
-                    addUtility('stroke', 'stroke', value);
-
-                    return utilities;
-                },
-                'font-': (suffix, value) => [
-                    [`font-${suffix}`, `font-family: ${value}`]
-                ],
-                'text-': (suffix, value) => [
-                    [`text-${suffix}`, `font-size: ${value}`]
-                ],
-                'font-weight-': (suffix, value) => [
-                    [`font-${suffix}`, `font-weight: ${value}`]
-                ],
-                'tracking-': (suffix, value) => [
-                    [`tracking-${suffix}`, `letter-spacing: ${value}`]
-                ],
-                'leading-': (suffix, value) => [
-                    [`leading-${suffix}`, `line-height: ${value}`]
-                ],
-                'breakpoint-': (suffix, value) => [
-                    [`@${suffix}`, `@media (min-width: ${value})`]
-                ],
-                'container-': (suffix, value) => [
-                    [`container-${suffix}`, `max-width: ${value}`],
-                    [`@container-${suffix}`, `@container (min-width: ${value})`]
-                ],
-                'spacing-': (suffix, value) => [
-                    [`gap-${suffix}`, `gap: ${value}`],
-                    [`p-${suffix}`, `padding: ${value}`],
-                    [`px-${suffix}`, `padding-left: ${value}; padding-right: ${value}`],
-                    [`py-${suffix}`, `padding-top: ${value}; padding-bottom: ${value}`],
-                    [`m-${suffix}`, `margin: ${value}`],
-                    [`mx-${suffix}`, `margin-left: ${value}; margin-right: ${value}`],
-                    [`my-${suffix}`, `margin-top: ${value}; margin-bottom: ${value}`],
-                    [`space-x-${suffix}`, `> * + * { margin-left: ${value}; }`],
-                    [`space-y-${suffix}`, `> * + * { margin-top: ${value}; }`],
-                    [`max-w-${suffix}`, `max-width: ${value}`],
-                    [`max-h-${suffix}`, `max-height: ${value}`],
-                    [`min-w-${suffix}`, `min-width: ${value}`],
-                    [`min-h-${suffix}`, `min-height: ${value}`],
-                    [`w-${suffix}`, `width: ${value}`],
-                    [`h-${suffix}`, `height: ${value}`]
-                ],
-                'radius-': (suffix, value) => [
-                    [`rounded-${suffix}`, `border-radius: ${value}`]
-                ],
-                'shadow-': (suffix, value) => [
-                    [`shadow-${suffix}`, `box-shadow: ${value}`]
-                ],
-                'inset-shadow-': (suffix, value) => [
-                    [`inset-shadow-${suffix}`, `box-shadow: inset ${value}`]
-                ],
-                'drop-shadow-': (suffix, value) => [
-                    [`drop-shadow-${suffix}`, `filter: drop-shadow(${value})`]
-                ],
-                'blur-': (suffix, value) => [
-                    [`blur-${suffix}`, `filter: blur(${value})`]
-                ],
-                'perspective-': (suffix, value) => [
-                    [`perspective-${suffix}`, `perspective: ${value}`]
-                ],
-                'aspect-': (suffix, value) => [
-                    [`aspect-${suffix}`, `aspect-ratio: ${value}`]
-                ],
-                'ease-': (suffix, value) => [
-                    [`ease-${suffix}`, `transition-timing-function: ${value}`]
-                ],
-                'animate-': (suffix, value) => [
-                    [`animate-${suffix}`, `animation: ${value}`]
-                ],
-                'border-width-': (suffix, value) => [
-                    [`border-${suffix}`, `border-width: ${value}`]
-                ],
-                'border-style-': (suffix, value) => [
-                    [`border-${suffix}`, `border-style: ${value}`]
-                ],
-                'outline-': (suffix, value) => [
-                    [`outline-${suffix}`, `outline-color: ${value}`]
-                ],
-                'outline-width-': (suffix, value) => [
-                    [`outline-${suffix}`, `outline-width: ${value}`]
-                ],
-                'outline-style-': (suffix, value) => [
-                    [`outline-${suffix}`, `outline-style: ${value}`]
-                ],
-                'ring-': (suffix, value) => [
-                    [`ring-${suffix}`, `box-shadow: 0 0 0 ${value} var(--color-ring)`]
-                ],
-                'ring-offset-': (suffix, value) => [
-                    [`ring-offset-${suffix}`, `--tw-ring-offset-width: ${value}`]
-                ],
-                'divide-': (suffix, value) => [
-                    [`divide-${suffix}`, `border-color: ${value}`]
-                ],
-                'accent-': (suffix, value) => [
-                    [`accent-${suffix}`, `accent-color: ${value}`]
-                ],
-                'caret-': (suffix, value) => [
-                    [`caret-${suffix}`, `caret-color: ${value}`]
-                ],
-                'decoration-': (suffix, value) => [
-                    [`decoration-${suffix}`, `text-decoration-color: ${value}`]
-                ],
-                'placeholder-': (suffix, value) => [
-                    [`placeholder-${suffix}`, `&::placeholder { color: ${value} }`]
-                ],
-                'selection-': (suffix, value) => [
-                    [`selection-${suffix}`, `&::selection { background-color: ${value} }`]
-                ],
-                'scrollbar-': (suffix, value) => [
-                    [`scrollbar-${suffix}`, `scrollbar-color: ${value}`]
-                ]
-            };
-
-            // Define valid variants and their CSS selectors
-            this.variants = {
-                // State variants
-                'hover': ':hover',
-                'focus': ':focus',
-                'focus-visible': ':focus-visible',
-                'focus-within': ':focus-within',
-                'active': ':active',
-                'visited': ':visited',
-                'target': ':target',
-                'first': ':first-child',
-                'last': ':last-child',
-                'only': ':only-child',
-                'odd': ':nth-child(odd)',
-                'even': ':nth-child(even)',
-                'first-of-type': ':first-of-type',
-                'last-of-type': ':last-of-type',
-                'only-of-type': ':only-of-type',
-                'empty': ':empty',
-                'disabled': ':disabled',
-                'enabled': ':enabled',
-                'checked': ':checked',
-                'indeterminate': ':indeterminate',
-                'default': ':default',
-                'required': ':required',
-                'valid': ':valid',
-                'invalid': ':invalid',
-                'in-range': ':in-range',
-                'out-of-range': ':out-of-range',
-                'placeholder-shown': ':placeholder-shown',
-                'autofill': ':autofill',
-                'read-only': ':read-only',
-                'read-write': ':read-write',
-                'optional': ':optional',
-                'user-valid': ':user-valid',
-                'user-invalid': ':user-invalid',
-                'open': '[open] &',
-                'closed': ':not([open]) &',
-                'paused': '[data-state="paused"] &',
-                'playing': '[data-state="playing"] &',
-                'muted': '[data-state="muted"] &',
-                'unmuted': '[data-state="unmuted"] &',
-                'collapsed': '[data-state="collapsed"] &',
-                'expanded': '[data-state="expanded"] &',
-                'unchecked': ':not(:checked)',
-                'selected': '[data-state="selected"] &',
-                'unselected': '[data-state="unselected"] &',
-                'details-content': '::details-content',
-                'nth': ':nth-child',
-                'nth-last': ':nth-last-child',
-                'nth-of-type': ':nth-of-type',
-                'nth-last-of-type': ':nth-last-of-type',
-                'has': ':has',
-                'not': ':not',
-
-                // Pseudo-elements
-                'before': '::before',
-                'after': '::after',
-                'first-letter': '::first-letter',
-                'first-line': '::first-line',
-                'marker': '::marker',
-                'selection': '::selection',
-                'file': '::file-selector-button',
-                'backdrop': '::backdrop',
-                'placeholder': '::placeholder',
-                'target-text': '::target-text',
-                'spelling-error': '::spelling-error',
-                'grammar-error': '::grammar-error',
-
-                // Media queries
-                'dark': '.dark &',
-                'light': '.light &',
-
-                // Group variants
-                'group': '.group &',
-                'group-hover': '.group:hover &',
-                'group-focus': '.group:focus &',
-                'group-focus-within': '.group:focus-within &',
-                'group-active': '.group:active &',
-                'group-disabled': '.group:disabled &',
-                'group-visited': '.group:visited &',
-                'group-checked': '.group:checked &',
-                'group-required': '.group:required &',
-                'group-valid': '.group:valid &',
-                'group-invalid': '.group:invalid &',
-                'group-in-range': '.group:in-range &',
-                'group-out-of-range': '.group:out-of-range &',
-                'group-placeholder-shown': '.group:placeholder-shown &',
-                'group-autofill': '.group:autofill &',
-                'group-read-only': '.group:read-only &',
-                'group-read-write': '.group:read-write &',
-                'group-optional': '.group:optional &',
-                'group-user-valid': '.group:user-valid &',
-                'group-user-invalid': '.group:user-invalid &',
-
-                // Peer variants
-                'peer': '.peer ~ &',
-                'peer-hover': '.peer:hover ~ &',
-                'peer-focus': '.peer:focus ~ &',
-                'peer-focus-within': '.peer:focus-within ~ &',
-                'peer-active': '.peer:active ~ &',
-                'peer-disabled': '.peer:disabled ~ &',
-                'peer-visited': '.peer:visited ~ &',
-                'peer-checked': '.peer:checked ~ &',
-                'peer-required': '.peer:required ~ &',
-                'peer-valid': '.peer:valid ~ &',
-                'peer-invalid': '.peer:invalid ~ &',
-                'peer-in-range': '.peer:in-range ~ &',
-                'peer-out-of-range': '.peer:out-of-range ~ &',
-                'peer-placeholder-shown': '.peer:placeholder-shown ~ &',
-                'peer-autofill': '.peer:autofill ~ &',
-                'peer-read-only': '.peer:read-only ~ &',
-                'peer-read-write': '.peer:read-write ~ &',
-                'peer-optional': '.peer:optional ~ &',
-                'peer-user-valid': '.peer:user-valid ~ &',
-                'peer-user-invalid': '.peer:user-invalid &',
-
-                'motion-safe': '@media (prefers-reduced-motion: no-preference)',
-                'motion-reduce': '@media (prefers-reduced-motion: reduce)',
-                'print': '@media print',
-                'portrait': '@media (orientation: portrait)',
-                'landscape': '@media (orientation: landscape)',
-                'contrast-more': '@media (prefers-contrast: more)',
-                'contrast-less': '@media (prefers-contrast: less)',
-                'forced-colors': '@media (forced-colors: active)',
-                'rtl': '&:where(:dir(rtl), [dir="rtl"], [dir="rtl"] *)',
-                'ltr': '&:where(:dir(ltr), [dir="ltr"], [dir="ltr"] *)',
-                '[dir=rtl]': '[dir="rtl"] &',
-                '[dir=ltr]': '[dir="ltr"] &',
-                'pointer-fine': '@media (pointer: fine)',
-                'pointer-coarse': '@media (pointer: coarse)',
-                'pointer-none': '@media (pointer: none)',
-                'any-pointer-fine': '@media (any-pointer: fine)',
-                'any-pointer-coarse': '@media (any-pointer: coarse)',
-                'any-pointer-none': '@media (any-pointer: none)',
-                'scripting-enabled': '@media (scripting: enabled)',
-                'can-hover': '@media (hover: hover)',
-                'can-not-hover': '@media (hover: none)',
-                'any-hover': '@media (any-hover: hover)',
-                'any-hover-none': '@media (any-hover: none)',
-                'any-pointer': '@media (any-pointer: fine)',
-                'any-pointer-coarse': '@media (any-pointer: coarse)',
-                'any-pointer-none': '@media (any-pointer: none)',
-                'color': '@media (color)',
-                'color-gamut': '@media (color-gamut: srgb)',
-                'color-gamut-p3': '@media (color-gamut: p3)',
-                'color-gamut-rec2020': '@media (color-gamut: rec2020)',
-                'monochrome': '@media (monochrome)',
-                'monochrome-color': '@media (monochrome: 0)',
-                'monochrome-grayscale': '@media (monochrome: 1)',
-                'inverted-colors': '@media (inverted-colors: inverted)',
-                'inverted-colors-none': '@media (inverted-colors: none)',
-                'update': '@media (update: fast)',
-                'update-slow': '@media (update: slow)',
-                'update-none': '@media (update: none)',
-                'overflow-block': '@media (overflow-block: scroll)',
-                'overflow-block-paged': '@media (overflow-block: paged)',
-                'overflow-inline': '@media (overflow-inline: scroll)',
-                'overflow-inline-auto': '@media (overflow-inline: auto)',
-                'prefers-color-scheme': '@media (prefers-color-scheme: dark)',
-                'prefers-color-scheme-light': '@media (prefers-color-scheme: light)',
-                'prefers-contrast': '@media (prefers-contrast: more)',
-                'prefers-contrast-less': '@media (prefers-contrast: less)',
-                'prefers-contrast-no-preference': '@media (prefers-contrast: no-preference)',
-                'prefers-reduced-motion': '@media (prefers-reduced-motion: reduce)',
-                'prefers-reduced-motion-no-preference': '@media (prefers-reduced-motion: no-preference)',
-                'prefers-reduced-transparency': '@media (prefers-reduced-transparency: reduce)',
-                'prefers-reduced-transparency-no-preference': '@media (prefers-reduced-transparency: no-preference)',
-                'resolution': '@media (resolution: 1dppx)',
-                'resolution-low': '@media (resolution: 1dppx)',
-                'resolution-high': '@media (resolution: 2dppx)',
-                'scan': '@media (scan: progressive)',
-                'scan-interlace': '@media (scan: interlace)',
-                'scripting': '@media (scripting: enabled)',
-                'scripting-none': '@media (scripting: none)',
-                'scripting-initial-only': '@media (scripting: initial-only)',
-
-                // Container queries
-                'container': '@container',
-                'container-name': '@container',
-
-                // Important modifier
-                '!': '!important',
-
-                // Responsive breakpoints
-                'sm': '@media (min-width: 640px)',
-                'md': '@media (min-width: 768px)',
-                'lg': '@media (min-width: 1024px)',
-                'xl': '@media (min-width: 1280px)',
-                '2xl': '@media (min-width: 1536px)',
-
-                // Supports queries
-                'supports': '@supports',
-
-                // Starting style
-                'starting': '@starting-style',
-
-                // Data attribute variants (common patterns)
-                'data-open': '[data-state="open"] &',
-                'data-closed': '[data-state="closed"] &',
-                'data-checked': '[data-state="checked"] &',
-                'data-unchecked': '[data-state="unchecked"] &',
-                'data-on': '[data-state="on"] &',
-                'data-off': '[data-state="off"] &',
-                'data-visible': '[data-state="visible"] &',
-                'data-hidden': '[data-state="hidden"] &',
-                'data-disabled': '[data-disabled] &',
-                'data-loading': '[data-loading] &',
-                'data-error': '[data-error] &',
-                'data-success': '[data-success] &',
-                'data-warning': '[data-warning] &',
-                'data-selected': '[data-selected] &',
-                'data-highlighted': '[data-highlighted] &',
-                'data-pressed': '[data-pressed] &',
-                'data-expanded': '[data-expanded] &',
-                'data-collapsed': '[data-collapsed] &',
-                'data-active': '[data-active] &',
-                'data-inactive': '[data-inactive] &',
-                'data-valid': '[data-valid] &',
-                'data-invalid': '[data-invalid] &',
-                'data-required': '[data-required] &',
-                'data-optional': '[data-optional] &',
-                'data-readonly': '[data-readonly] &',
-                'data-write': '[data-write] &',
-
-                // Aria attribute variants (common patterns)
-                'aria-expanded': '[aria-expanded="true"] &',
-                'aria-collapsed': '[aria-expanded="false"] &',
-                'aria-pressed': '[aria-pressed="true"] &',
-                'aria-unpressed': '[aria-pressed="false"] &',
-                'aria-checked': '[aria-checked="true"] &',
-                'aria-unchecked': '[aria-checked="false"] &',
-                'aria-selected': '[aria-selected="true"] &',
-                'aria-unselected': '[aria-selected="false"] &',
-                'aria-invalid': '[aria-invalid="true"] &',
-                'aria-valid': '[aria-invalid="false"] &',
-                'aria-required': '[aria-required="true"] &',
-                'aria-optional': '[aria-required="false"] &',
-                'aria-disabled': '[aria-disabled="true"] &',
-                'aria-enabled': '[aria-disabled="false"] &',
-                'aria-hidden': '[aria-hidden="true"] &',
-                'aria-visible': '[aria-hidden="false"] &',
-                'aria-busy': '[aria-busy="true"] &',
-                'aria-available': '[aria-busy="false"] &',
-                'aria-current': '[aria-current="true"] &',
-                'aria-not-current': '[aria-current="false"] &',
-                'aria-live': '[aria-live="polite"] &, [aria-live="assertive"] &',
-                'aria-atomic': '[aria-atomic="true"] &',
-                'aria-relevant': '[aria-relevant="additions"] &, [aria-relevant="removals"] &, [aria-relevant="text"] &, [aria-relevant="all"] &'
-            };
-
-            // Define variant groups that can be combined
-            this.variantGroups = {
-                'state': ['hover', 'focus', 'active', 'visited', 'target', 'open', 'closed', 'paused', 'playing', 'muted', 'unmuted', 'collapsed', 'expanded', 'unchecked', 'selected', 'unselected'],
-                'child': ['first', 'last', 'only', 'odd', 'even'],
-                'form': ['disabled', 'enabled', 'checked', 'indeterminate', 'required', 'valid', 'invalid'],
-                'pseudo': ['before', 'after', 'first-letter', 'first-line', 'marker', 'selection', 'file', 'backdrop'],
-                'media': ['dark', 'light', 'motion-safe', 'motion-reduce', 'print', 'portrait', 'landscape', 'rtl', 'ltr', 'can-hover', 'can-not-hover', 'any-hover', 'any-hover-none', 'color', 'monochrome', 'inverted-colors', 'inverted-colors-none', 'update', 'update-slow', 'update-none', 'overflow-block', 'overflow-block-paged', 'overflow-inline', 'overflow-inline-auto', 'prefers-color-scheme', 'prefers-color-scheme-light', 'prefers-contrast', 'prefers-contrast-less', 'prefers-contrast-no-preference', 'prefers-reduced-motion', 'prefers-reduced-motion-no-preference', 'prefers-reduced-transparency', 'prefers-reduced-transparency-no-preference', 'resolution', 'resolution-low', 'resolution-high', 'scan', 'scan-interlace', 'scripting', 'scripting-none', 'scripting-initial-only', 'forced-colors', 'contrast-more', 'contrast-less', 'pointer-fine', 'pointer-coarse', 'pointer-none', 'any-pointer-fine', 'any-pointer-coarse', 'any-pointer-none', 'scripting-enabled'],
-                'responsive': ['sm', 'md', 'lg', 'xl', '2xl'],
-                'group': ['group', 'group-hover', 'group-focus', 'group-active', 'group-disabled', 'group-checked', 'group-required', 'group-valid', 'group-invalid'],
-                'peer': ['peer', 'peer-hover', 'peer-focus', 'peer-active', 'peer-disabled', 'peer-checked', 'peer-required', 'peer-valid', 'peer-invalid'],
-                'data': ['data-open', 'data-closed', 'data-checked', 'data-unchecked', 'data-visible', 'data-hidden', 'data-disabled', 'data-loading', 'data-error', 'data-success', 'data-warning', 'data-selected', 'data-highlighted', 'data-pressed', 'data-expanded', 'data-collapsed', 'data-active', 'data-inactive', 'data-valid', 'data-invalid', 'data-required', 'data-optional', 'data-readonly', 'data-write'],
-                'aria': ['aria-expanded', 'aria-collapsed', 'aria-pressed', 'aria-unpressed', 'aria-checked', 'aria-unchecked', 'aria-selected', 'aria-unselected', 'aria-invalid', 'aria-valid', 'aria-required', 'aria-optional', 'aria-disabled', 'aria-enabled', 'aria-hidden', 'aria-visible', 'aria-busy', 'aria-available', 'aria-current', 'aria-not-current', 'aria-live', 'aria-atomic', 'aria-relevant']
-            };
-
-            // Cache for parsed class names
-            this.classCache = new Map();
+            // Variants and classCache already initialized above (before addCriticalBlockingStylesSync)
 
             // Load cache and start processing
             this.loadAndApplyCache();
+
+            // If cache loaded utilities, they'll be in the main style element
+            // The critical style element will be cleared when full utilities are ready
+
+            // Try to generate minimal utilities synchronously from inline styles
+            this.generateSynchronousUtilities();
 
             // Listen for component loads
             this.setupComponentLoadListener();
@@ -7091,141 +12110,7 @@ var Indux = (function (exports) {
             this.compile();
         }
 
-        setupComponentLoadListener() {
-            // Use a single debounced handler for all component-related events
-            const debouncedCompile = this.debounce(() => {
-                if (!this.isCompiling) {
-                    this.compile();
-                }
-            }, this.options.debounceTime);
-
-            // Listen for custom event when components are loaded
-            document.addEventListener('indux:component-loaded', (event) => {
-                debouncedCompile();
-            });
-
-            // Listen for route changes but don't recompile unnecessarily
-            document.addEventListener('indux:route-change', (event) => {
-                // Only trigger compilation if we detect new dynamic classes
-                // The existing MutationObserver will handle actual DOM changes
-                if (this.hasScannedStatic) {
-                    // Wait longer for route content to fully load before checking
-                    setTimeout(() => {
-                        const currentDynamicCount = this.dynamicClassCache.size;
-                        const currentClassesHash = this.lastClassesHash;
-                        
-                        // Scan for new classes
-                        this.getUsedClasses();
-                        const newDynamicCount = this.dynamicClassCache.size;
-                        const dynamicClasses = Array.from(this.dynamicClassCache);
-                        const newClassesHash = dynamicClasses.sort().join(',');
-                        
-                        // Only compile if we found genuinely new classes, not just code processing artifacts
-                        if (newDynamicCount > currentDynamicCount && newClassesHash !== currentClassesHash) {
-                            const newClasses = dynamicClasses.filter(cls => 
-                                // Filter out classes that are likely from code processing
-                                !cls.includes('hljs') && 
-                                !cls.startsWith('language-') && 
-                                !cls.includes('copy') &&
-                                !cls.includes('lines')
-                            );
-                            
-                            if (newClasses.length > 0) {
-                                debouncedCompile();
-                            }
-                        }
-                    }, 300); // Longer delay to let code processing finish
-                }
-            });
-
-            // Use a single MutationObserver for all DOM changes
-            const observer = new MutationObserver((mutations) => {
-                let shouldRecompile = false;
-
-                for (const mutation of mutations) {
-                    // Skip attribute changes that don't affect utilities
-                    if (mutation.type === 'attributes') {
-                        const attributeName = mutation.attributeName;
-                        
-                        // Skip ignored attributes (like id changes from router)
-                        if (this.ignoredAttributes.includes(attributeName)) {
-                            continue;
-                        }
-                        
-                        // Only care about class attribute changes
-                        if (attributeName !== 'class') {
-                            continue;
-                        }
-                        
-                        // If it's a class change, check if we have new classes that need utilities
-                        const element = mutation.target;
-                        if (element.nodeType === Node.ELEMENT_NODE) {
-                            const currentClasses = Array.from(element.classList || []);
-                            const newClasses = currentClasses.filter(cls => {
-                                // Skip ignored patterns
-                                if (this.ignoredClassPatterns.some(pattern => pattern.test(cls))) {
-                                    return false;
-                                }
-                                
-                                // Check if this class is new (not in our cache)
-                                return !this.staticClassCache.has(cls) && !this.dynamicClassCache.has(cls);
-                            });
-                            
-                            if (newClasses.length > 0) {
-                                // Add new classes to dynamic cache
-                                newClasses.forEach(cls => this.dynamicClassCache.add(cls));
-                                shouldRecompile = true;
-                                break;
-                            }
-                        }
-                    }
-                    else if (mutation.type === 'childList') {
-                        for (const node of mutation.addedNodes) {
-                            if (node.nodeType === Node.ELEMENT_NODE) {
-                                // Skip ignored elements using configurable selectors
-                                const isIgnoredElement = this.ignoredElementSelectors.some(selector => 
-                                    node.tagName?.toLowerCase() === selector.toLowerCase() ||
-                                    node.closest(selector)
-                                );
-                                
-                                if (isIgnoredElement) {
-                                    continue;
-                                }
-
-                                // Only recompile for significant changes using configurable selectors
-                                const hasSignificantChange = this.significantChangeSelectors.some(selector => {
-                                    try {
-                                        return node.matches?.(selector) || node.querySelector?.(selector);
-                                    } catch (e) {
-                                        return false; // Invalid selector
-                                    }
-                                });
-
-                                if (hasSignificantChange) {
-                                shouldRecompile = true;
-                                break;
-                                }
-                            }
-                        }
-                    }
-                    if (shouldRecompile) break;
-                }
-
-                if (shouldRecompile) {
-                    debouncedCompile();
-                }
-            });
-
-            // Start observing the document with the configured parameters
-            observer.observe(document.documentElement, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['class'] // Only observe class changes
-            });
-        }
-
-        // Debounce helper
+        // Debounce utility
         debounce(func, wait) {
             let timeout;
             return function executedFunction(...args) {
@@ -7240,19 +12125,18 @@ var Indux = (function (exports) {
 
         // Wait for Tailwind to be available
         async waitForTailwind() {
-            // Check if Tailwind is already available
-            if (this.isTailwindAvailable()) {
-                return;
-            }
+            return new Promise((resolve) => {
+                if (this.isTailwindAvailable()) {
+                    resolve();
+                    return;
+                }
 
-            // Wait for Tailwind to be available
-            return new Promise(resolve => {
                 const checkInterval = setInterval(() => {
                     if (this.isTailwindAvailable()) {
                         clearInterval(checkInterval);
                         resolve();
                     }
-                }, 50);
+                }, 100);
 
                 // Also check on DOMContentLoaded
                 document.addEventListener('DOMContentLoaded', () => {
@@ -7292,415 +12176,949 @@ var Indux = (function (exports) {
                 document.head.innerHTML.includes('indux')
             );
         }
+    }
 
-        loadAndApplyCache() {
-            try {
-                const cached = localStorage.getItem('tailwind-cache');
-                if (cached) {
-                    const parsed = JSON.parse(cached);
-                    this.cache = new Map(Object.entries(parsed));
 
-                    // Apply the most recent cached styles immediately
-                    const mostRecentCache = Array.from(this.cache.entries())
-                        .sort((a, b) => b[1].timestamp - a[1].timestamp)[0];
 
-                    if (mostRecentCache) {
-                        this.styleElement.textContent = mostRecentCache[1].css;
-                        this.lastThemeHash = mostRecentCache[1].themeHash;
+    // Synchronous utility generation
+    // Methods for generating utilities synchronously before first paint
+
+    TailwindCompiler.prototype.addCriticalBlockingStylesSync = function() {
+        if (!this.criticalStyleElement) return;
+        
+        const syncStart = performance.now();
+        if (this.debug) {
+            console.log(`[Indux Utilities] Starting synchronous utility generation at ${(syncStart - this.startTime).toFixed(2)}ms`);
+        }
+        
+        try {
+            // Extract CSS variables synchronously from already-loaded sources
+            const cssVariables = new Map();
+            
+            // 1. From inline style elements (already in DOM)
+            const inlineStyles = document.querySelectorAll('style:not(#utility-styles):not(#utility-styles-critical)');
+            if (this.debug) {
+                console.log(`[Indux Utilities] Found ${inlineStyles.length} inline style elements`);
+            }
+            for (const styleEl of inlineStyles) {
+                if (styleEl.textContent) {
+                    const variables = this.extractThemeVariables(styleEl.textContent);
+                    for (const [name, value] of variables.entries()) {
+                        cssVariables.set(name, value);
                     }
                 }
-            } catch (error) {
-                console.warn('Failed to load cached styles:', error);
             }
-        }
-
-        async startProcessing() {
+            if (this.debug && cssVariables.size > 0) {
+                console.log(`[Indux Utilities] Extracted ${cssVariables.size} CSS variables from inline styles`);
+            }
+            
+            // 2. From HTML source (parse style tags in HTML)
             try {
-
-                // Start initial compilation immediately
-                const initialCompilation = this.compile();
-
-                // Set up observer while compilation is running
-                this.observer = new MutationObserver((mutations) => {
-                    const relevantMutations = mutations.filter(mutation => {
-                        if (mutation.type === 'attributes' &&
-                            mutation.attributeName === 'class') {
-                            return true;
+                if (document.documentElement) {
+                    const htmlSource = document.documentElement.outerHTML;
+                    const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+                    let styleMatch;
+                    while ((styleMatch = styleRegex.exec(htmlSource)) !== null) {
+                        const cssContent = styleMatch[1];
+                        const variables = this.extractThemeVariables(cssContent);
+                        for (const [name, value] of variables.entries()) {
+                            cssVariables.set(name, value);
                         }
-                        if (mutation.type === 'childList') {
-                            return Array.from(mutation.addedNodes).some(node =>
-                                node.nodeType === Node.ELEMENT_NODE);
-                        }
-                        return false;
-                    });
-
-                    if (relevantMutations.length === 0) return;
-
-                    // Check if there are any new classes that need processing
-                    const newClasses = this.getUsedClasses();
-                    if (newClasses.classes.length === 0) return;
-
-                    if (this.compileTimeout) {
-                        clearTimeout(this.compileTimeout);
                     }
-                    this.compileTimeout = setTimeout(() => {
-                        if (!this.isCompiling) {
-                            this.compile();
-                        }
-                    }, this.options.debounceTime);
-                });
-
-                // Start observing immediately
-                this.observer.observe(document.documentElement, {
-                    childList: true,
-                    subtree: true,
-                    attributes: true,
-                    attributeFilter: ['class']
-                });
-
-                // Wait for initial compilation
-                await initialCompilation;
-
-                this.hasInitialized = true;
-            } catch (error) {
-                console.error('Error starting Tailwind compiler:', error);
+                }
+            } catch (e) {
+                // Ignore parsing errors
             }
-        }
-
-        discoverCssFiles() {
+            
+            // 3. From loaded stylesheets (synchronously read CSS rules)
             try {
-                // Get all stylesheets from the document
                 const stylesheets = Array.from(document.styleSheets);
-
-                // Process each stylesheet
+                if (this.debug) {
+                    console.log(`[Indux Utilities] Found ${stylesheets.length} stylesheets`);
+                }
                 for (const sheet of stylesheets) {
                     try {
-                        // Process local files and @indux CDN files
-                        if (sheet.href && (
-                            sheet.href.startsWith(window.location.origin) ||
-                            sheet.href.includes('@indux') ||
-                            (sheet.href.includes('jsdelivr') && sheet.href.includes('@indux')) ||
-                            (sheet.href.includes('unpkg') && sheet.href.includes('@indux'))
-                        )) {
-                            this.cssFiles.add(sheet.href);
-                        }
-
-                        // Get all @import rules (local and @indux CDN)
+                        // Try to access CSS rules (may fail due to CORS)
                         const rules = Array.from(sheet.cssRules || []);
                         for (const rule of rules) {
-                            if (rule.type === CSSRule.IMPORT_RULE && rule.href && (
-                                rule.href.startsWith(window.location.origin) ||
-                                rule.href.includes('@indux') ||
-                                (rule.href.includes('jsdelivr') && rule.href.includes('@indux')) ||
-                                (rule.href.includes('unpkg') && rule.href.includes('@indux'))
-                            )) {
-                                this.cssFiles.add(rule.href);
+                            if (rule.type === CSSRule.STYLE_RULE && rule.styleSheet) {
+                                // Handle @import rules that have nested stylesheets
+                                try {
+                                    const nestedRules = Array.from(rule.styleSheet.cssRules || []);
+                                    for (const nestedRule of nestedRules) {
+                                        if (nestedRule.type === CSSRule.STYLE_RULE) {
+                                            const cssText = nestedRule.cssText;
+                                            const variables = this.extractThemeVariables(cssText);
+                                            for (const [name, value] of variables.entries()) {
+                                                cssVariables.set(name, value);
+                                            }
+                                        }
+                                    }
+                                } catch (e) {
+                                    // Ignore nested rule errors
+                                }
+                            }
+                            if (rule.type === CSSRule.STYLE_RULE) {
+                                const cssText = rule.cssText;
+                                const variables = this.extractThemeVariables(cssText);
+                                for (const [name, value] of variables.entries()) {
+                                    cssVariables.set(name, value);
+                                }
                             }
                         }
                     } catch (e) {
-                        // Skip stylesheets that can't be accessed (external CDN files, CORS, etc.)
-                        // This is expected behavior for external stylesheets
-                    }
-                }
-
-                // Add any inline styles (exclude generated styles)
-                const styleElements = document.querySelectorAll('style:not(#utility-styles)');
-                for (const style of styleElements) {
-                    if (style.textContent && style.textContent.trim()) {
-                        const id = style.id || `inline-style-${Array.from(styleElements).indexOf(style)}`;
-                        this.cssFiles.add('inline:' + id);
-                    }
-                }
-            } catch (error) {
-                console.warn('Error discovering CSS files:', error);
-            }
-        }
-
-        loadPersistentCache() {
-            try {
-                const cached = localStorage.getItem('tailwind-cache');
-                if (cached) {
-                    const parsed = JSON.parse(cached);
-                    this.cache = new Map(Object.entries(parsed));
-                }
-            } catch (error) {
-                console.warn('Failed to load cached styles:', error);
-            }
-        }
-
-        savePersistentCache() {
-            try {
-                const serialized = JSON.stringify(Object.fromEntries(this.cache));
-                localStorage.setItem('tailwind-cache', serialized);
-            } catch (error) {
-                console.warn('Failed to save cached styles:', error);
-            }
-        }
-
-        // Generate a hash of the theme variables to detect changes
-        generateThemeHash(themeCss) {
-            // Use encodeURIComponent to handle non-Latin1 characters safely
-            return encodeURIComponent(themeCss).slice(0, 8); // Simple hash of theme content
-        }
-
-        // Clean up old cache entries
-        cleanupCache() {
-            const now = Date.now();
-            const maxAge = this.options.maxCacheAge;
-            const entriesToDelete = [];
-
-            for (const [key, value] of this.cache.entries()) {
-                if (value.timestamp && (now - value.timestamp > maxAge)) {
-                    entriesToDelete.push(key);
-                }
-            }
-
-            for (const key of entriesToDelete) {
-                this.cache.delete(key);
-            }
-
-            if (entriesToDelete.length > 0) {
-                this.savePersistentCache();
-            }
-        }
-
-        // Scan static HTML files and components for classes
-        async scanStaticClasses() {
-            if (this.staticScanPromise) {
-                return this.staticScanPromise;
-            }
-
-            this.staticScanPromise = (async () => {
-                try {
-                    const staticClasses = new Set();
-
-                    // 1. Scan index.html content
-                    const htmlContent = document.documentElement.outerHTML;
-                    this.extractClassesFromHTML(htmlContent, staticClasses);
-
-                    // 2. Scan component files from manifest
-                    const registry = window.InduxComponentsRegistry;
-                    const componentUrls = [];
-                    
-                    if (registry && registry.manifest) {
-                        // Get all component paths from manifest
-                        const allComponents = [
-                            ...(registry.manifest.preloadedComponents || []),
-                            ...(registry.manifest.components || [])
-                        ];
-                        componentUrls.push(...allComponents);
-                    }
-
-                    const componentPromises = componentUrls.map(async (url) => {
-                        try {
-                            const response = await fetch('/' + url);
-                            if (response.ok) {
-                                const html = await response.text();
-                                this.extractClassesFromHTML(html, staticClasses);
-                            }
-                        } catch (error) {
-                            // Silently ignore missing components
+                        // CORS or other access errors - expected for some stylesheets
+                        if (this.debug && sheet.href) {
+                            console.log(`[Indux Utilities] Cannot access stylesheet (CORS?): ${sheet.href}`);
                         }
-                    });
+                    }
+                }
+                if (this.debug && cssVariables.size > 0) {
+                    console.log(`[Indux Utilities] Extracted ${cssVariables.size} CSS variables from stylesheets`);
+                }
+            } catch (e) {
+                if (this.debug) {
+                    console.warn(`[Indux Utilities] Error reading stylesheets:`, e);
+                }
+            }
+            
+            // 4. From computed styles (if :root is available)
+            try {
+                if (document.documentElement && document.readyState !== 'loading') {
+                    const rootStyles = getComputedStyle(document.documentElement);
+                    let computedVars = 0;
+                    for (let i = 0; i < rootStyles.length; i++) {
+                        const prop = rootStyles[i];
+                        if (prop.startsWith('--')) {
+                            const value = rootStyles.getPropertyValue(prop);
+                            if (value && value.trim()) {
+                                cssVariables.set(prop.substring(2), value.trim());
+                                computedVars++;
+                            }
+                        }
+                    }
+                    if (this.debug && computedVars > 0) {
+                        console.log(`[Indux Utilities] Extracted ${computedVars} CSS variables from computed styles`);
+                    }
+                }
+            } catch (e) {
+                // Ignore errors
+            }
+            
+            // 5. Scan for classes that need utilities
+            const classesToGenerate = new Set();
+            try {
+                // Method A: Scan HTML source
+                if (document.documentElement) {
+                    const htmlSource = document.documentElement.outerHTML;
+                    const classRegex = /class=["']([^"']+)["']/gi;
+                    let classMatch;
+                    while ((classMatch = classRegex.exec(htmlSource)) !== null) {
+                        const classes = classMatch[1].split(/\s+/).filter(Boolean);
+                        for (const cls of classes) {
+                            // Match utility patterns that might use CSS variables
+                            if (/^(border|bg|text|ring|outline|decoration|caret|accent|fill|stroke)-[a-z0-9-]+(\/[0-9]+)?$/.test(cls)) {
+                                classesToGenerate.add(cls);
+                            }
+                        }
+                    }
+                }
+                
+                // Method B: Scan DOM directly (if body exists)
+                if (document.body) {
+                    const elements = document.body.querySelectorAll('*');
+                    for (const el of elements) {
+                        if (el.className && typeof el.className === 'string') {
+                            const classes = el.className.split(/\s+/).filter(Boolean);
+                            for (const cls of classes) {
+                                if (/^(border|bg|text|ring|outline|decoration|caret|accent|fill|stroke)-[a-z0-9-]+(\/[0-9]+)?$/.test(cls)) {
+                                    classesToGenerate.add(cls);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                if (this.debug) {
+                    console.log(`[Indux Utilities] Found ${classesToGenerate.size} utility classes to generate`);
+                    if (classesToGenerate.size > 0) {
+                        console.log(`[Indux Utilities] Sample classes: ${Array.from(classesToGenerate).slice(0, 5).join(', ')}`);
+                    }
+                }
+            } catch (e) {
+                if (this.debug) {
+                    console.warn(`[Indux Utilities] Error scanning for classes:`, e);
+                }
+            }
+            
+            // Generate utilities synchronously if we have CSS variables
+            if (this.debug) {
+                console.log(`[Indux Utilities] CSS variables found: ${cssVariables.size}, Classes found: ${classesToGenerate.size}`);
+            }
+            
+            if (cssVariables.size > 0) {
+                const generateStart = performance.now();
+                const cssText = Array.from(cssVariables.entries())
+                    .map(([name, value]) => `--${name}: ${value};`)
+                    .join('\n');
+                
+                const tempCss = `:root { ${cssText} }`;
+                
+                // If we have classes, use them. Otherwise, try to get classes from cache
+                let usedData = null; // Initialize to null so we can detect when it's not set
+                if (classesToGenerate.size > 0) {
+                    usedData = {
+                        classes: Array.from(classesToGenerate),
+                        variableSuffixes: []
+                    };
+                } else {
+                    // Try to get classes from cache (most efficient - only generate what was used before)
+                    const cached = localStorage.getItem('tailwind-cache');
+                    let cachedClasses = new Set();
+                    
+                    if (cached) {
+                        try {
+                            const parsed = JSON.parse(cached);
+                            const cacheEntries = Object.values(parsed);
+                            
+                            // Extract classes from cache keys (format: "class1,class2-themeHash")
+                            for (const entry of cacheEntries) {
+                                // Find the cache entry with the most recent timestamp
+                                const mostRecent = cacheEntries.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))[0];
+                                if (mostRecent && mostRecent.css) {
+                                    // Extract class names from generated CSS
+                                    const classMatches = mostRecent.css.match(/\.([a-zA-Z0-9_-]+(?::[a-zA-Z0-9_-]+)*)\s*{/g);
+                                    if (classMatches) {
+                                        for (const match of classMatches) {
+                                            const className = match.replace(/^\./, '').replace(/\s*{.*$/, '');
+                                            // Only include utility classes (not Tailwind native like red-500)
+                                            if (/^(border|bg|text|ring|outline|decoration|caret|accent|fill|stroke)-[a-z0-9-]+(\/[0-9]+)?$/.test(className.split(':').pop())) {
+                                                cachedClasses.add(className);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            // Ignore cache parsing errors
+                        }
+                    }
+                    
+                    if (cachedClasses.size > 0) {
+                        usedData = {
+                            classes: Array.from(cachedClasses),
+                            variableSuffixes: []
+                        };
+                        if (this.debug) {
+                            console.log(`[Indux Utilities] Using ${cachedClasses.size} classes from cache for synchronous generation`);
+                        }
+                    } else {
+                        // Last resort: scan HTML source text directly
+                        try {
+                            const htmlText = document.documentElement.innerHTML || '';
+                            const classMatches = htmlText.match(/class=["']([^"']+)["']/g);
+                            if (classMatches) {
+                                for (const match of classMatches) {
+                                    const classString = match.replace(/class=["']/, '').replace(/["']$/, '');
+                                    const classes = classString.split(/\s+/).filter(Boolean);
+                                    for (const cls of classes) {
+                                        if (/^(border|bg|text|ring|outline|decoration|caret|accent|fill|stroke)-[a-z0-9-]+(\/[0-9]+)?$/.test(cls)) {
+                                            cachedClasses.add(cls);
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            // Ignore errors
+                        }
+                        
+                        if (cachedClasses.size > 0) {
+                            usedData = {
+                                classes: Array.from(cachedClasses),
+                                variableSuffixes: []
+                            };
+                            if (this.debug) {
+                                console.log(`[Indux Utilities] Found ${cachedClasses.size} classes from HTML source text`);
+                            }
+                        }
+                        // If still no classes, continue to generate utilities for all color variables
+                    }
+                }
+                
+                // If no classes found, generate utilities for all color variables
+                if (!usedData || !usedData.classes || usedData.classes.length === 0) {
+                    if (this.debug) {
+                        console.log(`[Indux Utilities] No classes found in DOM/cache, checking for color variables to generate utilities...`);
+                    }
+                    
+                    // Generate utilities for all color-* variables to prevent flash
+                    const colorVars = Array.from(cssVariables.entries())
+                        .filter(([name]) => name.startsWith('color-'));
+                    
+                    if (this.debug) {
+                        console.log(`[Indux Utilities] Found ${colorVars.length} color variables out of ${cssVariables.size} total variables`);
+                    }
+                    
+                    if (colorVars.length > 0) {
+                        // Create synthetic classes for all color utilities (text, bg, border)
+                        const syntheticClasses = [];
+                        for (const [varName] of colorVars) {
+                            const suffix = varName.replace('color-', '');
+                            syntheticClasses.push(`text-${suffix}`);
+                            syntheticClasses.push(`bg-${suffix}`);
+                            syntheticClasses.push(`border-${suffix}`);
+                        }
+                        usedData = {
+                            classes: syntheticClasses,
+                            variableSuffixes: []
+                        };
+                        if (this.debug) {
+                            console.log(`[Indux Utilities] Generating utilities for all ${colorVars.length} color variables (${syntheticClasses.length} synthetic classes) to prevent flash`);
+                        }
+                    } else {
+                        if (this.debug) {
+                            console.log(`[Indux Utilities] No color variables found, skipping synchronous generation`);
+                        }
+                        return;
+                    }
+                }
+                
+                const generated = this.generateUtilitiesFromVars(tempCss, usedData);
+                if (generated) {
+                    const applyStart = performance.now();
+                    this.criticalStyleElement.textContent = generated;
+                    
+                    // Force a synchronous style recalculation
+                    if (document.body) {
+                        // Trigger a reflow to force style application
+                        void document.body.offsetHeight;
+                    } else {
+                        // If body doesn't exist yet, force reflow on documentElement
+                        void document.documentElement.offsetHeight;
+                    }
+                    
+                    const applyEnd = performance.now();
+                    
+                    if (this.debug) {
+                        const sampleClasses = usedData.classes.slice(0, 5).join(', ');
+                        console.log(`[Indux Utilities] Generated ${generated.split('{').length - 1} utility rules in ${(applyStart - generateStart).toFixed(2)}ms`);
+                        console.log(`[Indux Utilities] Applied critical utilities to DOM at ${(applyEnd - this.startTime).toFixed(2)}ms`);
+                        console.log(`[Indux Utilities] Critical utilities length: ${generated.length} chars`);
+                        console.log(`[Indux Utilities] Sample classes generated: ${sampleClasses}${usedData.classes.length > 5 ? '...' : ''}`);
+                    }
+                } else {
+                    if (this.debug) {
+                        console.warn(`[Indux Utilities] No utilities generated despite having ${cssVariables.size} variables`);
+                    }
+                }
+            } else {
+                if (this.debug) {
+                    console.warn(`[Indux Utilities] Cannot generate utilities: no CSS variables found`);
+                }
+            }
+        } catch (error) {
+            if (this.debug) {
+                console.error(`[Indux Utilities] Error in synchronous generation:`, error);
+            }
+        } finally {
+            if (this.debug) {
+                console.log(`[Indux Utilities] Synchronous generation completed in ${(performance.now() - syncStart).toFixed(2)}ms`);
+            }
+        }
+    };
 
-                    await Promise.all(componentPromises);
+    // Generate synchronous utilities (fallback method)
+    TailwindCompiler.prototype.generateSynchronousUtilities = function() {
+        try {
+            // Always try to generate, even if cache exists, to catch any new classes
+            const hasExistingStyles = this.styleElement.textContent && this.styleElement.textContent.trim();
 
-                    // Cache static classes
-                    for (const cls of staticClasses) {
-                        this.staticClassCache.add(cls);
+            let cssVariables = new Map();
+            const commonColorClasses = new Set();
+
+            // Method 1: Extract from inline style elements
+            const inlineStyles = document.querySelectorAll('style:not(#utility-styles)');
+            for (const styleEl of inlineStyles) {
+                if (styleEl.textContent) {
+                    const variables = this.extractThemeVariables(styleEl.textContent);
+                    for (const [name, value] of variables.entries()) {
+                        cssVariables.set(name, value);
+                    }
+                }
+            }
+
+            // Method 2: Parse HTML source directly for CSS variables in <style> tags
+            try {
+                const htmlSource = document.documentElement.outerHTML;
+                // Extract CSS from <style> tags in HTML source
+                const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+                let styleMatch;
+                while ((styleMatch = styleRegex.exec(htmlSource)) !== null) {
+                    const cssContent = styleMatch[1];
+                    const variables = this.extractThemeVariables(cssContent);
+                    for (const [name, value] of variables.entries()) {
+                        cssVariables.set(name, value);
+                    }
+                }
+            } catch (e) {
+                // Ignore parsing errors
+            }
+
+            // Method 3: Check computed styles from :root (if available)
+            try {
+                if (document.readyState !== 'loading') {
+                    const rootStyles = getComputedStyle(document.documentElement);
+                    // Extract all CSS variables, not just color ones
+                    const allProps = rootStyles.length;
+                    for (let i = 0; i < allProps; i++) {
+                        const prop = rootStyles[i];
+                        if (prop.startsWith('--')) {
+                            const value = rootStyles.getPropertyValue(prop);
+                            if (value && value.trim()) {
+                                cssVariables.set(prop.substring(2), value.trim());
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                // Ignore errors accessing computed styles
+            }
+
+            // Method 4: Scan HTML source directly for class attributes
+            try {
+                const htmlSource = document.documentElement.outerHTML;
+                // Extract all class attributes from HTML source
+                const classRegex = /class=["']([^"']+)["']/gi;
+                let classMatch;
+                while ((classMatch = classRegex.exec(htmlSource)) !== null) {
+                    const classString = classMatch[1];
+                    const classes = classString.split(/\s+/).filter(Boolean);
+                    for (const cls of classes) {
+                        // Match common color utility patterns (more comprehensive)
+                        if (/^(border|bg|text|ring|outline|decoration|caret|accent|fill|stroke)-[a-z0-9-]+(\/[0-9]+)?$/.test(cls)) {
+                            commonColorClasses.add(cls);
+                        }
+                    }
+                }
+            } catch (e) {
+                // Fallback: scan DOM if HTML parsing fails
+                const elements = document.querySelectorAll('*');
+                for (const el of elements) {
+                    if (el.className && typeof el.className === 'string') {
+                        const classes = el.className.split(/\s+/);
+                        for (const cls of classes) {
+                            if (/^(border|bg|text|ring|outline|decoration|caret|accent|fill|stroke)-[a-z0-9-]+(\/[0-9]+)?$/.test(cls)) {
+                                commonColorClasses.add(cls);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // If we have variables and classes, generate utilities
+            if (cssVariables.size > 0 && commonColorClasses.size > 0) {
+                const cssText = Array.from(cssVariables.entries())
+                    .map(([name, value]) => `--${name}: ${value};`)
+                    .join('\n');
+
+                const tempCss = `:root { ${cssText} }`;
+                const usedData = {
+                    classes: Array.from(commonColorClasses),
+                    variableSuffixes: []
+                };
+
+                const generated = this.generateUtilitiesFromVars(tempCss, usedData);
+                if (generated) {
+                    const finalCss = `@layer utilities {\n${generated}\n}`;
+                    // Apply styles - append to existing if cache exists, replace if not
+                    if (hasExistingStyles) {
+                        // Append new utilities to existing cache (they'll be deduplicated by CSS)
+                        this.styleElement.textContent += '\n\n' + finalCss;
+                    } else {
+                        this.styleElement.textContent = finalCss;
+                    }
+                    
+                    // Clear critical styles once we have generated utilities
+                    if (this.criticalStyleElement && generated.trim()) {
+                        this.criticalStyleElement.textContent = '';
+                    }
+                }
+            }
+        } catch (error) {
+            // Silently fail - async compilation will handle it
+        }
+    };
+
+
+
+    // Cache management
+    // Methods for loading, saving, and managing cached utilities
+
+    // Load and apply cached utilities
+    TailwindCompiler.prototype.loadAndApplyCache = function() {
+        const cacheStart = performance.now();
+        if (this.debug) {
+            console.log(`[Indux Utilities] Loading cache at ${(cacheStart - this.startTime).toFixed(2)}ms`);
+        }
+        try {
+            const cached = localStorage.getItem('tailwind-cache');
+            if (cached) {
+                if (this.debug) {
+                    console.log(`[Indux Utilities] Cache found, size: ${cached.length} chars`);
+                }
+                const parsed = JSON.parse(cached);
+                this.cache = new Map(Object.entries(parsed));
+
+                // Try to find the best matching cache entry
+                // First, try to get a quick scan of current classes
+                let currentClasses = new Set();
+                try {
+                    // Quick scan of HTML source for classes
+                    if (document.documentElement) {
+                        const htmlSource = document.documentElement.outerHTML;
+                        const classRegex = /class=["']([^"']+)["']/gi;
+                        let classMatch;
+                        while ((classMatch = classRegex.exec(htmlSource)) !== null) {
+                            const classes = classMatch[1].split(/\s+/).filter(Boolean);
+                            classes.forEach(cls => {
+                                if (!cls.startsWith('x-') && !cls.startsWith('$')) {
+                                    currentClasses.add(cls);
+                                }
+                            });
+                        }
+                    }
+                } catch (e) {
+                    // If HTML parsing fails, just use most recent
+                }
+
+                let bestMatch = null;
+                let bestScore = 0;
+
+                // Score cache entries by how many classes they match
+                if (currentClasses.size > 0) {
+                    for (const [key, value] of this.cache.entries()) {
+                        // Extract classes from cache key (format: "class1,class2-themeHash")
+                        // Find the last occurrence of '-' followed by 8 chars (theme hash length)
+                        const lastDashIndex = key.lastIndexOf('-');
+                        const classesPart = lastDashIndex > 0 ? key.substring(0, lastDashIndex) : key;
+                        const cachedClasses = classesPart ? classesPart.split(',') : [];
+                        const cachedSet = new Set(cachedClasses);
+                        
+                        // Count how many current classes are in cache
+                        let matches = 0;
+                        for (const cls of currentClasses) {
+                            if (cachedSet.has(cls)) {
+                                matches++;
+                            }
+                        }
+                        
+                        // Score based on match ratio and recency
+                        const matchRatio = matches / currentClasses.size;
+                        const recencyScore = (Date.now() - value.timestamp) / (24 * 60 * 60 * 1000); // Days since cache
+                        const score = matchRatio * 0.7 + (1 - Math.min(recencyScore, 1)) * 0.3; // 70% match, 30% recency
+                        
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestMatch = value;
+                        }
+                    }
+                }
+
+                // Use best match, or fall back to most recent
+                const cacheToUse = bestMatch || Array.from(this.cache.entries())
+                    .sort((a, b) => b[1].timestamp - a[1].timestamp)[0]?.[1];
+
+                if (cacheToUse && cacheToUse.css) {
+                    const applyCacheStart = performance.now();
+                    this.styleElement.textContent = cacheToUse.css;
+                    this.lastThemeHash = cacheToUse.themeHash;
+                    
+                    // Also apply cache to critical style element
+                    // Extract utilities from @layer utilities block and apply directly (no @layer)
+                    if (this.criticalStyleElement && !this.criticalStyleElement.textContent) {
+                        let criticalCss = cacheToUse.css;
+                        // Remove @layer utilities wrapper if present
+                        criticalCss = criticalCss.replace(/@layer\s+utilities\s*\{/g, '').replace(/\}\s*$/, '').trim();
+                        if (criticalCss) {
+                            this.criticalStyleElement.textContent = criticalCss;
+                            if (this.debug) {
+                                console.log(`[Indux Utilities] Applied cached CSS to critical style element (${criticalCss.length} chars) to prevent flash`);
+                            }
+                        }
+                    }
+                    
+                    if (this.debug) {
+                        console.log(`[Indux Utilities] Applied cached CSS at ${(applyCacheStart - this.startTime).toFixed(2)}ms`);
+                        console.log(`[Indux Utilities] Cached CSS length: ${cacheToUse.css.length} chars`);
+                        console.log(`[Indux Utilities] Cache age: ${((Date.now() - cacheToUse.timestamp) / 1000).toFixed(2)}s`);
+                    }
+                    
+                    // Don't clear critical styles yet - keep them until full compilation completes
+                    if (this.debug) {
+                        const hasUtilities = cacheToUse.css.includes('border-') || cacheToUse.css.includes('@layer utilities');
+                        console.log(`[Indux Utilities] Cache loaded - has utilities: ${hasUtilities}`);
+                        console.log(`[Indux Utilities] Keeping critical styles until full compilation verifies cache`);
+                    }
+                } else {
+                    if (this.debug) {
+                        console.log(`[Indux Utilities] No suitable cache entry found`);
+                    }
+                }
+            } else {
+                if (this.debug) {
+                    console.log(`[Indux Utilities] No cache in localStorage`);
+                }
+            }
+        } catch (error) {
+            console.warn('[Indux Utilities] Failed to load cached styles:', error);
+        } finally {
+            if (this.debug) {
+                console.log(`[Indux Utilities] Cache loading completed in ${(performance.now() - cacheStart).toFixed(2)}ms`);
+            }
+        }
+    };
+
+    // Save cache to localStorage
+    TailwindCompiler.prototype.savePersistentCache = function() {
+        try {
+            const serialized = JSON.stringify(Object.fromEntries(this.cache));
+            localStorage.setItem('tailwind-cache', serialized);
+        } catch (error) {
+            console.warn('Failed to save cached styles:', error);
+        }
+    };
+
+    // Load cache from localStorage
+    TailwindCompiler.prototype.loadPersistentCache = function() {
+        try {
+            const cached = localStorage.getItem('tailwind-cache');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                this.cache = new Map(Object.entries(parsed));
+            }
+        } catch (error) {
+            console.warn('Failed to load cached styles:', error);
+        }
+    };
+
+    // Generate a hash of the theme variables to detect changes
+    TailwindCompiler.prototype.generateThemeHash = function(themeCss) {
+        // Use encodeURIComponent to handle non-Latin1 characters safely
+        return encodeURIComponent(themeCss).slice(0, 8); // Simple hash of theme content
+    };
+
+    // Clean up old cache entries
+    TailwindCompiler.prototype.cleanupCache = function() {
+        const now = Date.now();
+        const maxAge = this.options.maxCacheAge;
+        const entriesToDelete = [];
+
+        for (const [key, value] of this.cache.entries()) {
+            if (value.timestamp && (now - value.timestamp > maxAge)) {
+                entriesToDelete.push(key);
+            }
+        }
+
+        for (const key of entriesToDelete) {
+            this.cache.delete(key);
+        }
+
+        if (entriesToDelete.length > 0) {
+            this.savePersistentCache();
+        }
+    };
+
+
+
+    // Helper methods
+    // Utility functions for extracting, parsing, and processing CSS and classes
+
+    // Discover CSS files from stylesheets and imports
+    TailwindCompiler.prototype.discoverCssFiles = function() {
+        try {
+            // Get all stylesheets from the document
+            const stylesheets = Array.from(document.styleSheets);
+
+            // Process each stylesheet
+            for (const sheet of stylesheets) {
+                try {
+                    // Process local files and @indux CDN files
+                    if (sheet.href && (
+                        sheet.href.startsWith(window.location.origin) ||
+                        sheet.href.includes('@indux') ||
+                        (sheet.href.includes('jsdelivr') && sheet.href.includes('@indux')) ||
+                        (sheet.href.includes('unpkg') && sheet.href.includes('@indux'))
+                    )) {
+                        this.cssFiles.add(sheet.href);
                     }
 
-                    this.hasScannedStatic = true;
-
-                    return staticClasses;
-                } catch (error) {
-                    console.warn('[TailwindCompiler] Error scanning static classes:', error);
-                    this.hasScannedStatic = true;
-                    return new Set();
+                    // Get all @import rules (local and @indux CDN)
+                    const rules = Array.from(sheet.cssRules || []);
+                    for (const rule of rules) {
+                        if (rule.type === CSSRule.IMPORT_RULE && rule.href && (
+                            rule.href.startsWith(window.location.origin) ||
+                            rule.href.includes('@indux') ||
+                            (rule.href.includes('jsdelivr') && rule.href.includes('@indux')) ||
+                            (rule.href.includes('unpkg') && rule.href.includes('@indux'))
+                        )) {
+                            this.cssFiles.add(rule.href);
+                        }
+                    }
+                } catch (e) {
+                    // Skip stylesheets that can't be accessed (external CDN files, CORS, etc.)
                 }
-            })();
+            }
 
+            // Add any inline styles (exclude generated styles)
+            const styleElements = document.querySelectorAll('style:not(#utility-styles)');
+            for (const style of styleElements) {
+                if (style.textContent && style.textContent.trim()) {
+                    const id = style.id || `inline-style-${Array.from(styleElements).indexOf(style)}`;
+                    this.cssFiles.add('inline:' + id);
+                }
+            }
+        } catch (error) {
+            console.warn('Error discovering CSS files:', error);
+        }
+    };
+
+    // Scan static HTML files and components for classes
+    TailwindCompiler.prototype.scanStaticClasses = async function() {
+        if (this.staticScanPromise) {
             return this.staticScanPromise;
         }
 
-        // Extract classes from HTML content
-        extractClassesFromHTML(html, classSet) {
+        this.staticScanPromise = (async () => {
+            try {
+                const staticClasses = new Set();
 
-            // Match class attributes: class="..." or class='...'
-            const classRegex = /class=["']([^"']+)["']/g;
-            let match;
-            
-            while ((match = classRegex.exec(html)) !== null) {
-                const classString = match[1];
-                const classes = classString.split(/\s+/).filter(Boolean);
-                for (const cls of classes) {
-                    if (cls && !cls.startsWith('x-') && !cls.startsWith('$')) {
+                // 1. Scan index.html content
+                const htmlContent = document.documentElement.outerHTML;
+                this.extractClassesFromHTML(htmlContent, staticClasses);
+
+                // 2. Scan component files from manifest
+                const registry = window.InduxComponentsRegistry;
+                const componentUrls = [];
+                
+                if (registry && registry.manifest) {
+                    // Get all component paths from manifest
+                    const allComponents = [
+                        ...(registry.manifest.preloadedComponents || []),
+                        ...(registry.manifest.components || [])
+                    ];
+                    componentUrls.push(...allComponents);
+                }
+
+                const componentPromises = componentUrls.map(async (url) => {
+                    try {
+                        const response = await fetch('/' + url);
+                        if (response.ok) {
+                            const html = await response.text();
+                            this.extractClassesFromHTML(html, staticClasses);
+                        }
+                    } catch (error) {
+                        // Silently ignore missing components
+                    }
+                });
+
+                await Promise.all(componentPromises);
+
+                // Cache static classes
+                for (const cls of staticClasses) {
+                    this.staticClassCache.add(cls);
+                }
+
+                this.hasScannedStatic = true;
+
+                return staticClasses;
+            } catch (error) {
+                console.warn('[TailwindCompiler] Error scanning static classes:', error);
+                this.hasScannedStatic = true;
+                return new Set();
+            }
+        })();
+
+        return this.staticScanPromise;
+    };
+
+    // Extract classes from HTML content
+    TailwindCompiler.prototype.extractClassesFromHTML = function(html, classSet) {
+        // Match class attributes: class="..." or class='...'
+        const classRegex = /class=["']([^"']+)["']/g;
+        let match;
+        
+        while ((match = classRegex.exec(html)) !== null) {
+            const classString = match[1];
+            const classes = classString.split(/\s+/).filter(Boolean);
+            for (const cls of classes) {
+                if (cls && !cls.startsWith('x-') && !cls.startsWith('$')) {
+                    classSet.add(cls);
+                }
+            }
+        }
+
+        // Also check for x-data and other Alpine directives that might contain classes
+        const alpineRegex = /x-(?:data|bind:class|class)=["']([^"']+)["']/g;
+        while ((match = alpineRegex.exec(html)) !== null) {
+            // Simple extraction - could be enhanced for complex Alpine expressions
+            const content = match[1];
+            const classMatches = content.match(/['"`]([^'"`\s]+)['"`]/g);
+            if (classMatches) {
+                for (const classMatch of classMatches) {
+                    const cls = classMatch.replace(/['"`]/g, '');
+                    if (cls && !cls.startsWith('$') && !cls.includes('(')) {
                         classSet.add(cls);
                     }
                 }
             }
-
-            // Also check for x-data and other Alpine directives that might contain classes
-            const alpineRegex = /x-(?:data|bind:class|class)=["']([^"']+)["']/g;
-            while ((match = alpineRegex.exec(html)) !== null) {
-                // Simple extraction - could be enhanced for complex Alpine expressions
-                const content = match[1];
-                const classMatches = content.match(/['"`]([^'"`\s]+)['"`]/g);
-                if (classMatches) {
-                    for (const classMatch of classMatches) {
-                        const cls = classMatch.replace(/['"`]/g, '');
-                        if (cls && !cls.startsWith('$') && !cls.includes('(')) {
-                            classSet.add(cls);
-                        }
-                    }
-                }
-            }
         }
+    };
 
-        getUsedClasses() {
-            try {
-                const allClasses = new Set();
-                const usedVariableSuffixes = new Set();
+    // Get all used classes from static and dynamic sources
+    TailwindCompiler.prototype.getUsedClasses = function() {
+        try {
+            const allClasses = new Set();
+            const usedVariableSuffixes = new Set();
 
-                // Add static classes (pre-scanned)
-                for (const cls of this.staticClassCache) {
+            // Add static classes (pre-scanned)
+            for (const cls of this.staticClassCache) {
+                allClasses.add(cls);
+            }
+
+            // Scan current DOM for dynamic classes only
+            const elements = document.getElementsByTagName('*');
+            for (const element of elements) {
+                let classes = [];
+                if (typeof element.className === 'string') {
+                    classes = element.className.split(/\s+/).filter(Boolean);
+                } else if (element.classList) {
+                    classes = Array.from(element.classList);
+                }
+
+                for (const cls of classes) {
+                    if (!cls) continue;
+
+                    // Skip classes using configurable patterns
+                    const isIgnoredClass = this.ignoredClassPatterns.some(pattern => 
+                        pattern.test(cls)
+                    );
+                    
+                    if (isIgnoredClass) {
+                        continue;
+                    }
+
+                    // Add all classes (static + dynamic)
                     allClasses.add(cls);
-                }
 
-                // Scan current DOM for dynamic classes only
-                const elements = document.getElementsByTagName('*');
-                for (const element of elements) {
-                    let classes = [];
-                    if (typeof element.className === 'string') {
-                        classes = element.className.split(/\s+/).filter(Boolean);
-                    } else if (element.classList) {
-                        classes = Array.from(element.classList);
-                    }
-
-                    for (const cls of classes) {
-                        if (!cls) continue;
-
-                        // Skip classes using configurable patterns
-                        const isIgnoredClass = this.ignoredClassPatterns.some(pattern => 
-                            pattern.test(cls)
-                        );
-                        
-                        if (isIgnoredClass) {
-                            continue;
-                        }
-
-                        // Add all classes (static + dynamic)
-                        allClasses.add(cls);
-
-                        // Track dynamic classes separately
-                        if (!this.staticClassCache.has(cls)) {
-                            this.dynamicClassCache.add(cls);
-                        }
+                    // Track dynamic classes separately
+                    if (!this.staticClassCache.has(cls)) {
+                        this.dynamicClassCache.add(cls);
                     }
                 }
-
-                // Process all classes for variable suffixes
-                for (const cls of allClasses) {
-                        // Extract base class and variants
-                        const parts = cls.split(':');
-                        const baseClass = parts[parts.length - 1];
-
-                        // Extract suffix for variable matching
-                        const classParts = baseClass.split('-');
-                        if (classParts.length > 1) {
-                            let suffix = classParts.slice(1).join('-');
-
-                            // Handle opacity modifiers (like /90, /50)
-                            let baseSuffix = suffix;
-                            if (suffix.includes('/')) {
-                                const parts = suffix.split('/');
-                                baseSuffix = parts[0];
-                                const opacity = parts[1];
-
-                                // Add both the base suffix and the full suffix with opacity
-                                usedVariableSuffixes.add(baseSuffix);
-                                usedVariableSuffixes.add(suffix); // Keep the full suffix with opacity
-                            } else {
-                                usedVariableSuffixes.add(suffix);
-                            }
-
-                            // For compound classes like text-content-subtle, also add the full suffix
-                            // This handles cases where the variable is --color-content-subtle
-                            if (classParts.length > 2) {
-                                const fullSuffix = classParts.slice(1).join('-');
-                                if (fullSuffix.includes('/')) {
-                                    usedVariableSuffixes.add(fullSuffix.split('/')[0]);
-                                } else {
-                                    usedVariableSuffixes.add(fullSuffix);
-                            }
-                        }
-                    }
-                }
-
-                const result = {
-                    classes: Array.from(allClasses),
-                    variableSuffixes: Array.from(usedVariableSuffixes)
-                };
-
-                return result;
-            } catch (error) {
-                console.error('Error getting used classes:', error);
-                return { classes: [], variableSuffixes: [] };
             }
+
+            // Process all classes for variable suffixes
+            for (const cls of allClasses) {
+                // Extract base class and variants
+                const parts = cls.split(':');
+                const baseClass = parts[parts.length - 1];
+
+                // Extract suffix for variable matching
+                const classParts = baseClass.split('-');
+                if (classParts.length > 1) {
+                    let suffix = classParts.slice(1).join('-');
+
+                    // Handle opacity modifiers (like /90, /50)
+                    let baseSuffix = suffix;
+                    if (suffix.includes('/')) {
+                        const parts = suffix.split('/');
+                        baseSuffix = parts[0];
+                        const opacity = parts[1];
+
+                        // Add both the base suffix and the full suffix with opacity
+                        usedVariableSuffixes.add(baseSuffix);
+                        usedVariableSuffixes.add(suffix); // Keep the full suffix with opacity
+                    } else {
+                        usedVariableSuffixes.add(suffix);
+                    }
+
+                    // For compound classes like text-content-subtle, also add the full suffix
+                    if (classParts.length > 2) {
+                        const fullSuffix = classParts.slice(1).join('-');
+                        if (fullSuffix.includes('/')) {
+                            usedVariableSuffixes.add(fullSuffix.split('/')[0]);
+                        } else {
+                            usedVariableSuffixes.add(fullSuffix);
+                        }
+                    }
+                }
+            }
+
+            const result = {
+                classes: Array.from(allClasses),
+                variableSuffixes: Array.from(usedVariableSuffixes)
+            };
+
+            return result;
+        } catch (error) {
+            console.error('Error getting used classes:', error);
+            return { classes: [], variableSuffixes: [] };
+        }
+    };
+
+    // Fetch theme content from CSS files
+    TailwindCompiler.prototype.fetchThemeContent = async function() {
+        const themeContents = new Set();
+        const fetchPromises = [];
+
+        // If we haven't discovered CSS files yet, do it now
+        if (this.cssFiles.size === 0) {
+            this.discoverCssFiles();
         }
 
-        async fetchThemeContent() {
-            const themeContents = new Set();
-            const fetchPromises = [];
+        // Process all files concurrently
+        for (const source of this.cssFiles) {
+            const fetchPromise = (async () => {
+                try {
+                    let content = '';
+                    let needsFetch = true;
 
-            // If we haven't discovered CSS files yet, do it now
-            if (this.cssFiles.size === 0) {
-                this.discoverCssFiles();
-            }
-
-            // Process all files concurrently
-            for (const source of this.cssFiles) {
-                const fetchPromise = (async () => {
-                    try {
-                        let content = '';
-                        let needsFetch = true;
-
-                        if (source.startsWith('inline:')) {
-                            const styleId = source.replace('inline:', '');
-                            const styleElement = styleId ?
-                                document.getElementById(styleId) :
-                                document.querySelector('style');
-                            if (styleElement) {
-                                content = styleElement.textContent;
-                            }
-                            needsFetch = false;
+                    if (source.startsWith('inline:')) {
+                        const styleId = source.replace('inline:', '');
+                        const styleElement = styleId ?
+                            document.getElementById(styleId) :
+                            document.querySelector('style');
+                        if (styleElement) {
+                            content = styleElement.textContent;
+                        }
+                        needsFetch = false;
+                    } else {
+                        // Smart caching: use session storage + timestamp approach
+                        const cacheKey = source;
+                        const cached = this.cssContentCache.get(cacheKey);
+                        const now = Date.now();
+                        
+                        // Different cache times based on file source
+                        let cacheTime;
+                        if (source.includes('@indux') || source.includes('jsdelivr') || source.includes('unpkg')) {
+                            // CDN files: cache longer (5 minutes for static, 1 minute for dynamic)
+                            cacheTime = this.hasScannedStatic ? 60000 : 300000;
                         } else {
-                            // Smart caching: use session storage + timestamp approach
-                            const cacheKey = source;
-                            const cached = this.cssContentCache.get(cacheKey);
-                            const now = Date.now();
-                            
-                            // Different cache times based on file source
-                            let cacheTime;
-                            if (source.includes('@indux') || source.includes('jsdelivr') || source.includes('unpkg')) {
-                                // CDN files: cache longer (5 minutes for static, 1 minute for dynamic)
-                                cacheTime = this.hasScannedStatic ? 60000 : 300000;
-                            } else {
-                                // Local files: shorter cache (5 seconds for dynamic, 30 seconds for static)
-                                cacheTime = this.hasScannedStatic ? 5000 : 30000;
-                            }
-                            
-                            if (cached && (now - cached.timestamp) < cacheTime) {
-                                content = cached.content;
-                                needsFetch = false;
-                            }
+                            // Local files: shorter cache (5 seconds for dynamic, 30 seconds for static)
+                            cacheTime = this.hasScannedStatic ? 5000 : 30000;
+                        }
+                        
+                        if (cached && (now - cached.timestamp) < cacheTime) {
+                            content = cached.content;
+                            needsFetch = false;
+                        }
 
-                            if (needsFetch) {
-                                // Add timestamp for development cache busting, but keep it minimal
-                                const timestamp = Math.floor(now / 1000); // Only changes every second
-                                const url = `${source}?t=${timestamp}`;
+                        if (needsFetch) {
+                            // Add timestamp for development cache busting, but keep it minimal
+                            const timestamp = Math.floor(now / 1000); // Only changes every second
+                            const url = `${source}?t=${timestamp}`;
 
-                                const response = await fetch(url);
+                            const response = await fetch(url);
 
                             if (!response.ok) {
                                 console.warn('Failed to fetch stylesheet:', url);
@@ -7708,164 +13126,88 @@ var Indux = (function (exports) {
                             }
 
                             content = await response.text();
-                                
-                                // Cache the content with timestamp
-                                this.cssContentCache.set(cacheKey, {
-                                    content: content,
-                                    timestamp: now
-                                });
-                            }
-                        }
-
-                        if (content) {
-                            themeContents.add(content);
-                        }
-                    } catch (error) {
-                        console.warn(`Error fetching CSS from ${source}:`, error);
-                    }
-                })();
-                fetchPromises.push(fetchPromise);
-            }
-
-            // Wait for all fetches to complete
-            await Promise.all(fetchPromises);
-
-            return Array.from(themeContents).join('\n');
-        }
-
-        async processThemeContent(content) {
-            try {
-                const variables = this.extractThemeVariables(content);
-                if (variables.size === 0) {
-                    return;
-                }
-
-                // Only log and process actual changes
-                let hasChanges = false;
-                for (const [name, value] of variables.entries()) {
-                    const currentValue = this.currentThemeVars.get(name);
-                    if (currentValue !== value) {
-                        hasChanges = true;
-                        this.currentThemeVars.set(name, value);
-                    }
-                }
-
-                if (hasChanges) {
-                    // Generate utilities for these variables
-                    const utilities = this.generateUtilitiesFromVars(content, this.getUsedClasses());
-                    if (!utilities) {
-                        return;
-                    }
-
-                    // Update styles immediately with new utilities
-                    const newStyles = `@layer utilities {\n${utilities}\n}`;
-                    this.updateStyles(newStyles);
-                }
-
-            } catch (error) {
-                console.warn('Error processing theme content:', error);
-            }
-        }
-
-        updateStyles(newStyles) {
-            if (!this.styleElement) {
-                console.warn('No style element found');
-                return;
-            }
-
-            this.styleElement.textContent = newStyles;
-        }
-
-        extractThemeVariables(cssText) {
-            const variables = new Map();
-
-            // Extract ALL CSS custom properties from ANY declaration block
-            // This regex finds --variable-name: value; patterns anywhere in the CSS
-            const varRegex = /--([\w-]+):\s*([^;]+);/g;
-
-            let varMatch;
-            while ((varMatch = varRegex.exec(cssText)) !== null) {
-                const name = varMatch[1];
-                const value = varMatch[2].trim();
-                variables.set(name, value);
-            }
-
-            return variables;
-        }
-
-        extractCustomUtilities(cssText) {
-            const utilities = new Map();
-
-            // Extract custom utility classes from CSS
-            // This regex finds .class-name { ... } patterns in @layer utilities or standalone
-            const utilityRegex = /(?:@layer\s+utilities\s*{[^}]*}|^)(?:[^{}]*?)(?:^|\s)(\.[\w-]+)\s*{([^}]+)}/gm;
-
-            let match;
-            while ((match = utilityRegex.exec(cssText)) !== null) {
-                const className = match[1].substring(1); // Remove the leading dot
-                const cssRules = match[2].trim();
-                
-                // Skip if it's a Tailwind-generated class (starts with common prefixes)
-                if (this.isTailwindGeneratedClass(className)) {
-                    continue;
-                }
-
-                // Store the utility class and its CSS (combine if already exists)
-                if (utilities.has(className)) {
-                    const existingRules = utilities.get(className);
-                    utilities.set(className, `${existingRules}; ${cssRules}`);
-                } else {
-                    utilities.set(className, cssRules);
-                }
-            }
-
-            // Also look for :where() selectors which are common in Indux utilities
-            // Handle both single class and multiple class selectors
-            const whereRegex = /:where\(([^)]+)\)\s*{([^}]+)}/g;
-            while ((match = whereRegex.exec(cssText)) !== null) {
-                const selectorContent = match[1];
-                const cssRules = match[2].trim();
-                
-                // Extract individual class names from the selector
-                const classMatches = selectorContent.match(/\.([\w-]+)/g);
-                if (classMatches) {
-                    for (const classMatch of classMatches) {
-                        const className = classMatch.substring(1); // Remove the leading dot
-                        
-                        if (!this.isTailwindGeneratedClass(className)) {
-                            // Combine CSS rules if the class already exists
-                            if (utilities.has(className)) {
-                                const existingRules = utilities.get(className);
-                                utilities.set(className, `${existingRules}; ${cssRules}`);
-                            } else {
-                                utilities.set(className, cssRules);
-                            }
+                            
+                            // Cache the content with timestamp
+                            this.cssContentCache.set(cacheKey, {
+                                content: content,
+                                timestamp: now
+                            });
                         }
                     }
+
+                    if (content) {
+                        themeContents.add(content);
+                    }
+                } catch (error) {
+                    console.warn(`Error fetching CSS from ${source}:`, error);
                 }
+            })();
+            fetchPromises.push(fetchPromise);
+        }
+
+        // Wait for all fetches to complete
+        await Promise.all(fetchPromises);
+
+        return Array.from(themeContents).join('\n');
+    };
+
+    // Extract CSS variables from CSS text
+    TailwindCompiler.prototype.extractThemeVariables = function(cssText) {
+        const variables = new Map();
+
+        // Extract ALL CSS custom properties from ANY declaration block
+        const varRegex = /--([\w-]+):\s*([^;]+);/g;
+
+        let varMatch;
+        while ((varMatch = varRegex.exec(cssText)) !== null) {
+            const name = varMatch[1];
+            const value = varMatch[2].trim();
+            variables.set(name, value);
+        }
+
+        return variables;
+    };
+
+    // Extract custom utilities from CSS text
+    TailwindCompiler.prototype.extractCustomUtilities = function(cssText) {
+        const utilities = new Map();
+
+        // Extract custom utility classes from CSS
+        const utilityRegex = /(?:@layer\s+utilities\s*{[^}]*}|^)(?:[^{}]*?)(?:^|\s)(\.[\w-]+)\s*{([^}]+)}/gm;
+
+        let match;
+        while ((match = utilityRegex.exec(cssText)) !== null) {
+            const className = match[1].substring(1); // Remove the leading dot
+            const cssRules = match[2].trim();
+            
+            // Skip if it's a Tailwind-generated class (starts with common prefixes)
+            if (this.isTailwindGeneratedClass(className)) {
+                continue;
             }
 
-            // Fallback: detect classes inside compound selectors (e.g., aside[popover].appear-start { ... })
-            // This is broader and runs last to avoid duplicating rules already captured above.
-            try {
-                const compoundRegex = /([^{}]+)\{([^}]+)\}/gm;
-                let compoundMatch;
-                while ((compoundMatch = compoundRegex.exec(cssText)) !== null) {
-                    const selector = compoundMatch[1].trim();
-                    const cssRules = compoundMatch[2].trim();
+            // Store the utility class and its CSS (combine if already exists)
+            if (utilities.has(className)) {
+                const existingRules = utilities.get(className);
+                utilities.set(className, `${existingRules}; ${cssRules}`);
+            } else {
+                utilities.set(className, cssRules);
+            }
+        }
 
-                    // Skip at-rules and keyframes/selectors without classes
-                    if (selector.startsWith('@')) continue;
-
-                    const classMatches = selector.match(/\.[A-Za-z0-9_-]+/g);
-                    if (!classMatches) continue;
-
-                    for (const classToken of classMatches) {
-                        const className = classToken.substring(1);
-
-                        // Skip Tailwind-generated or already captured classes
-                        if (this.isTailwindGeneratedClass(className)) continue;
-
+        // Also look for :where() selectors which are common in Indux utilities
+        // Handle both single class and multiple class selectors
+        const whereRegex = /:where\(([^)]+)\)\s*{([^}]+)}/g;
+        while ((match = whereRegex.exec(cssText)) !== null) {
+            const selectorContent = match[1];
+            const cssRules = match[2].trim();
+            
+            // Extract individual class names from the selector
+            const classMatches = selectorContent.match(/\.([\w-]+)/g);
+            if (classMatches) {
+                for (const classMatch of classMatches) {
+                    const className = classMatch.substring(1); // Remove the leading dot
+                    
+                    if (!this.isTailwindGeneratedClass(className)) {
                         // Combine CSS rules if the class already exists
                         if (utilities.has(className)) {
                             const existingRules = utilities.get(className);
@@ -7875,687 +13217,1051 @@ var Indux = (function (exports) {
                         }
                     }
                 }
-            } catch (e) {
-                // Be tolerant: this is a best-effort extractor
             }
+        }
 
-            // Universal fallback with basic nesting resolution for selectors using '&'
-            // Captures context like :where(aside[popover]) &.appear-start &:not(:popover-open)
-            try {
-                const rules = [];
+        // Fallback: detect classes inside compound selectors (e.g., aside[popover].appear-start { ... })
+        try {
+            const compoundRegex = /([^{}]+)\{([^}]+)\}/gm;
+            let compoundMatch;
+            while ((compoundMatch = compoundRegex.exec(cssText)) !== null) {
+                const selector = compoundMatch[1].trim();
+                const cssRules = compoundMatch[2].trim();
 
-                // Minimal nested CSS resolver: scans and builds combined selectors
-                const resolveNested = (text, parentSelector = '') => {
-                    let i = 0;
-                    while (i < text.length) {
-                        // Skip whitespace
-                        while (i < text.length && /\s/.test(text[i])) i++;
-                        if (i >= text.length) break;
+                // Skip at-rules and keyframes/selectors without classes
+                if (selector.startsWith('@')) continue;
 
-                        // Capture selector up to '{'
-                        let selStart = i;
-                        while (i < text.length && text[i] !== '{') i++;
-                        if (i >= text.length) break;
-                        const rawSelector = text.slice(selStart, i).trim();
+                const classMatches = selector.match(/\.[A-Za-z0-9_-]+/g);
+                if (!classMatches) continue;
 
-                        // Find matching '}' with brace depth
-                        i++; // skip '{'
-                        let depth = 1;
-                        let blockStart = i;
-                        while (i < text.length && depth > 0) {
-                            if (text[i] === '{') depth++;
-                            else if (text[i] === '}') depth--;
-                            i++;
-                        }
-                        const block = text.slice(blockStart, i - 1);
+                for (const classToken of classMatches) {
+                    const className = classToken.substring(1);
 
-                        // Build combined selector by replacing '&' with parentSelector
-                        const combinedSelector = parentSelector
-                            ? rawSelector.replace(/&/g, parentSelector).trim()
-                            : rawSelector.trim();
+                    // Skip Tailwind-generated or already captured classes
+                    if (this.isTailwindGeneratedClass(className)) continue;
 
-                        // Extract immediate declarations (ignore nested blocks and at-rules)
-                        const extractTopLevelDecls = (content) => {
-                            let decl = '';
-                            let depth = 0;
-                            let i2 = 0;
-                            while (i2 < content.length) {
-                                const ch = content[i2];
-                                if (ch === '{') { depth++; i2++; continue; }
-                                if (ch === '}') { depth--; i2++; continue; }
-                                if (depth === 0) {
-                                    decl += ch;
-                                }
-                                i2++;
-                            }
-                            // Remove comments and trim whitespace
-                            decl = decl.replace(/\/\*[^]*?\*\//g, '').trim();
-                            // Remove at-rules at top-level within block (e.g., @starting-style)
-                            decl = decl.split(';')
-                                .map(s => s.trim())
-                                .filter(s => s && !s.startsWith('@') && s.includes(':'))
-                                .join('; ');
-                            if (decl && !decl.endsWith(';')) decl += ';';
-                            return decl;
-                        };
-
-                        const declText = extractTopLevelDecls(block);
-                        if (declText) {
-                            rules.push({ selector: combinedSelector, css: declText });
-                        }
-
-                        // Recurse into nested blocks with current selector as parent
-                        resolveNested(block, combinedSelector);
-                    }
-                };
-
-                resolveNested(cssText, '');
-
-                // Map resolved rules to utilities by class token presence
-                for (const rule of rules) {
-                    // Clean selector: strip comments and normalize whitespace
-                    let cleanedSelector = rule.selector.replace(/\/\*[^]*?\*\//g, '').replace(/\s+/g, ' ').trim();
-                    const classTokens = cleanedSelector.match(/\.[A-Za-z0-9_-]+/g);
-                    if (!classTokens) continue;
-
-                    for (const token of classTokens) {
-                        const className = token.slice(1);
-                        if (this.isTailwindGeneratedClass(className)) continue;
-
-                        // Store selector-aware utility so variants preserve context and pseudos
-                        const value = { selector: cleanedSelector, css: rule.css };
-                        if (utilities.has(className)) {
-                            const existing = utilities.get(className);
-                            if (typeof existing === 'string') {
-                                utilities.set(className, [ { selector: `.${className}`, css: existing }, value ]);
-                            } else if (Array.isArray(existing)) {
-                                const found = existing.find(e => e.selector === value.selector);
-                                if (found) {
-                                    found.css = `${found.css}; ${value.css}`;
-                                } else {
-                                    existing.push(value);
-                                }
-                            } else if (existing && existing.selector) {
-                                if (existing.selector === value.selector) {
-                                    existing.css = `${existing.css}; ${value.css}`;
-                                    utilities.set(className, [ existing ]);
-                                } else {
-                                    utilities.set(className, [ existing, value ]);
-                                }
-                            }
-                        } else {
-                            utilities.set(className, [ value ]);
-                        }
+                    // Combine CSS rules if the class already exists
+                    if (utilities.has(className)) {
+                        const existingRules = utilities.get(className);
+                        utilities.set(className, `${existingRules}; ${cssRules}`);
+                    } else {
+                        utilities.set(className, cssRules);
                     }
                 }
-            } catch (e) {
-                // Tolerate parsing errors; this is best-effort
             }
-
-            return utilities;
+        } catch (e) {
+            // Be tolerant: this is a best-effort extractor
         }
 
-        isTailwindGeneratedClass(className) {
-            // Check if this looks like a Tailwind-generated class
-            const tailwindPatterns = [
-                /^[a-z]+-\d+$/, // spacing, sizing classes like p-4, w-10
-                /^[a-z]+-\[/, // arbitrary values like w-[100px]
-                /^(text|bg|border|ring|shadow|opacity|scale|rotate|translate|skew|origin|transform|transition|duration|delay|ease|animate|backdrop|blur|brightness|contrast|drop-shadow|grayscale|hue-rotate|invert|saturate|sepia|filter|backdrop-)/, // common Tailwind prefixes
-                /^(sm|md|lg|xl|2xl):/, // responsive prefixes
-                /^(hover|focus|active|disabled|group-hover|group-focus|peer-hover|peer-focus):/, // state prefixes
-                /^(dark|light):/, // theme prefixes
-                /^!/, // important modifier
-                /^\[/, // arbitrary selectors
-            ];
+        // Universal fallback with basic nesting resolution for selectors using '&'
+        // Captures context like :where(aside[popover]) &.appear-start &:not(:popover-open)
+        try {
+            const rules = [];
 
-            return tailwindPatterns.some(pattern => pattern.test(className));
-        }
+            // Minimal nested CSS resolver: scans and builds combined selectors
+            const resolveNested = (text, parentSelector = '') => {
+                let i = 0;
+                while (i < text.length) {
+                    // Skip whitespace
+                    while (i < text.length && /\s/.test(text[i])) i++;
+                    if (i >= text.length) break;
 
-        parseClassName(className) {
-            // Check cache first
-            if (this.classCache.has(className)) {
-                return this.classCache.get(className);
-            }
+                    // Capture selector up to '{'
+                    let selStart = i;
+                    while (i < text.length && text[i] !== '{') i++;
+                    if (i >= text.length) break;
+                    const rawSelector = text.slice(selStart, i).trim();
 
-            const result = {
-                important: className.startsWith('!'),
-                variants: [],
-                baseClass: className
+                    // Find matching '}' with brace depth
+                    i++; // skip '{'
+                    let depth = 1;
+                    let blockStart = i;
+                    while (i < text.length && depth > 0) {
+                        if (text[i] === '{') depth++;
+                        else if (text[i] === '}') depth--;
+                        i++;
+                    }
+                    const block = text.slice(blockStart, i - 1);
+
+                    // Build combined selector by replacing '&' with parentSelector
+                    const combinedSelector = parentSelector
+                        ? rawSelector.replace(/&/g, parentSelector).trim()
+                        : rawSelector.trim();
+
+                    // Extract immediate declarations (ignore nested blocks and at-rules)
+                    const extractTopLevelDecls = (content) => {
+                        let decl = '';
+                        let depth = 0;
+                        let i2 = 0;
+                        while (i2 < content.length) {
+                            const ch = content[i2];
+                            if (ch === '{') { depth++; i2++; continue; }
+                            if (ch === '}') { depth--; i2++; continue; }
+                            if (depth === 0) {
+                                decl += ch;
+                            }
+                            i2++;
+                        }
+                        // Remove comments and trim whitespace
+                        decl = decl.replace(/\/\*[^]*?\*\//g, '').trim();
+                        // Remove at-rules at top-level within block (e.g., @starting-style)
+                        decl = decl.split(';')
+                            .map(s => s.trim())
+                            .filter(s => s && !s.startsWith('@') && s.includes(':'))
+                            .join('; ');
+                        if (decl && !decl.endsWith(';')) decl += ';';
+                        return decl;
+                    };
+
+                    const declText = extractTopLevelDecls(block);
+                    if (declText) {
+                        rules.push({ selector: combinedSelector, css: declText });
+                    }
+
+                    // Recurse into nested blocks with current selector as parent
+                    resolveNested(block, combinedSelector);
+                }
             };
 
-            // Remove important modifier if present
-            if (result.important) {
-                className = className.slice(1);
-            }
+            resolveNested(cssText, '');
 
-            // Split by variant separator, but preserve content within brackets
-            const parts = [];
-            let current = '';
-            let bracketDepth = 0;
-            
-            for (let i = 0; i < className.length; i++) {
-                const char = className[i];
-                
-                if (char === '[') {
-                    bracketDepth++;
-                } else if (char === ']') {
-                    bracketDepth--;
-                }
-                
-                if (char === ':' && bracketDepth === 0) {
-                    // This is a variant separator, not part of a bracket expression
-                    parts.push(current);
-                    current = '';
-                } else {
-                    current += char;
-                }
-            }
-            parts.push(current); // Add the last part
-            
-            result.baseClass = parts.pop(); // Last part is always the base class
+            // Map resolved rules to utilities by class token presence
+            for (const rule of rules) {
+                // Clean selector: strip comments and normalize whitespace
+                let cleanedSelector = rule.selector.replace(/\/\*[^]*?\*\//g, '').replace(/\s+/g, ' ').trim();
+                const classTokens = cleanedSelector.match(/\.[A-Za-z0-9_-]+/g);
+                if (!classTokens) continue;
 
-            // Process variants in order (left to right)
-            result.variants = parts.map(variant => {
-                // Check for arbitrary selector variants [&_selector]
-                if (variant.startsWith('[') && variant.endsWith(']')) {
-                    const arbitrarySelector = variant.slice(1, -1); // Remove brackets
-                    if (arbitrarySelector.startsWith('&')) {
-                        return {
-                            name: variant,
-                            selector: arbitrarySelector,
-                            isArbitrary: true
-                        };
+                for (const token of classTokens) {
+                    const className = token.slice(1);
+                    if (this.isTailwindGeneratedClass(className)) continue;
+
+                    // Store selector-aware utility so variants preserve context and pseudos
+                    const value = { selector: cleanedSelector, css: rule.css };
+                    if (utilities.has(className)) {
+                        const existing = utilities.get(className);
+                        if (typeof existing === 'string') {
+                            utilities.set(className, [ { selector: `.${className}`, css: existing }, value ]);
+                        } else if (Array.isArray(existing)) {
+                            const found = existing.find(e => e.selector === value.selector);
+                            if (found) {
+                                found.css = `${found.css}; ${value.css}`;
+                            } else {
+                                existing.push(value);
+                            }
+                        } else if (existing && existing.selector) {
+                            if (existing.selector === value.selector) {
+                                existing.css = `${existing.css}; ${value.css}`;
+                                utilities.set(className, [ existing ]);
+                            } else {
+                                utilities.set(className, [ existing, value ]);
+                            }
+                        }
+                    } else {
+                        utilities.set(className, [ value ]);
                     }
                 }
-                
-                const selector = this.variants[variant];
-                if (!selector) {
-                    console.warn(`Unknown variant: ${variant}`);
-                    return null;
-                }
-                return {
-                    name: variant,
-                    selector: selector,
-                    isArbitrary: false
-                };
-            }).filter(Boolean);
-
-            // Cache the result
-            this.classCache.set(className, result);
-            return result;
+            }
+        } catch (e) {
+            // Tolerate parsing errors; this is best-effort
         }
 
-        generateCustomUtilities(usedData) {
-            try {
-                const utilities = [];
-                const generatedRules = new Set();
-                const { classes: usedClasses } = usedData;
+        return utilities;
+    };
 
+    // Check if a class name looks like a Tailwind-generated class
+    TailwindCompiler.prototype.isTailwindGeneratedClass = function(className) {
+        // Check if this looks like a Tailwind-generated class
+        const tailwindPatterns = [
+            /^[a-z]+-\d+$/, // spacing, sizing classes like p-4, w-10
+            /^[a-z]+-\[/, // arbitrary values like w-[100px]
+            /^(text|bg|border|ring|shadow|opacity|scale|rotate|translate|skew|origin|transform|transition|duration|delay|ease|animate|backdrop|blur|brightness|contrast|drop-shadow|grayscale|hue-rotate|invert|saturate|sepia|filter|backdrop-)/, // common Tailwind prefixes
+            /^(sm|md|lg|xl|2xl):/, // responsive prefixes
+            /^(hover|focus|active|disabled|group-hover|group-focus|peer-hover|peer-focus):/, // state prefixes
+            /^(dark|light):/, // theme prefixes
+            /^!/, // important modifier
+            /^\[/, // arbitrary selectors
+        ];
 
-                if (this.customUtilities.size === 0) {
-                    return '';
+        return tailwindPatterns.some(pattern => pattern.test(className));
+    };
+
+    // Parse a class name into its components (variants, base class, important)
+    TailwindCompiler.prototype.parseClassName = function(className) {
+        // Check cache first
+        if (this.classCache.has(className)) {
+            return this.classCache.get(className);
+        }
+
+        const result = {
+            important: className.startsWith('!'),
+            variants: [],
+            baseClass: className
+        };
+
+        // Remove important modifier if present
+        if (result.important) {
+            className = className.slice(1);
+        }
+
+        // Split by variant separator, but preserve content within brackets
+        const parts = [];
+        let current = '';
+        let bracketDepth = 0;
+        
+        for (let i = 0; i < className.length; i++) {
+            const char = className[i];
+            
+            if (char === '[') {
+                bracketDepth++;
+            } else if (char === ']') {
+                bracketDepth--;
+            }
+            
+            if (char === ':' && bracketDepth === 0) {
+                parts.push(current);
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        parts.push(current); // Add the last part
+        
+        result.baseClass = parts.pop(); // Last part is always the base class
+
+        // Process variants in order (left to right)
+        result.variants = parts.map(variant => {
+            // Check for arbitrary selector variants [&_selector]
+            if (variant.startsWith('[') && variant.endsWith(']')) {
+                const arbitrarySelector = variant.slice(1, -1); // Remove brackets
+                if (arbitrarySelector.startsWith('&')) {
+                    return {
+                        name: variant,
+                        selector: arbitrarySelector,
+                        isArbitrary: true
+                    };
                 }
+            }
+            
+            const selector = this.variants[variant];
+            if (!selector) {
+                console.warn(`Unknown variant: ${variant}`);
+                return null;
+            }
+            return {
+                name: variant,
+                selector: selector,
+                isArbitrary: false
+            };
+        }).filter(Boolean);
 
-                // Helper to escape special characters in class names
-                const escapeClassName = (className) => {
-                    return className.replace(/[^a-zA-Z0-9-]/g, '\\$&');
-                };
-
-                // Helper to generate a single utility with its variants
-                const generateUtility = (baseClass, css, selectorInfo) => {
-                    // Find all variants of this base class that are actually used
-                    const usedVariants = usedClasses
-                        .filter(cls => {
-                            const parts = cls.split(':');
-                            const basePart = parts[parts.length - 1];
-                            const isMatch = basePart === baseClass || (basePart.startsWith('!') && basePart.slice(1) === baseClass);
-                            return isMatch;
-                        });
-
-                    // Skip generating base utility - it already exists in the CSS
-                    // Only generate variants and important versions
-                    
-                    // Generate important version if used
-                    if (usedClasses.includes('!' + baseClass)) {
-                        const importantCss = css.includes(';') ? 
-                            css.replace(/;/g, ' !important;') : 
-                            css + ' !important';
-                        let rule;
-                        if (selectorInfo && selectorInfo.selector) {
-                            const variantSel = `.${escapeClassName('!' + baseClass)}`;
-                            let contextual = selectorInfo.selector.replace(new RegExp(`\\.${baseClass}(?=[^a-zA-Z0-9_-]|$)`), variantSel);
-                            if (contextual === selectorInfo.selector) {
-                                // Fallback: append class to the end if base token not found
-                                contextual = `${selectorInfo.selector}${variantSel}`;
-                            }
-                            rule = `${contextual} { ${importantCss} }`;
-                        } else {
-                            rule = `.${escapeClassName('!' + baseClass)} { ${importantCss} }`;
-                        }
-                        if (!generatedRules.has(rule)) {
-                            utilities.push(rule);
-                            generatedRules.add(rule);
-                        }
-                    }
-
-                    // Generate each variant as a separate class
-                    for (const variantClass of usedVariants) {
-                        if (variantClass === baseClass) continue;
-
-                        const parsed = this.parseClassName(variantClass);
-
-                        // Check if this is an important variant
-                        const isImportant = parsed.important;
-                        const cssContent = isImportant ? 
-                            (css.includes(';') ? css.replace(/;/g, ' !important;') : css + ' !important') : 
-                            css;
-
-                        // Build selector by applying variants
-                        let selector = `.${escapeClassName(variantClass)}`;
-                        let hasMediaQuery = false;
-                        let mediaQueryRule = '';
-
-                        for (const variant of parsed.variants) {
-                            if (variant.isArbitrary) {
-                                // Handle arbitrary selectors like [&_figure] or [&_fieldset:has(legend):not(.whatever)]
-                                let arbitrarySelector = variant.selector;
-                                
-                                // Replace underscores with spaces, but preserve them inside parentheses
-                                arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
-                                
-                                selector = { baseClass: selector, arbitrarySelector };
-                            } else if (variant.selector.startsWith(':')) {
-                                // For pseudo-classes, append to selector
-                                selector = `${selector}${variant.selector}`;
-                            } else if (variant.selector.startsWith('@')) {
-                                // For media queries, wrap the whole rule
-                                hasMediaQuery = true;
-                                mediaQueryRule = variant.selector;
-                            } else if (variant.selector.includes('&')) {
-                                // For contextual selectors (like dark mode)
-                                selector = variant.selector.replace('&', selector);
-                            }
-                        }
-
-                        // Generate the final rule
-                        let rule;
-                        if (typeof selector === 'object' && selector.arbitrarySelector) {
-                            // Handle arbitrary selectors with nested CSS
-                            rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContent}\n    }\n}`;
-                        } else {
-                            // Regular selector or contextual replacement using original selector info
-                            if (selectorInfo && selectorInfo.selector) {
-                                const contextualRe = new RegExp(`\\.${baseClass}(?=[^a-zA-Z0-9_-]|$)`);
-                                let contextual = selectorInfo.selector.replace(contextualRe, selector);
-                                if (contextual === selectorInfo.selector) {
-                                    // Fallback when base token not directly present
-                                    contextual = `${selectorInfo.selector}${selector}`;
-                                }
-                                rule = `${contextual} { ${cssContent} }`;
-                            } else {
-                                rule = `${selector} { ${cssContent} }`;
-                            }
-                        }
-                        
-                        let finalRule;
-                        if (hasMediaQuery) {
-                            // Wrap once for responsive variants unless the rule already contains @media
-                            if (typeof rule === 'string' && rule.trim().startsWith('@media')) {
-                                finalRule = rule;
-                            } else {
-                                finalRule = `${mediaQueryRule} { ${rule} }`;
-                            }
-                        } else {
-                            finalRule = rule;
-                        }
+        // Cache the result
+        this.classCache.set(className, result);
+        return result;
+    };
 
 
-                        if (!generatedRules.has(finalRule)) {
-                            utilities.push(finalRule);
-                            generatedRules.add(finalRule);
-                        }
-                    }
-                };
 
-                // Generate utilities for each custom class that's actually used
-                for (const [className, cssOrSelector] of this.customUtilities.entries()) {
-                    // Check if this specific utility class is actually used (including variants and important)
-                    const isUsed = usedClasses.some(cls => {
-                        // Parse the class to extract the base utility name
-                        const parsed = this.parseClassName(cls);
-                        const baseClass = parsed.baseClass;
-                        
-                        // Check both normal and important versions
-                        return baseClass === className || 
-                               baseClass === '!' + className ||
-                               (baseClass.startsWith('!') && baseClass.slice(1) === className);
+    // Compilation methods
+    // Main compilation logic and utility generation
+
+    // Generate utilities from CSS variables
+    TailwindCompiler.prototype.generateUtilitiesFromVars = function(cssText, usedData) {
+        try {
+            const utilities = [];
+            const generatedRules = new Set(); // Track generated rules to prevent duplicates
+            const variables = this.extractThemeVariables(cssText);
+            const { classes: usedClasses, variableSuffixes } = usedData;
+
+            if (variables.size === 0) {
+                return '';
+            }
+
+            // Helper to escape special characters in class names
+            const escapeClassName = (className) => {
+                return className.replace(/[^a-zA-Z0-9-]/g, '\\$&');
+            };
+
+            // Helper to generate a single utility with its variants
+            const generateUtility = (baseClass, css) => {
+                // Find all variants of this base class that are actually used
+                const usedVariants = usedClasses
+                    .filter(cls => {
+                        const parts = cls.split(':');
+                        const basePart = parts[parts.length - 1];
+                        return basePart === baseClass || (basePart.startsWith('!') && basePart.slice(1) === baseClass);
                     });
 
-                    if (isUsed) {
-                        if (typeof cssOrSelector === 'string') {
-                            generateUtility(className, cssOrSelector, null);
-                        } else if (Array.isArray(cssOrSelector)) {
-                            for (const entry of cssOrSelector) {
-                                if (entry && entry.css && entry.selector) {
-                                    generateUtility(className, entry.css, { selector: entry.selector });
-                                }
-                            }
-                        } else if (cssOrSelector && cssOrSelector.css && cssOrSelector.selector) {
-                            generateUtility(className, cssOrSelector.css, { selector: cssOrSelector.selector });
-                        }
+                // Generate base utility if it's used directly
+                if (usedClasses.includes(baseClass)) {
+                    const rule = `.${escapeClassName(baseClass)} { ${css} }`;
+                    if (!generatedRules.has(rule)) {
+                        utilities.push(rule);
+                        generatedRules.add(rule);
+                    }
+                }
+                // Generate important version if used
+                if (usedClasses.includes('!' + baseClass)) {
+                    const importantCss = css.includes(';') ? 
+                        css.replace(/;/g, ' !important;') : 
+                        css + ' !important';
+                    const rule = `.${escapeClassName('!' + baseClass)} { ${importantCss} }`;
+                    if (!generatedRules.has(rule)) {
+                        utilities.push(rule);
+                        generatedRules.add(rule);
                     }
                 }
 
-                return utilities.join('\n');
-            } catch (error) {
-                console.error('Error generating custom utilities:', error);
-                return '';
-            }
-        }
+                // Generate each variant as a separate class
+                for (const variantClass of usedVariants) {
+                    if (variantClass === baseClass) continue;
 
-        generateUtilitiesFromVars(cssText, usedData) {
-            try {
-                const utilities = [];
-                const generatedRules = new Set(); // Track generated rules to prevent duplicates
-                const variables = this.extractThemeVariables(cssText);
-                const { classes: usedClasses, variableSuffixes } = usedData;
+                    const parsed = this.parseClassName(variantClass);
 
-                if (variables.size === 0) {
-                    return '';
+                    // Check if this is an important variant
+                    const isImportant = parsed.important;
+                    const cssContent = isImportant ? 
+                        (css.includes(';') ? css.replace(/;/g, ' !important;') : css + ' !important') : 
+                        css;
+
+                    // Build selector by applying variants
+                    let selector = `.${escapeClassName(variantClass)}`;
+                    let hasMediaQuery = false;
+                    let mediaQueryRule = '';
+
+                    for (const variant of parsed.variants) {
+                        if (variant.isArbitrary) {
+                            // Handle arbitrary selectors like [&_figure] or [&_fieldset:has(legend):not(.whatever)]
+                            // Convert underscores to spaces, but be careful with complex selectors
+                            let arbitrarySelector = variant.selector;
+                            
+                            arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
+                            selector = { baseClass: selector, arbitrarySelector };
+                        } else if (variant.selector.includes('&')) {
+                            let nestedSelector = variant.selector;
+                            if (nestedSelector.includes(',')) {
+                                nestedSelector = nestedSelector
+                                    .split(',')
+                                    .map(s => {
+                                        const trimmed = s.trim();
+                                        if (trimmed.includes('&')) {
+                                            return '&' + trimmed.replace(/\s*&\s*/g, '');
+                                        }
+                                        return '&' + trimmed;
+                                    })
+                                    .join(', ');
+                            } else {
+                                nestedSelector = nestedSelector.replace(/\s*&\s*/g, '');
+                                if (!nestedSelector.startsWith('&')) {
+                                    nestedSelector = '&' + nestedSelector;
+                                } else {
+                                    nestedSelector = nestedSelector.replace(/^&\s*/, '&');
+                                }
+                            }
+                            selector = { baseClass: selector, arbitrarySelector: nestedSelector };
+                        } else if (variant.selector.startsWith(':')) {
+                            // For pseudo-classes, append to selector
+                            selector = `${selector}${variant.selector}`;
+                        } else if (variant.selector.startsWith('@')) {
+                            // For media queries, wrap the whole rule
+                            hasMediaQuery = true;
+                            mediaQueryRule = variant.selector;
+                        }
+                    }
+
+                    // Generate the final rule
+                    let rule;
+                    if (typeof selector === 'object' && selector.arbitrarySelector) {
+                        // Handle arbitrary selectors with nested CSS
+                        rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContent}\n    }\n}`;
+                    } else {
+                        // Regular selector
+                        rule = `${selector} { ${cssContent} }`;
+                    }
+                    
+                    const finalRule = hasMediaQuery ? 
+                        `${mediaQueryRule} { ${rule} }` : 
+                        rule;
+
+                    if (!generatedRules.has(finalRule)) {
+                        utilities.push(finalRule);
+                        generatedRules.add(finalRule);
+                    }
+                }
+            };
+
+            // Generate utilities based on variable prefix
+            for (const [varName, varValue] of variables.entries()) {
+                if (!varName.match(this.regexPatterns.tailwindPrefix)) {
+                    continue;
                 }
 
-                // Helper to escape special characters in class names
-                const escapeClassName = (className) => {
-                    return className.replace(/[^a-zA-Z0-9-]/g, '\\$&');
-                };
+                const suffix = varName.split('-').slice(1).join('-');
+                const value = `var(--${varName})`;
+                const prefix = varName.split('-')[0] + '-';
+                const generator = this.utilityGenerators[prefix];
 
-                // Helper to generate a single utility with its variants
-                const generateUtility = (baseClass, css) => {
-                    // Find all variants of this base class that are actually used
-                    const usedVariants = usedClasses
-                        .filter(cls => {
-                            const parts = cls.split(':');
-                            const basePart = parts[parts.length - 1];
-                            return basePart === baseClass || (basePart.startsWith('!') && basePart.slice(1) === baseClass);
+                if (generator) {
+                    const utilityPairs = generator(suffix, value);
+                    for (const [className, css] of utilityPairs) {
+                        // Check if this specific utility class is actually used (including variants and important)
+                        const isUsed = usedClasses.some(cls => {
+                            // Parse the class to extract the base utility name
+                            const parsed = this.parseClassName(cls);
+                            const baseClass = parsed.baseClass;
+                            
+                            // Check both normal and important versions
+                            return baseClass === className || 
+                                   baseClass === '!' + className ||
+                                   (baseClass.startsWith('!') && baseClass.slice(1) === className);
+                        });
+                        if (isUsed) {
+                            generateUtility(className, css);
+                        }
+
+                        // Check for opacity variants of this utility
+                        const opacityVariants = usedClasses.filter(cls => {
+                            // Parse the class to extract the base utility name
+                            const parsed = this.parseClassName(cls);
+                            const baseClass = parsed.baseClass;
+                            
+                            // Check if this class has an opacity modifier and matches our base class
+                            if (baseClass.includes('/')) {
+                                const baseWithoutOpacity = baseClass.split('/')[0];
+                                if (baseWithoutOpacity === className) {
+                                    const opacity = baseClass.split('/')[1];
+                                    // Validate that the opacity is a number between 0-100
+                                    return !isNaN(opacity) && opacity >= 0 && opacity <= 100;
+                                }
+                            }
+                            return false;
                         });
 
-                    // Generate base utility if it's used directly
-                    if (usedClasses.includes(baseClass)) {
-                        const rule = `.${escapeClassName(baseClass)} { ${css} }`;
-                        if (!generatedRules.has(rule)) {
-                            utilities.push(rule);
-                            generatedRules.add(rule);
-                        }
-                    }
-                    // Generate important version if used
-                    if (usedClasses.includes('!' + baseClass)) {
-                        const importantCss = css.includes(';') ? 
-                            css.replace(/;/g, ' !important;') : 
-                            css + ' !important';
-                        const rule = `.${escapeClassName('!' + baseClass)} { ${importantCss} }`;
-                        if (!generatedRules.has(rule)) {
-                            utilities.push(rule);
-                            generatedRules.add(rule);
-                        }
-                    }
-
-                    // Generate each variant as a separate class
-                    for (const variantClass of usedVariants) {
-                        if (variantClass === baseClass) continue;
-
-                        const parsed = this.parseClassName(variantClass);
-
-                        // Check if this is an important variant
-                        const isImportant = parsed.important;
-                        const cssContent = isImportant ? 
-                            (css.includes(';') ? css.replace(/;/g, ' !important;') : css + ' !important') : 
-                            css;
-
-                        // Build selector by applying variants
-                            let selector = `.${escapeClassName(variantClass)}`;
-                        let hasMediaQuery = false;
-                        let mediaQueryRule = '';
-
-                        for (const variant of parsed.variants) {
-                            if (variant.isArbitrary) {
-                                // Handle arbitrary selectors like [&_figure] or [&_fieldset:has(legend):not(.whatever)]
-                                // Convert underscores to spaces, but be careful with complex selectors
-                                let arbitrarySelector = variant.selector;
-                                
-                                // Replace underscores with spaces, but preserve them inside parentheses
-                                // This handles cases like :not(.whatever,_else) where the underscore should become a space
-                                arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
-                                
-                                // We'll handle this in the CSS generation - store for later use
-                                selector = { baseClass: selector, arbitrarySelector };
-                            } else if (variant.selector.startsWith(':')) {
-                                // For pseudo-classes, append to selector
-                                selector = `${selector}${variant.selector}`;
-                            } else if (variant.selector.startsWith('@')) {
-                                // For media queries, wrap the whole rule
-                                hasMediaQuery = true;
-                                mediaQueryRule = variant.selector;
-                            } else if (variant.selector.includes('&')) {
-                                // For contextual selectors (like dark mode)
-                                selector = variant.selector.replace('&', selector);
-                            }
-                        }
-
-                        // Generate the final rule
-                        let rule;
-                        if (typeof selector === 'object' && selector.arbitrarySelector) {
-                            // Handle arbitrary selectors with nested CSS
-                            rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContent}\n    }\n}`;
-                        } else {
-                            // Regular selector
-                            rule = `${selector} { ${cssContent} }`;
-                        }
-                        
-                        const finalRule = hasMediaQuery ? 
-                            `${mediaQueryRule} { ${rule} }` : 
-                            rule;
-
-                            if (!generatedRules.has(finalRule)) {
-                                utilities.push(finalRule);
-                                generatedRules.add(finalRule);
-                        }
-                    }
-                };
-
-                // Generate utilities based on variable prefix
-                for (const [varName, varValue] of variables.entries()) {
-                    if (!varName.match(this.regexPatterns.tailwindPrefix)) {
-                        continue;
-                    }
-
-                    const suffix = varName.split('-').slice(1).join('-');
-                    const value = `var(--${varName})`;
-                    const prefix = varName.split('-')[0] + '-';
-                    const generator = this.utilityGenerators[prefix];
-
-                    if (generator) {
-                        const utilityPairs = generator(suffix, value);
-                        for (const [className, css] of utilityPairs) {
-                            // Check if this specific utility class is actually used (including variants and important)
-                            const isUsed = usedClasses.some(cls => {
-                                // Parse the class to extract the base utility name
-                                const parsed = this.parseClassName(cls);
-                                const baseClass = parsed.baseClass;
-                                
-                                // Check both normal and important versions
-                                return baseClass === className || 
-                                       baseClass === '!' + className ||
-                                       (baseClass.startsWith('!') && baseClass.slice(1) === className);
-                            });
-                            if (isUsed) {
-                                generateUtility(className, css);
-                            }
-
-                            // Check for opacity variants of this utility
-                            const opacityVariants = usedClasses.filter(cls => {
-                                // Parse the class to extract the base utility name
-                                const parsed = this.parseClassName(cls);
-                                const baseClass = parsed.baseClass;
-                                
-                                // Check if this class has an opacity modifier and matches our base class
-                                if (baseClass.includes('/')) {
-                                    const baseWithoutOpacity = baseClass.split('/')[0];
-                                    if (baseWithoutOpacity === className) {
-                                        const opacity = baseClass.split('/')[1];
-                                        // Validate that the opacity is a number between 0-100
-                                        return !isNaN(opacity) && opacity >= 0 && opacity <= 100;
-                                    }
-                                }
-                                return false;
-                            });
-
-                            // Generate opacity utilities for each variant found
-                            for (const variant of opacityVariants) {
-                                const opacity = variant.split('/')[1];
-                                const opacityValue = `color-mix(in oklch, ${value} ${opacity}%, transparent)`;
-                                const opacityCss = css.replace(value, opacityValue);
-                                generateUtility(variant, opacityCss);
-                            }
+                        // Generate opacity utilities for each variant found
+                        for (const variant of opacityVariants) {
+                            const opacity = variant.split('/')[1];
+                            const opacityValue = `color-mix(in oklch, ${value} ${opacity}%, transparent)`;
+                            const opacityCss = css.replace(value, opacityValue);
+                            generateUtility(variant, opacityCss);
                         }
                     }
                 }
+            }
 
-                return utilities.join('\n');
-            } catch (error) {
-                console.error('Error generating utilities:', error);
+            return utilities.join('\n');
+        } catch (error) {
+            console.error('Error generating utilities:', error);
+            return '';
+        }
+    };
+
+    // Generate custom utilities from discovered custom utility classes
+    TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
+        try {
+            const utilities = [];
+            const generatedRules = new Set();
+            const { classes: usedClasses } = usedData;
+
+            if (this.customUtilities.size === 0) {
                 return '';
             }
-        }
 
-        async compile() {
-            try {
-                // Prevent too frequent compilations
-                const now = Date.now();
-                if (now - this.lastCompileTime < this.minCompileInterval) {
-                    return;
+            // Helper to escape special characters in class names
+            const escapeClassName = (className) => {
+                return className.replace(/[^a-zA-Z0-9-]/g, '\\$&');
+            };
+
+            // Helper to generate a single utility with its variants
+            const generateUtility = (baseClass, css, selectorInfo) => {
+                // Find all variants of this base class that are actually used
+                const usedVariants = usedClasses
+                    .filter(cls => {
+                        const parts = cls.split(':');
+                        const basePart = parts[parts.length - 1];
+                        const isMatch = basePart === baseClass || (basePart.startsWith('!') && basePart.slice(1) === baseClass);
+                        return isMatch;
+                    });
+
+                // Skip generating base utility - it already exists in the CSS
+                // Only generate variants and important versions
+                
+                // Generate important version if used
+                if (usedClasses.includes('!' + baseClass)) {
+                    const importantCss = css.includes(';') ? 
+                        css.replace(/;/g, ' !important;') : 
+                        css + ' !important';
+                    let rule;
+                    if (selectorInfo && selectorInfo.selector) {
+                        const variantSel = `.${escapeClassName('!' + baseClass)}`;
+                        let contextual = selectorInfo.selector.replace(new RegExp(`\\.${baseClass}(?=[^a-zA-Z0-9_-]|$)`), variantSel);
+                        if (contextual === selectorInfo.selector) {
+                            // Fallback: append class to the end if base token not found
+                            contextual = `${selectorInfo.selector}${variantSel}`;
+                        }
+                        rule = `${contextual} { ${importantCss} }`;
+                    } else {
+                        rule = `.${escapeClassName('!' + baseClass)} { ${importantCss} }`;
+                    }
+                    if (!generatedRules.has(rule)) {
+                        utilities.push(rule);
+                        generatedRules.add(rule);
+                    }
                 }
-                this.lastCompileTime = now;
 
-                if (this.isCompiling) {
-                    return;
-                }
-                this.isCompiling = true;
+                // Generate each variant as a separate class
+                for (const variantClass of usedVariants) {
+                    if (variantClass === baseClass) continue;
 
-                // On first run, scan static classes and CSS variables
-                if (!this.hasScannedStatic) {
-                    await this.scanStaticClasses();
+                    const parsed = this.parseClassName(variantClass);
+
+                    // Check if this is an important variant
+                    const isImportant = parsed.important;
+                    const cssContent = isImportant ? 
+                        (css.includes(';') ? css.replace(/;/g, ' !important;') : css + ' !important') : 
+                        css;
+
+                    // Build selector by applying variants
+                    let selector = `.${escapeClassName(variantClass)}`;
+                    let hasMediaQuery = false;
+                    let mediaQueryRule = '';
+
+                    for (const variant of parsed.variants) {
+                        if (variant.isArbitrary) {
+                            // Handle arbitrary selectors like [&_figure] or [&_fieldset:has(legend):not(.whatever)]
+                            let arbitrarySelector = variant.selector;
+                            
+                            // Replace underscores with spaces, but preserve them inside parentheses
+                            arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
+                            
+                            selector = { baseClass: selector, arbitrarySelector };
+                        } else if (variant.selector.includes('&')) {
+                            let nestedSelector = variant.selector;
+                            if (nestedSelector.includes(',')) {
+                                nestedSelector = nestedSelector
+                                    .split(',')
+                                    .map(s => {
+                                        const trimmed = s.trim();
+                                        if (trimmed.includes('&')) {
+                                            return '&' + trimmed.replace(/\s*&\s*/g, '');
+                                        }
+                                        return '&' + trimmed;
+                                    })
+                                    .join(', ');
+                            } else {
+                                nestedSelector = nestedSelector.replace(/\s*&\s*/g, '');
+                                if (!nestedSelector.startsWith('&')) {
+                                    nestedSelector = '&' + nestedSelector;
+                                } else {
+                                    nestedSelector = nestedSelector.replace(/^&\s*/, '&');
+                                }
+                            }
+                            selector = { baseClass: selector, arbitrarySelector: nestedSelector };
+                        } else if (variant.selector.startsWith(':')) {
+                            // For pseudo-classes, append to selector
+                            selector = `${selector}${variant.selector}`;
+                        } else if (variant.selector.startsWith('@')) {
+                            // For media queries, wrap the whole rule
+                            hasMediaQuery = true;
+                            mediaQueryRule = variant.selector;
+                        }
+                    }
+
+                    // Generate the final rule
+                    let rule;
+                    if (typeof selector === 'object' && selector.arbitrarySelector) {
+                        // Handle arbitrary selectors with nested CSS
+                        rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContent}\n    }\n}`;
+                    } else {
+                        // Regular selector or contextual replacement using original selector info
+                        if (selectorInfo && selectorInfo.selector) {
+                            const contextualRe = new RegExp(`\\.${baseClass}(?=[^a-zA-Z0-9_-]|$)`);
+                            let contextual = selectorInfo.selector.replace(contextualRe, selector);
+                            if (contextual === selectorInfo.selector) {
+                                // Fallback when base token not directly present
+                                contextual = `${selectorInfo.selector}${selector}`;
+                            }
+                            rule = `${contextual} { ${cssContent} }`;
+                        } else {
+                            rule = `${selector} { ${cssContent} }`;
+                        }
+                    }
                     
-                    // Fetch CSS content once for initial compilation
-                    const themeCss = await this.fetchThemeContent();
-                    if (themeCss) {
-                        // Extract and cache custom utilities
-                    const discoveredCustomUtilities = this.extractCustomUtilities(themeCss);
-                        for (const [name, value] of discoveredCustomUtilities.entries()) {
-                            this.customUtilities.set(name, value);
+                    let finalRule;
+                    if (hasMediaQuery) {
+                        // Wrap once for responsive variants unless the rule already contains @media
+                        if (typeof rule === 'string' && rule.trim().startsWith('@media')) {
+                            finalRule = rule;
+                        } else {
+                            finalRule = `${mediaQueryRule} { ${rule} }`;
                         }
+                    } else {
+                        finalRule = rule;
+                    }
 
-                        const variables = this.extractThemeVariables(themeCss);
-                        for (const [name, value] of variables.entries()) {
-                            this.currentThemeVars.set(name, value);
-                        }
-                        
-                        // Generate utilities for all static classes
-                        const staticUsedData = {
-                            classes: Array.from(this.staticClassCache),
-                            variableSuffixes: []
-                        };
-                        // Process static classes for variable suffixes
-                        for (const cls of this.staticClassCache) {
-                            const parts = cls.split(':');
-                            const baseClass = parts[parts.length - 1];
-                            const classParts = baseClass.split('-');
-                            if (classParts.length > 1) {
-                                staticUsedData.variableSuffixes.push(classParts.slice(1).join('-'));
+                    if (!generatedRules.has(finalRule)) {
+                        utilities.push(finalRule);
+                        generatedRules.add(finalRule);
+                    }
+                }
+            };
+
+            // Generate utilities for each custom class that's actually used
+            for (const [className, cssOrSelector] of this.customUtilities.entries()) {
+                // Check if this specific utility class is actually used (including variants and important)
+                const isUsed = usedClasses.some(cls => {
+                    // Parse the class to extract the base utility name
+                    const parsed = this.parseClassName(cls);
+                    const baseClass = parsed.baseClass;
+                    
+                    // Check both normal and important versions
+                    return baseClass === className || 
+                           baseClass === '!' + className ||
+                           (baseClass.startsWith('!') && baseClass.slice(1) === className);
+                });
+
+                if (isUsed) {
+                    if (typeof cssOrSelector === 'string') {
+                        generateUtility(className, cssOrSelector, null);
+                    } else if (Array.isArray(cssOrSelector)) {
+                        for (const entry of cssOrSelector) {
+                            if (entry && entry.css && entry.selector) {
+                                generateUtility(className, entry.css, { selector: entry.selector });
                             }
                         }
-                        
-                        // Generate both variable-based and custom utilities
-                        const varUtilities = this.generateUtilitiesFromVars(themeCss, staticUsedData);
-                        const customUtilitiesGenerated = this.generateCustomUtilities(staticUsedData);
-                        
-                        const allUtilities = [varUtilities, customUtilitiesGenerated].filter(Boolean).join('\n\n');
-                        if (allUtilities) {
-                            const finalCss = `@layer utilities {\n${allUtilities}\n}`;
-                            this.styleElement.textContent = finalCss;
-                            this.lastClassesHash = staticUsedData.classes.sort().join(',');
-                        }
+                    } else if (cssOrSelector && cssOrSelector.css && cssOrSelector.selector) {
+                        generateUtility(className, cssOrSelector.css, { selector: cssOrSelector.selector });
                     }
-                    
-                    this.hasInitialized = true;
-                    this.isCompiling = false;
-                    return;
                 }
+            }
 
-                // For subsequent compilations, check for new dynamic classes
-                const usedData = this.getUsedClasses();
-                const dynamicClasses = Array.from(this.dynamicClassCache);
-                
-                // Create a hash of current dynamic classes to detect changes
-                const dynamicClassesHash = dynamicClasses.sort().join(',');
-                
-                // Check if dynamic classes have actually changed
-                if (dynamicClassesHash !== this.lastClassesHash || !this.hasInitialized) {
-                    // Fetch CSS content for dynamic compilation
-                    const themeCss = await this.fetchThemeContent();
-                    if (!themeCss) {
-                        this.isCompiling = false;
-                        return;
-                    }
+            return utilities.join('\n');
+        } catch (error) {
+            console.error('Error generating custom utilities:', error);
+            return '';
+        }
+    };
 
-                    // Update custom utilities cache if needed
+    // Main compilation method
+    TailwindCompiler.prototype.compile = async function() {
+        const compileStart = performance.now();
+        if (this.debug) {
+            console.log(`[Indux Utilities] Compile started at ${(compileStart - this.startTime).toFixed(2)}ms`);
+        }
+
+        try {
+            // Prevent too frequent compilations
+            const now = Date.now();
+            if (now - this.lastCompileTime < this.minCompileInterval) {
+                return;
+            }
+            this.lastCompileTime = now;
+
+            if (this.isCompiling) {
+                return;
+            }
+            this.isCompiling = true;
+
+            // On first run, scan static classes and CSS variables
+            if (!this.hasScannedStatic) {
+                await this.scanStaticClasses();
+                
+                // Fetch CSS content once for initial compilation
+                const themeCss = await this.fetchThemeContent();
+                if (themeCss) {
+                    // Extract and cache custom utilities
                     const discoveredCustomUtilities = this.extractCustomUtilities(themeCss);
                     for (const [name, value] of discoveredCustomUtilities.entries()) {
                         this.customUtilities.set(name, value);
                     }
-                    
-                    
 
-                    // Check for variable changes
                     const variables = this.extractThemeVariables(themeCss);
-                    let hasVariableChanges = false;
                     for (const [name, value] of variables.entries()) {
-                        const currentValue = this.currentThemeVars.get(name);
-                        if (currentValue !== value) {
-                            hasVariableChanges = true;
-                            this.currentThemeVars.set(name, value);
+                        this.currentThemeVars.set(name, value);
+                    }
+                    
+                    // Generate utilities for all static classes
+                    const staticUsedData = {
+                        classes: Array.from(this.staticClassCache),
+                        variableSuffixes: []
+                    };
+                    // Process static classes for variable suffixes
+                    for (const cls of this.staticClassCache) {
+                        const parts = cls.split(':');
+                        const baseClass = parts[parts.length - 1];
+                        const classParts = baseClass.split('-');
+                        if (classParts.length > 1) {
+                            staticUsedData.variableSuffixes.push(classParts.slice(1).join('-'));
                         }
                     }
+                    
+                    // Generate both variable-based and custom utilities
+                    const varUtilities = this.generateUtilitiesFromVars(themeCss, staticUsedData);
+                    const customUtilitiesGenerated = this.generateCustomUtilities(staticUsedData);
+                    
+                    const allUtilities = [varUtilities, customUtilitiesGenerated].filter(Boolean).join('\n\n');
+                    if (allUtilities) {
+                        const finalCss = `@layer utilities {\n${allUtilities}\n}`;
+                        
+                        // Read critical styles BEFORE clearing (they'll be merged into final CSS)
+                        const criticalCss = this.criticalStyleElement && this.criticalStyleElement.textContent ? 
+                            `\n\n/* Critical utilities (non-layer, will be overridden by layer utilities) */\n${this.criticalStyleElement.textContent}` : 
+                            '';
+                        
+                        this.styleElement.textContent = finalCss + criticalCss;
+                        
+                        // Clear critical styles AFTER merging, but wait for paint to ensure no flash
+                        // Use requestAnimationFrame to ensure styles are painted before clearing
+                        requestAnimationFrame(() => {
+                            requestAnimationFrame(() => {
+                                // Double RAF ensures paint has occurred
+                                if (this.criticalStyleElement && this.criticalStyleElement.textContent) {
+                                    if (this.debug) {
+                                        console.log(`[Indux Utilities] Clearing critical styles after paint`);
+                                    }
+                                    this.criticalStyleElement.textContent = '';
+                                }
+                            });
+                        });
+                        this.lastClassesHash = staticUsedData.classes.sort().join(',');
+                        
+                        // Save to cache for next page load
+                        const themeHash = this.generateThemeHash(themeCss);
+                        const cacheKey = `${this.lastClassesHash}-${themeHash}`;
+                        this.cache.set(cacheKey, {
+                            css: finalCss,
+                            timestamp: Date.now(),
+                            themeHash: themeHash
+                        });
+                        this.savePersistentCache();
+                    }
+                }
+                
+                this.hasInitialized = true;
+                this.isCompiling = false;
+                return;
+            }
 
-                    // Generate utilities for all classes (static + dynamic) if needed
-                    if (hasVariableChanges || dynamicClassesHash !== this.lastClassesHash) {
-                        
-                        // Generate both variable-based and custom utilities
-                        const varUtilities = this.generateUtilitiesFromVars(themeCss, usedData);
-                        const customUtilitiesGenerated = this.generateCustomUtilities(usedData);
-                        
-                        
-                        const allUtilities = [varUtilities, customUtilitiesGenerated].filter(Boolean).join('\n\n');
-                        if (allUtilities) {
-                            const finalCss = `@layer utilities {\n${allUtilities}\n}`;
-                            this.styleElement.textContent = finalCss;
-                            this.lastClassesHash = dynamicClassesHash;
-                        }
+            // For subsequent compilations, check for new dynamic classes
+            const usedData = this.getUsedClasses();
+            const dynamicClasses = Array.from(this.dynamicClassCache);
+            
+            // Create a hash of current dynamic classes to detect changes
+            const dynamicClassesHash = dynamicClasses.sort().join(',');
+            
+            // Check if dynamic classes have actually changed
+            if (dynamicClassesHash !== this.lastClassesHash || !this.hasInitialized) {
+                // Fetch CSS content for dynamic compilation
+                const themeCss = await this.fetchThemeContent();
+                if (!themeCss) {
+                    this.isCompiling = false;
+                    return;
+                }
+
+                // Update custom utilities cache if needed
+                const discoveredCustomUtilities = this.extractCustomUtilities(themeCss);
+                for (const [name, value] of discoveredCustomUtilities.entries()) {
+                    this.customUtilities.set(name, value);
+                }
+                
+                // Check for variable changes
+                const variables = this.extractThemeVariables(themeCss);
+                let hasVariableChanges = false;
+                for (const [name, value] of variables.entries()) {
+                    const currentValue = this.currentThemeVars.get(name);
+                    if (currentValue !== value) {
+                        hasVariableChanges = true;
+                        this.currentThemeVars.set(name, value);
                     }
                 }
 
-            } catch (error) {
-                console.error('Error compiling Tailwind CSS:', error);
-            } finally {
-                this.isCompiling = false;
+                // Generate utilities for all classes (static + dynamic) if needed
+                if (hasVariableChanges || dynamicClassesHash !== this.lastClassesHash) {
+                    
+                    // Generate both variable-based and custom utilities
+                    const varUtilities = this.generateUtilitiesFromVars(themeCss, usedData);
+                    const customUtilitiesGenerated = this.generateCustomUtilities(usedData);
+                    
+                    const allUtilities = [varUtilities, customUtilitiesGenerated].filter(Boolean).join('\n\n');
+                    if (allUtilities) {
+                        const finalCss = `@layer utilities {\n${allUtilities}\n}`;
+                        
+                        // Read critical styles BEFORE clearing (they'll be merged into final CSS)
+                        const criticalCss = this.criticalStyleElement && this.criticalStyleElement.textContent ? 
+                            `\n\n/* Critical utilities (non-layer, will be overridden by layer utilities) */\n${this.criticalStyleElement.textContent}` : 
+                            '';
+                        
+                        this.styleElement.textContent = finalCss + criticalCss;
+                        
+                        // Clear critical styles AFTER merging, but wait for paint to ensure no flash
+                        // Use requestAnimationFrame to ensure styles are painted before clearing
+                        requestAnimationFrame(() => {
+                            requestAnimationFrame(() => {
+                                // Double RAF ensures paint has occurred
+                                if (this.criticalStyleElement && this.criticalStyleElement.textContent) {
+                                    if (this.debug) {
+                                        console.log(`[Indux Utilities] Clearing critical styles after paint`);
+                                    }
+                                    this.criticalStyleElement.textContent = '';
+                                }
+                            });
+                        });
+                        this.lastClassesHash = dynamicClassesHash;
+                        
+                        // Save to cache for next page load
+                        const themeHash = this.generateThemeHash(themeCss);
+                        const cacheKey = `${this.lastClassesHash}-${themeHash}`;
+                        this.cache.set(cacheKey, {
+                            css: finalCss,
+                            timestamp: Date.now(),
+                            themeHash: themeHash
+                        });
+                        this.savePersistentCache();
+                    }
+                }
+            }
+
+        } catch (error) {
+            console.error('[Indux Utilities] Error compiling Tailwind CSS:', error);
+        } finally {
+            this.isCompiling = false;
+            if (this.debug) {
+                console.log(`[Indux Utilities] Compile completed in ${(performance.now() - compileStart).toFixed(2)}ms`);
             }
         }
-    }
+    };
+
+
+
+    // DOM observation and event handling
+    // Methods for watching DOM changes and triggering recompilation
+
+    // Setup component load listener and MutationObserver
+    TailwindCompiler.prototype.setupComponentLoadListener = function() {
+        // Use a single debounced handler for all component-related events
+        const debouncedCompile = this.debounce(() => {
+            if (!this.isCompiling) {
+                this.compile();
+            }
+        }, this.options.debounceTime);
+
+        // Listen for custom event when components are loaded
+        document.addEventListener('indux:component-loaded', (event) => {
+            debouncedCompile();
+        });
+
+        // Listen for route changes but don't recompile unnecessarily
+        document.addEventListener('indux:route-change', (event) => {
+            // Only trigger compilation if we detect new dynamic classes
+            // The existing MutationObserver will handle actual DOM changes
+            if (this.hasScannedStatic) {
+                // Wait longer for route content to fully load before checking
+                setTimeout(() => {
+                    const currentDynamicCount = this.dynamicClassCache.size;
+                    const currentClassesHash = this.lastClassesHash;
+                    
+                    // Scan for new classes
+                    this.getUsedClasses();
+                    const newDynamicCount = this.dynamicClassCache.size;
+                    const dynamicClasses = Array.from(this.dynamicClassCache);
+                    const newClassesHash = dynamicClasses.sort().join(',');
+                    
+                    // Only compile if we found genuinely new classes, not just code processing artifacts
+                    if (newDynamicCount > currentDynamicCount && newClassesHash !== currentClassesHash) {
+                        const newClasses = dynamicClasses.filter(cls => 
+                            // Filter out classes that are likely from code processing
+                            !cls.includes('hljs') && 
+                            !cls.startsWith('language-') && 
+                            !cls.includes('copy') &&
+                            !cls.includes('lines')
+                        );
+                        
+                        if (newClasses.length > 0) {
+                            debouncedCompile();
+                        }
+                    }
+                }, 300); // Longer delay to let code processing finish
+            }
+        });
+
+        // Use a single MutationObserver for all DOM changes
+        const observer = new MutationObserver((mutations) => {
+            let shouldRecompile = false;
+
+            for (const mutation of mutations) {
+                // Skip attribute changes that don't affect utilities
+                if (mutation.type === 'attributes') {
+                    const attributeName = mutation.attributeName;
+                    
+                    // Skip ignored attributes (like id changes from router)
+                    if (this.ignoredAttributes.includes(attributeName)) {
+                        continue;
+                    }
+                    
+                    // Only care about class attribute changes
+                    if (attributeName !== 'class') {
+                        continue;
+                    }
+                    
+                    // If it's a class change, check if we have new classes that need utilities
+                    const element = mutation.target;
+                    if (element.nodeType === Node.ELEMENT_NODE) {
+                        const currentClasses = Array.from(element.classList || []);
+                        const newClasses = currentClasses.filter(cls => {
+                            // Skip ignored patterns
+                            if (this.ignoredClassPatterns.some(pattern => pattern.test(cls))) {
+                                return false;
+                            }
+                            
+                            // Check if this class is new (not in our cache)
+                            return !this.staticClassCache.has(cls) && !this.dynamicClassCache.has(cls);
+                        });
+                        
+                        if (newClasses.length > 0) {
+                            // Add new classes to dynamic cache
+                            newClasses.forEach(cls => this.dynamicClassCache.add(cls));
+                            shouldRecompile = true;
+                            break;
+                        }
+                    }
+                }
+                else if (mutation.type === 'childList') {
+                    for (const node of mutation.addedNodes) {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            // Skip ignored elements using configurable selectors
+                            const isIgnoredElement = this.ignoredElementSelectors.some(selector => 
+                                node.tagName?.toLowerCase() === selector.toLowerCase() ||
+                                node.closest(selector)
+                            );
+                            
+                            if (isIgnoredElement) {
+                                continue;
+                            }
+
+                            // Only recompile for significant changes using configurable selectors
+                            const hasSignificantChange = this.significantChangeSelectors.some(selector => {
+                                try {
+                                    return node.matches?.(selector) || node.querySelector?.(selector);
+                                } catch (e) {
+                                    return false; // Invalid selector
+                                }
+                            });
+
+                            if (hasSignificantChange) {
+                                shouldRecompile = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (shouldRecompile) break;
+            }
+
+            if (shouldRecompile) {
+                debouncedCompile();
+            }
+        });
+
+        // Start observing the document with the configured parameters
+        observer.observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class'] // Only observe class changes
+        });
+    };
+
+    // Start processing with initial compilation and observer setup
+    TailwindCompiler.prototype.startProcessing = async function() {
+        try {
+            // Start initial compilation immediately
+            const initialCompilation = this.compile();
+
+            // Set up observer while compilation is running
+            this.observer = new MutationObserver((mutations) => {
+                const relevantMutations = mutations.filter(mutation => {
+                    if (mutation.type === 'attributes' &&
+                        mutation.attributeName === 'class') {
+                        return true;
+                    }
+                    if (mutation.type === 'childList') {
+                        return Array.from(mutation.addedNodes).some(node =>
+                            node.nodeType === Node.ELEMENT_NODE);
+                    }
+                    return false;
+                });
+
+                if (relevantMutations.length === 0) return;
+
+                // Check if there are any new classes that need processing
+                const newClasses = this.getUsedClasses();
+                if (newClasses.classes.length === 0) return;
+
+                if (this.compileTimeout) {
+                    clearTimeout(this.compileTimeout);
+                }
+                this.compileTimeout = setTimeout(() => {
+                    if (!this.isCompiling) {
+                        this.compile();
+                    }
+                }, this.options.debounceTime);
+            });
+
+            // Start observing immediately
+            this.observer.observe(document.documentElement, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['class']
+            });
+
+            // Wait for initial compilation
+            await initialCompilation;
+
+            this.hasInitialized = true;
+        } catch (error) {
+            console.error('Error starting Tailwind compiler:', error);
+        }
+    };
+
+
+
+    // Utilities initialization
+    // Initialize compiler and set up event listeners
 
     // Initialize immediately without waiting for DOMContentLoaded
     const compiler = new TailwindCompiler();
 
     // Expose utilities compiler for optional integration
     window.InduxUtilities = compiler;
+
+    // Log when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            if (compiler.debug) {
+                console.log(`[Indux Utilities] DOMContentLoaded fired at ${(performance.now() - compiler.startTime).toFixed(2)}ms`);
+            }
+        });
+    } else {
+        if (compiler.debug) {
+            console.log(`[Indux Utilities] DOM already loaded when script ran`);
+        }
+    }
+
+    // Log first paint if available
+    if ('PerformanceObserver' in window) {
+        try {
+            const paintObserver = new PerformanceObserver((list) => {
+                for (const entry of list.getEntries()) {
+                    if (compiler.debug && (entry.name === 'first-paint' || entry.name === 'first-contentful-paint')) {
+                        console.log(`[Indux Utilities] ${entry.name} at ${entry.startTime.toFixed(2)}ms`);
+                    }
+                }
+            });
+            paintObserver.observe({ entryTypes: ['paint'] });
+        } catch (e) {
+            // PerformanceObserver might not be available
+        }
+    }
 
     // Also handle DOMContentLoaded for any elements that might be added later
     document.addEventListener('DOMContentLoaded', () => {

@@ -273,16 +273,18 @@
             align-items: center;
             gap: calc(var(--spacing, 0.25rem) * 2);
             width: 100%;
-            padding: 0.5rem 1rem;
+            padding: 0.5rem 4rem 0.5rem 1rem;
             font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji');
             font-size: 0.8125rem;
             font-weight: 500;
             color: var(--color-content-subtle, oklch(67.4% 0.0318 251.27));
             border-bottom: none;
             border-radius: 0.8125rem 0.8125rem 0 0;
+            overflow-x: auto;
 
             /* Tab titles */
             & button[role=tab] {
+                flex-shrink: 0;
                 height: fit-content;
                 padding: var(--spacing, 0.25rem) calc(var(--spacing, 0.25rem) * 2);
                 border-radius: var(--radius, 0.5rem);

@@ -141,7 +141,7 @@
         direction: rtl
     }
 
-    :where([disabled], :disabled, [aria-disabled=true]) {
+    :where([disabled], :disabled, [aria-disabled=true], .disabled) {
         opacity: .5;
         cursor: default;
         pointer-events: none

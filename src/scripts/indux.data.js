@@ -418,83 +418,88 @@ async function initializeDataSourcesPlugin() {
         });
     }
 
-    // Create a safe proxy for loading state
-    function createLoadingProxy() {
-        return new Proxy({}, {
+    // Create a simple fallback object that returns empty strings for all properties
+    // This prevents infinite recursion by not using a Proxy for nested property access
+    function createSimpleFallback() {
+        const fallback = Object.create(null);
+        
+        // Add primitive conversion methods directly to the object
+        fallback[Symbol.toPrimitive] = function(hint) {
+            return hint === 'number' ? 0 : '';
+        };
+        fallback.valueOf = function() { return ''; };
+        fallback.toString = function() { return ''; };
+        
+        // Add route() function that returns the fallback for chaining
+        fallback.route = function(pathKey) {
+            return fallback;
+        };
+        
+        // For array-like properties, add length
+        Object.defineProperty(fallback, 'length', {
+            value: 0,
+            writable: false,
+            enumerable: false,
+            configurable: false
+        });
+        
+        // Make Symbol.toPrimitive non-enumerable and directly on the object
+        Object.defineProperty(fallback, Symbol.toPrimitive, {
+            value: function(hint) {
+                return hint === 'number' ? 0 : '';
+            },
+            writable: false,
+            enumerable: false,
+            configurable: false
+        });
+        
+        // Use Proxy only for the initial access - but return the plain object for nested accesses
+        return new Proxy(fallback, {
             get(target, key) {
-                // Handle special keys
-                if (key === Symbol.iterator || key === 'then' || key === 'catch' || key === 'finally') {
+                // Handle special keys that shouldn't trigger recursion
+                if (key === Symbol.iterator || key === 'then' || key === 'catch' || key === 'finally' ||
+                    key === Symbol.toStringTag || key === Symbol.hasInstance) {
                     return undefined;
                 }
 
-                // Handle route() function - always available
-                if (key === 'route') {
-                    return function(pathKey) {
-                        // Return a safe fallback proxy that returns empty strings for all properties
-                        return new Proxy({}, {
-                            get(target, prop) {
-                                // Return empty string for any property to prevent expression display
-                                if (typeof prop === 'string') {
-                                    return '';
-                                }
-                                return undefined;
-                            }
-                        });
-                    };
+                // Handle constructor and prototype
+                if (key === 'constructor' || key === '__proto__' || key === 'prototype') {
+                    return undefined;
                 }
 
-                // Handle toPrimitive for text content
-                if (key === Symbol.toPrimitive) {
-                    return function () { return ''; };
-                }
-
-                // Handle valueOf for text content
-                if (key === 'valueOf') {
-                    return function () { return ''; };
-                }
-
-                // Handle toString for text content
-                if (key === 'toString') {
-                    return function () { return ''; };
-                }
-
-                // Handle numeric keys for array access
-                if (typeof key === 'string' && !isNaN(Number(key))) {
-                    return createLoadingProxy();
-                }
-
-                // Return empty string for most properties to prevent expression display
-                if (typeof key === 'string') {
-                    // For known array properties, return a special proxy with route() function
-                    // This prevents infinite recursion while providing route() functionality
-                    if (key === 'legal' || key === 'docs' || key === 'features' || key === 'items') {
-                        return new Proxy({}, {
-                            get(target, prop) {
-                                if (prop === 'route') {
-                                    return function(pathKey) {
-                                        // Return a safe fallback proxy that returns empty strings
-                                        return new Proxy({}, {
-                                            get() { return ''; }
-                                        });
-                                    };
-                                }
-                                if (prop === 'length') return 0;
-                                if (typeof prop === 'string' && !isNaN(Number(prop))) {
-                                    return createLoadingProxy();
-                                }
-                                return '';
-                            }
-                        });
+                // If the key exists on the target (like route, toString, valueOf, length, Symbol.toPrimitive), return it
+                if (key in target || key === Symbol.toPrimitive) {
+                    const value = target[key];
+                    if (value !== undefined) {
+                        return value;
                     }
-                    // For other string properties that might be nested objects/arrays, return loading proxy
-                    // This allows chaining like $x.nested.stuff.people.route('path')
-                    return createLoadingProxy();
                 }
 
-                // Return empty object for nested properties
-                return createLoadingProxy();
+                // For any other property access, return the plain target object (not the proxy)
+                // This prevents recursion because accessing properties on the plain object won't trigger this proxy's getter
+                // The plain object will return undefined for missing properties, which Alpine will handle
+                return target;
+            },
+            has(target, key) {
+                // Make all string keys appear to exist to prevent Alpine from trying to access them
+                if (typeof key === 'string') {
+                    return true;
+                }
+                return key in target || key === Symbol.toPrimitive;
             }
         });
+    }
+    
+    // Create a cached singleton fallback object
+    let cachedLoadingProxy = null;
+    
+    // Create a safe proxy for loading state
+    function createLoadingProxy() {
+        // Reuse cached fallback for all nested property accesses
+        if (!cachedLoadingProxy) {
+            cachedLoadingProxy = createSimpleFallback();
+        }
+        return cachedLoadingProxy;
     }
 
     // Create a proxy for array items

@@ -46,6 +46,8 @@ function copyFilesToDist() {
         { source: 'styles/indux.code.min.css', dest: '../dist/indux.code.min.css' },
         
         // Individual plugin files
+        { source: 'scripts/indux.appwrite.auth.js', dest: '../dist/indux.appwrite.auth.js' },
+        { source: 'scripts/indux.code.js', dest: '../dist/indux.code.js' },
         { source: 'scripts/indux.components.js', dest: '../dist/indux.components.js' },
         { source: 'scripts/indux.data.js', dest: '../dist/indux.data.js' },
         { source: 'scripts/indux.dropdowns.js', dest: '../dist/indux.dropdowns.js' },
@@ -120,7 +122,6 @@ export default [
 /*  Contains all Indux plugins bundled with Iconify (iconify.design)
 /*
 /*  With on-demand reference to:
-/*  - highlight.js (https://highlightjs.org)
 /*  - js-yaml (https://nodeca.github.io/js-yaml)
 /*  - Marked JS (https://marked.js.org)
 /*
@@ -152,7 +153,6 @@ export default [
 /*  - Tailwind CSS (modified Play CDN script) (tailwindcss.com)
 /*
 /*  With on-demand reference to:
-/*  - highlight.js (https://highlightjs.org)
 /*  - js-yaml (https://nodeca.github.io/js-yaml)
 /*  - Marked JS (https://marked.js.org)
 /*

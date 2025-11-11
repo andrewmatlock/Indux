@@ -22,13 +22,23 @@ npm run build
 
 ---
 
-## Publish to jsDelivr
+## Publish to npm and jsDelivr
 
 ```bash
 git tag v1.0.0
 git push origin v1.0.0
 ```
-Auto-publishes to npm and jsDelivr CDN via GitHub Actions. Files available at URLs like:
+
+**Note:** This triggers the GitHub Actions workflow (`.github/workflows/release.yml`) which:
+1. Builds the project
+2. Creates a GitHub release with build artifacts
+3. Publishes to npm as `@indux/indux`
+4. Publishes the starter template to npm as `@indux/starter`
+
+**Required GitHub Secrets:**
+- `NPM_TOKEN`: Your npm authentication token (create at https://www.npmjs.com/settings/YOUR_USERNAME/tokens)
+
+Files are then available at URLs like:
 - `https://cdn.jsdelivr.net/npm/@indux/indux@0.2.3/dist/indux.js`
 - `https://cdn.jsdelivr.net/npm/@indux/indux@0.2.3/dist/indux.css`
 

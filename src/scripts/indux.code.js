@@ -1,4 +1,13 @@
-/* Indux Code */
+/*  Indux Code
+/*  By Andrew Matlock under MIT license
+/*  https://github.com/andrewmatlock/Indux
+/*
+/*  With reference to:
+/*  - highlight.js (https://highlightjs.org)
+/*  - Marked JS (https://marked.js.org)
+/*
+/*  Requires Alpine JS (alpinejs.dev) to operate.
+*/
 
 // Cache for highlight.js loading
 let hljsPromise = null;
