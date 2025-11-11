@@ -24,19 +24,39 @@ npm run build
 
 ## Publish to npm and jsDelivr
 
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
+**Manual Publishing Steps:**
 
-**Note:** This triggers the GitHub Actions workflow (`.github/workflows/release.yml`) which:
-1. Builds the project
-2. Creates a GitHub release with build artifacts
-3. Publishes to npm as `@indux/indux`
-4. Publishes the starter template to npm as `@indux/starter`
+1. **Build the project:**
+   ```bash
+   npm run build
+   ```
 
-**Required GitHub Secrets:**
-- `NPM_TOKEN`: Your npm authentication token (create at https://www.npmjs.com/settings/YOUR_USERNAME/tokens)
+2. **Update version in package.json:**
+   ```bash
+   npm version patch  # or minor, or major
+   ```
+   Or manually edit `package.json` to set the version.
+
+3. **Commit and tag:**
+   ```bash
+   git add .
+   git commit -m "Release vX.X.X"
+   git tag vX.X.X
+   git push origin master
+   git push origin vX.X.X
+   ```
+
+4. **Publish to npm:**
+   ```bash
+   npm publish
+   ```
+
+5. **Publish starter template (optional):**
+   ```bash
+   npm run publish:starter
+   ```
+
+**Note:** You must be logged into npm (`npm login`) before publishing.
 
 Files are then available at URLs like:
 - `https://cdn.jsdelivr.net/npm/@indux/indux@0.2.3/dist/indux.js`
