@@ -20,7 +20,10 @@ jobs:
         cache: 'npm'
         
     - name: Install dependencies
-      run: npm install
+      run: |
+        npm install
+        # Fix Rollup optional dependencies issue
+        npm install @rollup/rollup-linux-x64-gnu --save-optional || true
       
     - name: Build Indux
       run: npm run build
