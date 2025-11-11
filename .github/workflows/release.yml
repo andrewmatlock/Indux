@@ -21,9 +21,10 @@ jobs:
         
     - name: Install dependencies
       run: |
+        # Clear npm cache and do clean install to fix Rollup optional deps
+        rm -rf node_modules package-lock.json
+        npm cache clean --force
         npm install
-        # Fix Rollup optional dependencies issue
-        npm install @rollup/rollup-linux-x64-gnu --save-optional || true
       
     - name: Build Indux
       run: npm run build
