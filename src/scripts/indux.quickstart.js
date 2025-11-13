@@ -2266,24 +2266,47 @@ ${H}`)
       const utilities = new Map();
 
       // Extract custom utility classes from CSS
-      const utilityRegex = /(?:@layer\s+utilities\s*{[^}]*}|^)(?:[^{}]*?)(?:^|\s)(\.[\w-]+)\s*{([^}]+)}/gm;
+      // Match: .classname or .!classname (where classname can contain word chars and hyphens)
+      const utilityRegex = /(?:@layer\s+utilities\s*{[^}]*}|^)(?:[^{}]*?)(?:^|\s)(\.!?[\w-]+)\s*{([^}]+)}/gm;
 
       let match;
       while ((match = utilityRegex.exec(cssText)) !== null) {
           const className = match[1].substring(1); // Remove the leading dot
           const cssRules = match[2].trim();
           
-          // Skip if it's a Tailwind-generated class (starts with common prefixes)
-          if (this.isTailwindGeneratedClass(className)) {
+          // Skip if it's a Tailwind-generated class (check base name without !)
+          const baseClassName = className.startsWith('!') ? className.slice(1) : className;
+          if (this.isTailwindGeneratedClass(baseClassName)) {
               continue;
           }
 
-          // Store the utility class and its CSS (combine if already exists)
+          // Check if CSS rules contain !important
+          const hasImportant = /\s!important/.test(cssRules);
+          const classHasImportantPrefix = className.startsWith('!');
+          
+          // Determine final CSS rules
+          let finalCssRules = cssRules;
+          if (classHasImportantPrefix) {
+              // Class has ! prefix, ensure CSS has !important
+              if (!hasImportant) {
+                  finalCssRules = cssRules.includes(';') ? 
+                      cssRules.replace(/;/g, ' !important;') : 
+                      cssRules + ' !important';
+              }
+          } else {
+              // Class doesn't have ! prefix, remove !important if present
+              if (hasImportant) {
+                  finalCssRules = cssRules.replace(/\s!important/g, '');
+              }
+          }
+
+          // Store the utility class with its full name (including ! prefix) as the key
+          // This ensures !col is stored separately from col
           if (utilities.has(className)) {
               const existingRules = utilities.get(className);
-              utilities.set(className, `${existingRules}; ${cssRules}`);
+              utilities.set(className, `${existingRules}; ${finalCssRules}`);
           } else {
-              utilities.set(className, cssRules);
+              utilities.set(className, finalCssRules);
           }
       }
 
@@ -2294,20 +2317,61 @@ ${H}`)
           const selectorContent = match[1];
           const cssRules = match[2].trim();
           
-          // Extract individual class names from the selector
-          const classMatches = selectorContent.match(/\.([\w-]+)/g);
+          // Check if CSS rules contain !important
+          const hasImportant = /\s!important/.test(cssRules);
+          
+          // Extract individual class names from the selector, including those with ! prefix
+          // Match: .classname or .!classname (where classname can contain word chars and hyphens)
+          const classMatches = selectorContent.match(/\.(!?[\w-]+)/g);
           if (classMatches) {
               for (const classMatch of classMatches) {
                   const className = classMatch.substring(1); // Remove the leading dot
                   
-                  if (!this.isTailwindGeneratedClass(className)) {
-                      // Combine CSS rules if the class already exists
-                      if (utilities.has(className)) {
-                          const existingRules = utilities.get(className);
-                          utilities.set(className, `${existingRules}; ${cssRules}`);
-                      } else {
-                          utilities.set(className, cssRules);
+                  // Skip if it's a Tailwind-generated class (but check base name without !)
+                  const baseClassName = className.startsWith('!') ? className.slice(1) : className;
+                  if (this.isTailwindGeneratedClass(baseClassName)) {
+                      continue;
+                  }
+                  
+                  // Determine if this class should have !important
+                  // Only apply !important if the class name itself starts with ! (e.g., !col)
+                  const classHasImportantPrefix = className.startsWith('!');
+                  let finalCssRules = cssRules;
+                  
+                  if (classHasImportantPrefix) {
+                      // Class has ! prefix, ensure CSS has !important
+                      if (!hasImportant) {
+                          finalCssRules = cssRules.includes(';') ? 
+                              cssRules.replace(/;/g, ' !important;') : 
+                              cssRules + ' !important';
                       }
+                  } else {
+                      // Class doesn't have ! prefix, remove !important if present
+                      if (hasImportant) {
+                          finalCssRules = cssRules.replace(/\s!important/g, '');
+                      }
+                  }
+                  
+                  // Store the class with its full name (including ! prefix) as the key
+                  // This ensures !col is stored separately from col
+                  const storageKey = className;
+                  
+                  // Combine CSS rules if the class already exists
+                  if (utilities.has(storageKey)) {
+                      const existing = utilities.get(storageKey);
+                      // If existing is a string, combine
+                      if (typeof existing === 'string') {
+                          utilities.set(storageKey, `${existing}; ${finalCssRules}`);
+                      } else if (Array.isArray(existing)) {
+                          // For array format, we need to handle this differently
+                          // For now, convert to string format
+                          const existingCss = existing.map(e => e.css || e).join('; ');
+                          utilities.set(storageKey, `${existingCss}; ${finalCssRules}`);
+                      } else {
+                          utilities.set(storageKey, `${existing.css || existing}; ${finalCssRules}`);
+                      }
+                  } else {
+                      utilities.set(storageKey, finalCssRules);
                   }
               }
           }
@@ -2324,21 +2388,44 @@ ${H}`)
               // Skip at-rules and keyframes/selectors without classes
               if (selector.startsWith('@')) continue;
 
-              const classMatches = selector.match(/\.[A-Za-z0-9_-]+/g);
+              // Match: .classname or .!classname
+              const classMatches = selector.match(/\.!?[A-Za-z0-9_-]+/g);
               if (!classMatches) continue;
 
+              // Check if CSS rules contain !important
+              const hasImportant = /\s!important/.test(cssRules);
+
               for (const classToken of classMatches) {
-                  const className = classToken.substring(1);
+                  const className = classToken.substring(1); // Remove the leading dot
 
-                  // Skip Tailwind-generated or already captured classes
-                  if (this.isTailwindGeneratedClass(className)) continue;
+                  // Skip Tailwind-generated or already captured classes (check base name without !)
+                  const baseClassName = className.startsWith('!') ? className.slice(1) : className;
+                  if (this.isTailwindGeneratedClass(baseClassName)) continue;
 
-                  // Combine CSS rules if the class already exists
+                  // Determine if this class should have !important
+                  const classHasImportantPrefix = className.startsWith('!');
+                  let finalCssRules = cssRules;
+                  
+                  if (classHasImportantPrefix) {
+                      // Class has ! prefix, ensure CSS has !important
+                      if (!hasImportant) {
+                          finalCssRules = cssRules.includes(';') ? 
+                              cssRules.replace(/;/g, ' !important;') : 
+                              cssRules + ' !important';
+                      }
+                  } else {
+                      // Class doesn't have ! prefix, remove !important if present
+                      if (hasImportant) {
+                          finalCssRules = cssRules.replace(/\s!important/g, '');
+                      }
+                  }
+
+                  // Store the class with its full name (including ! prefix) as the key
                   if (utilities.has(className)) {
                       const existingRules = utilities.get(className);
-                      utilities.set(className, `${existingRules}; ${cssRules}`);
+                      utilities.set(className, `${existingRules}; ${finalCssRules}`);
                   } else {
-                      utilities.set(className, cssRules);
+                      utilities.set(className, finalCssRules);
                   }
               }
           }
@@ -2422,15 +2509,41 @@ ${H}`)
           for (const rule of rules) {
               // Clean selector: strip comments and normalize whitespace
               let cleanedSelector = rule.selector.replace(/\/\*[^]*?\*\//g, '').replace(/\s+/g, ' ').trim();
-              const classTokens = cleanedSelector.match(/\.[A-Za-z0-9_-]+/g);
+              // Match: .classname or .!classname
+              const classTokens = cleanedSelector.match(/\.!?[A-Za-z0-9_-]+/g);
               if (!classTokens) continue;
 
+              // Check if CSS rules contain !important
+              const hasImportant = /\s!important/.test(rule.css);
+
               for (const token of classTokens) {
-                  const className = token.slice(1);
-                  if (this.isTailwindGeneratedClass(className)) continue;
+                  const className = token.slice(1); // Remove the leading dot
+                  
+                  // Skip Tailwind-generated classes (check base name without !)
+                  const baseClassName = className.startsWith('!') ? className.slice(1) : className;
+                  if (this.isTailwindGeneratedClass(baseClassName)) continue;
+
+                  // Determine if this class should have !important
+                  const classHasImportantPrefix = className.startsWith('!');
+                  let finalCss = rule.css;
+                  
+                  if (classHasImportantPrefix) {
+                      // Class has ! prefix, ensure CSS has !important
+                      if (!hasImportant) {
+                          finalCss = rule.css.includes(';') ? 
+                              rule.css.replace(/;/g, ' !important;') : 
+                              rule.css + ' !important';
+                      }
+                  } else {
+                      // Class doesn't have ! prefix, remove !important if present
+                      if (hasImportant) {
+                          finalCss = rule.css.replace(/\s!important/g, '');
+                      }
+                  }
 
                   // Store selector-aware utility so variants preserve context and pseudos
-                  const value = { selector: cleanedSelector, css: rule.css };
+                  // Use full className (including !) as the key
+                  const value = { selector: cleanedSelector, css: finalCss };
                   if (utilities.has(className)) {
                       const existing = utilities.get(className);
                       if (typeof existing === 'string') {
@@ -2780,18 +2893,30 @@ ${H}`)
               
               // Generate important version if used
               if (usedClasses.includes('!' + baseClass)) {
-                  const importantCss = css.includes(';') ? 
-                      css.replace(/;/g, ' !important;') : 
-                      css + ' !important';
+                  // Check if CSS already has !important to avoid double !important
+                  const alreadyHasImportant = /\s!important/.test(css);
+                  const importantCss = alreadyHasImportant ? css : 
+                      (css.includes(';') ? 
+                          css.replace(/;/g, ' !important;') : 
+                          css + ' !important');
                   let rule;
                   if (selectorInfo && selectorInfo.selector) {
-                      const variantSel = `.${escapeClassName('!' + baseClass)}`;
-                      let contextual = selectorInfo.selector.replace(new RegExp(`\\.${baseClass}(?=[^a-zA-Z0-9_-]|$)`), variantSel);
-                      if (contextual === selectorInfo.selector) {
-                          // Fallback: append class to the end if base token not found
-                          contextual = `${selectorInfo.selector}${variantSel}`;
+                      // If the original selector contains :where(), don't try to modify it
+                      // Generate a separate rule for the important version
+                      // This prevents :where(.row, .col) from becoming :where(.row, .!col) with !important on all
+                      if (selectorInfo.selector.includes(':where(')) {
+                          // For :where() selectors, generate individual class selector for important version
+                          rule = `.${escapeClassName('!' + baseClass)} { ${importantCss} }`;
+                      } else {
+                          // For other contextual selectors, do the replacement
+                          const variantSel = `.${escapeClassName('!' + baseClass)}`;
+                          let contextual = selectorInfo.selector.replace(new RegExp(`\\.${baseClass}(?=[^a-zA-Z0-9_-]|$)`), variantSel);
+                          if (contextual === selectorInfo.selector) {
+                              // Fallback: append class to the end if base token not found
+                              contextual = `${selectorInfo.selector}${variantSel}`;
+                          }
+                          rule = `${contextual} { ${importantCss} }`;
                       }
-                      rule = `${contextual} { ${importantCss} }`;
                   } else {
                       rule = `.${escapeClassName('!' + baseClass)} { ${importantCss} }`;
                   }
@@ -2867,13 +2992,24 @@ ${H}`)
                   } else {
                       // Regular selector or contextual replacement using original selector info
                       if (selectorInfo && selectorInfo.selector) {
-                          const contextualRe = new RegExp(`\\.${baseClass}(?=[^a-zA-Z0-9_-]|$)`);
-                          let contextual = selectorInfo.selector.replace(contextualRe, selector);
-                          if (contextual === selectorInfo.selector) {
-                              // Fallback when base token not directly present
-                              contextual = `${selectorInfo.selector}${selector}`;
+                          // If the original selector contains :where(), don't try to modify it
+                          // Instead, generate a separate rule for this specific class
+                          // This prevents issues where :where(.row, .col) would become :where(.row, .!col)
+                          // with !important applied to all classes
+                          if (selectorInfo.selector.includes(':where(')) {
+                              // For :where() selectors, generate individual class selector
+                              // This ensures !important is only applied to the specific class
+                              rule = `${selector} { ${cssContent} }`;
+                          } else {
+                              // For other contextual selectors, do the replacement
+                              const contextualRe = new RegExp(`\\.${baseClass}(?=[^a-zA-Z0-9_-]|$)`);
+                              let contextual = selectorInfo.selector.replace(contextualRe, selector);
+                              if (contextual === selectorInfo.selector) {
+                                  // Fallback when base token not directly present
+                                  contextual = `${selectorInfo.selector}${selector}`;
+                              }
+                              rule = `${contextual} { ${cssContent} }`;
                           }
-                          rule = `${contextual} { ${cssContent} }`;
                       } else {
                           rule = `${selector} { ${cssContent} }`;
                       }
@@ -2900,6 +3036,10 @@ ${H}`)
 
           // Generate utilities for each custom class that's actually used
           for (const [className, cssOrSelector] of this.customUtilities.entries()) {
+              // Normalize class name: if it starts with !, extract the base name
+              const hasImportantPrefix = className.startsWith('!');
+              const baseClassName = hasImportantPrefix ? className.slice(1) : className;
+              
               // Check if this specific utility class is actually used (including variants and important)
               const isUsed = usedClasses.some(cls => {
                   // Parse the class to extract the base utility name
@@ -2908,21 +3048,35 @@ ${H}`)
                   
                   // Check both normal and important versions
                   return baseClass === className || 
-                         baseClass === '!' + className ||
-                         (baseClass.startsWith('!') && baseClass.slice(1) === className);
+                         baseClass === baseClassName ||
+                         baseClass === '!' + baseClassName ||
+                         (baseClass.startsWith('!') && baseClass.slice(1) === baseClassName);
               });
 
               if (isUsed) {
+                  // Normalize CSS: if className has ! prefix, the CSS should already have !important
+                  // But we need to pass the base class name to generateUtility
+                  let normalizedCss = cssOrSelector;
                   if (typeof cssOrSelector === 'string') {
-                      generateUtility(className, cssOrSelector, null);
+                      normalizedCss = cssOrSelector;
+                  } else if (Array.isArray(cssOrSelector)) {
+                      // For arrays, we'll handle each entry separately below
+                  } else if (cssOrSelector && cssOrSelector.css) {
+                      normalizedCss = cssOrSelector.css;
+                  }
+                  
+                  // Generate utility with base class name (without !)
+                  // The CSS already has !important if className started with !
+                  if (typeof cssOrSelector === 'string') {
+                      generateUtility(baseClassName, normalizedCss, null);
                   } else if (Array.isArray(cssOrSelector)) {
                       for (const entry of cssOrSelector) {
                           if (entry && entry.css && entry.selector) {
-                              generateUtility(className, entry.css, { selector: entry.selector });
+                              generateUtility(baseClassName, entry.css, { selector: entry.selector });
                           }
                       }
                   } else if (cssOrSelector && cssOrSelector.css && cssOrSelector.selector) {
-                      generateUtility(className, cssOrSelector.css, { selector: cssOrSelector.selector });
+                      generateUtility(baseClassName, cssOrSelector.css, { selector: cssOrSelector.selector });
                   }
               }
           }

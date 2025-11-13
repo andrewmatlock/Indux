@@ -223,18 +223,30 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
             
             // Generate important version if used
             if (usedClasses.includes('!' + baseClass)) {
-                const importantCss = css.includes(';') ? 
-                    css.replace(/;/g, ' !important;') : 
-                    css + ' !important';
+                // Check if CSS already has !important to avoid double !important
+                const alreadyHasImportant = /\s!important/.test(css);
+                const importantCss = alreadyHasImportant ? css : 
+                    (css.includes(';') ? 
+                        css.replace(/;/g, ' !important;') : 
+                        css + ' !important');
                 let rule;
                 if (selectorInfo && selectorInfo.selector) {
-                    const variantSel = `.${escapeClassName('!' + baseClass)}`;
-                    let contextual = selectorInfo.selector.replace(new RegExp(`\\.${baseClass}(?=[^a-zA-Z0-9_-]|$)`), variantSel);
-                    if (contextual === selectorInfo.selector) {
-                        // Fallback: append class to the end if base token not found
-                        contextual = `${selectorInfo.selector}${variantSel}`;
+                    // If the original selector contains :where(), don't try to modify it
+                    // Generate a separate rule for the important version
+                    // This prevents :where(.row, .col) from becoming :where(.row, .!col) with !important on all
+                    if (selectorInfo.selector.includes(':where(')) {
+                        // For :where() selectors, generate individual class selector for important version
+                        rule = `.${escapeClassName('!' + baseClass)} { ${importantCss} }`;
+                    } else {
+                        // For other contextual selectors, do the replacement
+                        const variantSel = `.${escapeClassName('!' + baseClass)}`;
+                        let contextual = selectorInfo.selector.replace(new RegExp(`\\.${baseClass}(?=[^a-zA-Z0-9_-]|$)`), variantSel);
+                        if (contextual === selectorInfo.selector) {
+                            // Fallback: append class to the end if base token not found
+                            contextual = `${selectorInfo.selector}${variantSel}`;
+                        }
+                        rule = `${contextual} { ${importantCss} }`;
                     }
-                    rule = `${contextual} { ${importantCss} }`;
                 } else {
                     rule = `.${escapeClassName('!' + baseClass)} { ${importantCss} }`;
                 }
@@ -310,13 +322,24 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                 } else {
                     // Regular selector or contextual replacement using original selector info
                     if (selectorInfo && selectorInfo.selector) {
-                        const contextualRe = new RegExp(`\\.${baseClass}(?=[^a-zA-Z0-9_-]|$)`);
-                        let contextual = selectorInfo.selector.replace(contextualRe, selector);
-                        if (contextual === selectorInfo.selector) {
-                            // Fallback when base token not directly present
-                            contextual = `${selectorInfo.selector}${selector}`;
+                        // If the original selector contains :where(), don't try to modify it
+                        // Instead, generate a separate rule for this specific class
+                        // This prevents issues where :where(.row, .col) would become :where(.row, .!col)
+                        // with !important applied to all classes
+                        if (selectorInfo.selector.includes(':where(')) {
+                            // For :where() selectors, generate individual class selector
+                            // This ensures !important is only applied to the specific class
+                            rule = `${selector} { ${cssContent} }`;
+                        } else {
+                            // For other contextual selectors, do the replacement
+                            const contextualRe = new RegExp(`\\.${baseClass}(?=[^a-zA-Z0-9_-]|$)`);
+                            let contextual = selectorInfo.selector.replace(contextualRe, selector);
+                            if (contextual === selectorInfo.selector) {
+                                // Fallback when base token not directly present
+                                contextual = `${selectorInfo.selector}${selector}`;
+                            }
+                            rule = `${contextual} { ${cssContent} }`;
                         }
-                        rule = `${contextual} { ${cssContent} }`;
                     } else {
                         rule = `${selector} { ${cssContent} }`;
                     }
@@ -343,6 +366,10 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
 
         // Generate utilities for each custom class that's actually used
         for (const [className, cssOrSelector] of this.customUtilities.entries()) {
+            // Normalize class name: if it starts with !, extract the base name
+            const hasImportantPrefix = className.startsWith('!');
+            const baseClassName = hasImportantPrefix ? className.slice(1) : className;
+            
             // Check if this specific utility class is actually used (including variants and important)
             const isUsed = usedClasses.some(cls => {
                 // Parse the class to extract the base utility name
@@ -351,21 +378,35 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                 
                 // Check both normal and important versions
                 return baseClass === className || 
-                       baseClass === '!' + className ||
-                       (baseClass.startsWith('!') && baseClass.slice(1) === className);
+                       baseClass === baseClassName ||
+                       baseClass === '!' + baseClassName ||
+                       (baseClass.startsWith('!') && baseClass.slice(1) === baseClassName);
             });
 
             if (isUsed) {
+                // Normalize CSS: if className has ! prefix, the CSS should already have !important
+                // But we need to pass the base class name to generateUtility
+                let normalizedCss = cssOrSelector;
                 if (typeof cssOrSelector === 'string') {
-                    generateUtility(className, cssOrSelector, null);
+                    normalizedCss = cssOrSelector;
+                } else if (Array.isArray(cssOrSelector)) {
+                    // For arrays, we'll handle each entry separately below
+                } else if (cssOrSelector && cssOrSelector.css) {
+                    normalizedCss = cssOrSelector.css;
+                }
+                
+                // Generate utility with base class name (without !)
+                // The CSS already has !important if className started with !
+                if (typeof cssOrSelector === 'string') {
+                    generateUtility(baseClassName, normalizedCss, null);
                 } else if (Array.isArray(cssOrSelector)) {
                     for (const entry of cssOrSelector) {
                         if (entry && entry.css && entry.selector) {
-                            generateUtility(className, entry.css, { selector: entry.selector });
+                            generateUtility(baseClassName, entry.css, { selector: entry.selector });
                         }
                     }
                 } else if (cssOrSelector && cssOrSelector.css && cssOrSelector.selector) {
-                    generateUtility(className, cssOrSelector.css, { selector: cssOrSelector.selector });
+                    generateUtility(baseClassName, cssOrSelector.css, { selector: cssOrSelector.selector });
                 }
             }
         }
