@@ -1,10 +1,4 @@
-/*  Indux Appwrite Auth
-/*  By Andrew Matlock under MIT license
-/*  https://github.com/andrewmatlock/Indux
-/*
-/*  Supports authentication with an Appwrite project
-/*  Requires Alpine JS (alpinejs.dev) to operate
-*/
+/* Auth main */
 
 // Initialize auth plugin - orchestrates all modules
 let _pluginInitializing = false;

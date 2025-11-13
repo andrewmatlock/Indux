@@ -3969,13 +3969,21 @@ ${H}`)
 
   var indux_appwrite_auth = {};
 
-  /* Auth config */
+  /*  Indux Appwrite Auth
+  /*  By Andrew Matlock under MIT license
+  /*  https://github.com/andrewmatlock/Indux
+  /*
+  /*  Supports authentication with an Appwrite project
+  /*  Requires Alpine JS (alpinejs.dev) to operate
+  */
 
   var hasRequiredIndux_appwrite_auth;
 
   function requireIndux_appwrite_auth () {
   	if (hasRequiredIndux_appwrite_auth) return indux_appwrite_auth;
   	hasRequiredIndux_appwrite_auth = 1;
+  	/* Auth config */
+
   	// Load manifest if not already loaded
   	async function ensureManifest() {
   	    if (window.InduxComponentsRegistry?.manifest) {
@@ -4763,13 +4771,7 @@ ${H}`)
   	    initialize: initializeAuthStore
   	};
 
-  	/*  Indux Appwrite Auth
-  	/*  By Andrew Matlock under MIT license
-  	/*  https://github.com/andrewmatlock/Indux
-  	/*
-  	/*  Supports authentication with an Appwrite project
-  	/*  Requires Alpine JS (alpinejs.dev) to operate
-  	*/
+  	/* Auth main */
 
   	// Initialize auth plugin - orchestrates all modules
   	let _pluginInitializing = false;
