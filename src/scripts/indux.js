@@ -13263,24 +13263,39 @@ var Indux = (function (exports) {
                     
                     // Store the class with its full name (including ! prefix) as the key
                     // This ensures !col is stored separately from col
+                    // Store as selector-aware object to preserve :where() context for variants
                     const storageKey = className;
+                    const originalSelector = `:where(${selectorContent})`;
+                    const value = { selector: originalSelector, css: finalCssRules };
                     
                     // Combine CSS rules if the class already exists
                     if (utilities.has(storageKey)) {
                         const existing = utilities.get(storageKey);
-                        // If existing is a string, combine
+                        // If existing is a string, convert to array format
                         if (typeof existing === 'string') {
-                            utilities.set(storageKey, `${existing}; ${finalCssRules}`);
+                            utilities.set(storageKey, [ 
+                                { selector: `.${className}`, css: existing }, 
+                                value 
+                            ]);
                         } else if (Array.isArray(existing)) {
-                            // For array format, we need to handle this differently
-                            // For now, convert to string format
-                            const existingCss = existing.map(e => e.css || e).join('; ');
-                            utilities.set(storageKey, `${existingCss}; ${finalCssRules}`);
-                        } else {
-                            utilities.set(storageKey, `${existing.css || existing}; ${finalCssRules}`);
+                            // Check if this selector already exists in the array
+                            const found = existing.find(e => e.selector === value.selector);
+                            if (found) {
+                                found.css = `${found.css}; ${value.css}`;
+                            } else {
+                                existing.push(value);
+                            }
+                        } else if (existing && existing.selector) {
+                            // Convert single object to array
+                            if (existing.selector === value.selector) {
+                                existing.css = `${existing.css}; ${value.css}`;
+                                utilities.set(storageKey, [ existing ]);
+                            } else {
+                                utilities.set(storageKey, [ existing, value ]);
+                            }
                         }
                     } else {
-                        utilities.set(storageKey, finalCssRules);
+                        utilities.set(storageKey, [ value ]);
                     }
                 }
             }
