@@ -1654,6 +1654,23 @@ TailwindCompiler.prototype.extractThemeVariables = function(cssText) {
 // Extract custom utilities from CSS text
 TailwindCompiler.prototype.extractCustomUtilities = function(cssText) {
     const utilities = new Map();
+    
+    // Helper to ensure CSS is always a string
+    const ensureCssString = (css) => {
+        if (typeof css === 'string') {
+            // Clean up any [object Object] that might have snuck in
+            return css.replace(/\[object Object\](;?\s*)/g, '').trim();
+        }
+        if (css && typeof css === 'object' && css.css) {
+            return ensureCssString(css.css);
+        }
+        const stringified = String(css);
+        // Return empty string instead of [object Object]
+        if (stringified === '[object Object]') {
+            return '';
+        }
+        return stringified;
+    };
 
     // Extract custom utility classes from CSS
     // Match: .classname or .!classname (where classname can contain word chars and hyphens)
@@ -1690,22 +1707,77 @@ TailwindCompiler.prototype.extractCustomUtilities = function(cssText) {
             }
         }
 
-        // Store the utility class with its full name (including ! prefix) as the key
-        // This ensures !col is stored separately from col
-        if (utilities.has(className)) {
-            const existingRules = utilities.get(className);
-            utilities.set(className, `${existingRules}; ${finalCssRules}`);
-        } else {
-            utilities.set(className, finalCssRules);
-        }
+                // Store the utility class with its full name (including ! prefix) as the key
+                // This ensures !col is stored separately from col
+                // Ensure CSS is always a string
+                const cssString = ensureCssString(finalCssRules);
+                if (utilities.has(className)) {
+                    const existingRules = utilities.get(className);
+                    const existingCssString = ensureCssString(existingRules);
+                    utilities.set(className, `${existingCssString}; ${cssString}`);
+                } else {
+                    utilities.set(className, cssString);
+                }
     }
 
     // Also look for :where() selectors which are common in Indux utilities
     // Handle both single class and multiple class selectors
-    const whereRegex = /:where\(([^)]+)\)\s*{([^}]+)}/g;
-    while ((match = whereRegex.exec(cssText)) !== null) {
-        const selectorContent = match[1];
-        const cssRules = match[2].trim();
+    // Use a function to properly match braces for nested rules
+    const extractWhereSelectors = (text) => {
+        const matches = [];
+        let i = 0;
+        while (i < text.length) {
+            // Find :where(
+            const whereStart = text.indexOf(':where(', i);
+            if (whereStart === -1) break;
+            
+            // Find matching closing paren for :where(
+            let parenDepth = 1;
+            let j = whereStart + 7; // Skip ':where('
+            while (j < text.length && parenDepth > 0) {
+                if (text[j] === '(') parenDepth++;
+                else if (text[j] === ')') parenDepth--;
+                j++;
+            }
+            if (parenDepth > 0) {
+                i = whereStart + 1;
+                continue; // Malformed, skip
+            }
+            
+            const selectorContent = text.slice(whereStart + 7, j - 1);
+            
+            // Skip whitespace and find opening brace
+            while (j < text.length && /\s/.test(text[j])) j++;
+            if (j >= text.length || text[j] !== '{') {
+                i = whereStart + 1;
+                continue;
+            }
+            
+            // Find matching closing brace (handle nested braces)
+            let braceDepth = 1;
+            let blockStart = j + 1;
+            j++;
+            while (j < text.length && braceDepth > 0) {
+                if (text[j] === '{') braceDepth++;
+                else if (text[j] === '}') braceDepth--;
+                j++;
+            }
+            if (braceDepth > 0) {
+                i = whereStart + 1;
+                continue; // Malformed, skip
+            }
+            
+            const cssRules = text.slice(blockStart, j - 1).trim();
+            matches.push({ selectorContent, cssRules, fullMatch: text.slice(whereStart, j) });
+            i = j;
+        }
+        return matches;
+    };
+    
+    const whereMatches = extractWhereSelectors(cssText);
+    for (const match of whereMatches) {
+        const selectorContent = match.selectorContent;
+        const cssRules = match.cssRules;
         
         // Check if CSS rules contain !important
         const hasImportant = /\s!important/.test(cssRules);
@@ -1745,31 +1817,45 @@ TailwindCompiler.prototype.extractCustomUtilities = function(cssText) {
                 // Store the class with its full name (including ! prefix) as the key
                 // This ensures !col is stored separately from col
                 // Store as selector-aware object to preserve :where() context for variants
+                // Mark as fullBlock since it contains nested rules
                 const storageKey = className;
                 const originalSelector = `:where(${selectorContent})`;
-                const value = { selector: originalSelector, css: finalCssRules };
+                // Ensure CSS is always a string
+                const cssString = ensureCssString(finalCssRules);
+                const value = { 
+                    selector: originalSelector, 
+                    css: cssString,
+                    fullBlock: true // :where() blocks often contain nested rules
+                };
                 
                 // Combine CSS rules if the class already exists
                 if (utilities.has(storageKey)) {
                     const existing = utilities.get(storageKey);
                     // If existing is a string, convert to array format
                     if (typeof existing === 'string') {
+                        const existingCssString = ensureCssString(existing);
                         utilities.set(storageKey, [ 
-                            { selector: `.${className}`, css: existing }, 
+                            { selector: `.${className}`, css: existingCssString }, 
                             value 
                         ]);
                     } else if (Array.isArray(existing)) {
                         // Check if this selector already exists in the array
                         const found = existing.find(e => e.selector === value.selector);
                         if (found) {
-                            found.css = `${found.css}; ${value.css}`;
+                            // Ensure both are strings before concatenating
+                            const foundCss = ensureCssString(found.css);
+                            const valueCss = ensureCssString(value.css);
+                            found.css = `${foundCss}; ${valueCss}`;
                         } else {
                             existing.push(value);
                         }
                     } else if (existing && existing.selector) {
                         // Convert single object to array
                         if (existing.selector === value.selector) {
-                            existing.css = `${existing.css}; ${value.css}`;
+                            // Ensure both are strings before concatenating
+                            const existingCss = ensureCssString(existing.css);
+                            const valueCss = ensureCssString(value.css);
+                            existing.css = `${existingCss}; ${valueCss}`;
                             utilities.set(storageKey, [ existing ]);
                         } else {
                             utilities.set(storageKey, [ existing, value ]);
@@ -1783,12 +1869,41 @@ TailwindCompiler.prototype.extractCustomUtilities = function(cssText) {
     }
 
     // Fallback: detect classes inside compound selectors (e.g., aside[popover].appear-start { ... })
+    // Use brace matching to handle nested rules properly
     try {
-        const compoundRegex = /([^{}]+)\{([^}]+)\}/gm;
-        let compoundMatch;
-        while ((compoundMatch = compoundRegex.exec(cssText)) !== null) {
-            const selector = compoundMatch[1].trim();
-            const cssRules = compoundMatch[2].trim();
+        let i = 0;
+        while (i < cssText.length) {
+            // Skip whitespace
+            while (i < cssText.length && /\s/.test(cssText[i])) i++;
+            if (i >= cssText.length) break;
+            
+            // Skip at-rules
+            if (cssText[i] === '@') {
+                // Skip to next line or closing brace
+                while (i < cssText.length && cssText[i] !== '\n' && cssText[i] !== '}') i++;
+                continue;
+            }
+            
+            // Capture selector up to '{'
+            let selStart = i;
+            while (i < cssText.length && cssText[i] !== '{') i++;
+            if (i >= cssText.length) break;
+            const selector = cssText.slice(selStart, i).trim();
+            
+            // Find matching '}' with brace depth (handles nested braces)
+            i++; // skip '{'
+            let depth = 1;
+            let blockStart = i;
+            while (i < cssText.length && depth > 0) {
+                if (cssText[i] === '{') depth++;
+                else if (cssText[i] === '}') depth--;
+                i++;
+            }
+            if (depth > 0) {
+                // Malformed, skip
+                continue;
+            }
+            const cssRules = cssText.slice(blockStart, i - 1).trim();
 
             // Skip at-rules and keyframes/selectors without classes
             if (selector.startsWith('@')) continue;
@@ -1826,11 +1941,30 @@ TailwindCompiler.prototype.extractCustomUtilities = function(cssText) {
                 }
 
                 // Store the class with its full name (including ! prefix) as the key
+                // Ensure CSS is always a string
+                const cssString = ensureCssString(finalCssRules);
                 if (utilities.has(className)) {
                     const existingRules = utilities.get(className);
-                    utilities.set(className, `${existingRules}; ${finalCssRules}`);
+                    
+                    // Handle arrays properly - don't stringify them
+                    if (Array.isArray(existingRules)) {
+                        // If existing is an array, add this as a new entry
+                        // Create a simple selector entry for the compound selector
+                        utilities.set(className, [...existingRules, { 
+                            selector: `.${className}`, 
+                            css: cssString,
+                            fullBlock: true // Compound selectors often have nested rules
+                        }]);
+                    } else {
+                        // Existing is a string or object - convert to array format
+                        const existingCssString = ensureCssString(existingRules);
+                        utilities.set(className, [
+                            { selector: `.${className}`, css: existingCssString },
+                            { selector: `.${className}`, css: cssString, fullBlock: true }
+                        ]);
+                    }
                 } else {
-                    utilities.set(className, finalCssRules);
+                    utilities.set(className, cssString);
                 }
             }
         }
@@ -1930,25 +2064,34 @@ TailwindCompiler.prototype.extractCustomUtilities = function(cssText) {
                 // Store selector-aware utility so variants preserve context and pseudos
                 // Use full className (including !) as the key
                 // Preserve fullBlock flag if present
+                // Ensure CSS is always a string
+                const cssString = ensureCssString(finalCss);
                 const value = { 
                     selector: cleanedSelector, 
-                    css: finalCss,
+                    css: cssString,
                     fullBlock: rule.fullBlock || false
                 };
                 if (utilities.has(className)) {
                     const existing = utilities.get(className);
                     if (typeof existing === 'string') {
-                        utilities.set(className, [ { selector: `.${className}`, css: existing }, value ]);
+                        const existingCssString = ensureCssString(existing);
+                        utilities.set(className, [ { selector: `.${className}`, css: existingCssString }, value ]);
                     } else if (Array.isArray(existing)) {
                         const found = existing.find(e => e.selector === value.selector);
                         if (found) {
-                            found.css = `${found.css}; ${value.css}`;
+                            // Ensure both are strings before concatenating
+                            const foundCss = ensureCssString(found.css);
+                            const valueCss = ensureCssString(value.css);
+                            found.css = `${foundCss}; ${valueCss}`;
                         } else {
                             existing.push(value);
                         }
                     } else if (existing && existing.selector) {
                         if (existing.selector === value.selector) {
-                            existing.css = `${existing.css}; ${value.css}`;
+                            // Ensure both are strings before concatenating
+                            const existingCss = ensureCssString(existing.css);
+                            const valueCss = ensureCssString(value.css);
+                            existing.css = `${existingCss}; ${valueCss}`;
                             utilities.set(className, [ existing ]);
                         } else {
                             utilities.set(className, [ existing, value ]);
@@ -2117,9 +2260,11 @@ TailwindCompiler.prototype.generateUtilitiesFromVars = function(cssText, usedDat
 
                 // Check if this is an important variant
                 const isImportant = parsed.important;
+                // Ensure css is a string (handle cases where it might be an object)
+                const cssString = typeof css === 'string' ? css : (css && typeof css === 'object' && css.css ? css.css : String(css));
                 const cssContent = isImportant ? 
-                    (css.includes(';') ? css.replace(/;/g, ' !important;') : css + ' !important') : 
-                    css;
+                    (cssString.includes(';') ? cssString.replace(/;/g, ' !important;') : cssString + ' !important') : 
+                    cssString;
 
                 // Build selector by applying variants
                 let selector = `.${escapeClassName(variantClass)}`;
@@ -2258,6 +2403,12 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
         const utilities = [];
         const generatedRules = new Set();
         const { classes: usedClasses } = usedData;
+        
+        // Helper to clean up [object Object] from CSS strings
+        const cleanCssString = (css) => {
+            if (typeof css !== 'string') return css;
+            return css.replace(/\[object Object\](;?\s*)/g, '').trim();
+        };
 
         if (this.customUtilities.size === 0) {
             return '';
@@ -2268,8 +2419,110 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
             return className.replace(/[^a-zA-Z0-9-]/g, '\\$&');
         };
 
+        // Helper to replace & in CSS selectors (not in property values or comments)
+        // IMPORTANT: For CSS nesting, we should NOT replace & in nested selectors
+        // The & should remain as-is so CSS nesting works correctly
+        // This function should only be used for legacy/flattened CSS, not nested CSS
+        const replaceAmpersandInSelectors = (cssText, replacement) => {
+            // For full blocks with nested rules, don't replace & at all - preserve CSS nesting
+            // Check if this looks like nested CSS:
+            // - Has & followed by :, ., [, or whitespace then { (nested selector)
+            // - Has ] & (attribute selector followed by &, like [dir=rtl] &)
+            // - Has & on its own line followed by :, ., or [ (common nested pattern)
+            const hasNestedSelectors = 
+                /&\s*[:\.\[{]/.test(cssText) ||           // &:not(), &::before, &[attr], & {
+                /&\s*\n\s*[:\.\[{]/.test(cssText) ||      // & on new line followed by selector
+                /\]\s*&/.test(cssText) ||                 // [dir=rtl] & pattern
+                /&\s*$/.test(cssText.split('\n').find(line => line.trim().startsWith('&')) || ''); // & on its own line
+            
+            if (hasNestedSelectors) {
+                // This is nested CSS - don't replace &, preserve it as-is
+                return cssText;
+            }
+            
+            // Legacy behavior: replace & for flattened CSS (shouldn't be needed for nested CSS)
+            let result = '';
+            let i = 0;
+            let inString = false;
+            let stringChar = '';
+            let inComment = false;
+            
+            while (i < cssText.length) {
+                const char = cssText[i];
+                const nextChar = i + 1 < cssText.length ? cssText[i + 1] : '';
+                const prevChar = i > 0 ? cssText[i - 1] : '';
+                
+                // Handle strings
+                if ((char === '"' || char === "'") && !inComment) {
+                    if (!inString) {
+                        inString = true;
+                        stringChar = char;
+                    } else if (char === stringChar && prevChar !== '\\') {
+                        inString = false;
+                        stringChar = '';
+                    }
+                    result += char;
+                    i++;
+                    continue;
+                }
+                
+                if (inString) {
+                    result += char;
+                    i++;
+                    continue;
+                }
+                
+                // Handle comments
+                if (char === '/' && nextChar === '*') {
+                    inComment = true;
+                    result += char;
+                    i++;
+                    continue;
+                }
+                
+                if (inComment) {
+                    if (char === '*' && nextChar === '/') {
+                        inComment = false;
+                        result += char;
+                        i++;
+                        continue;
+                    }
+                    result += char;
+                    i++;
+                    continue;
+                }
+                
+                // Replace & when it's in a selector context (only for legacy/flattened CSS)
+                if (char === '&') {
+                    const lookAhead = cssText.slice(i + 1, Math.min(i + 10, cssText.length));
+                    const isSelector = 
+                        lookAhead.match(/^[:\.\[\+\>~,)]/) ||
+                        lookAhead.match(/^\s+[:\.\[\+\>~,{]/) ||
+                        lookAhead === '' ||
+                        lookAhead[0] === '\n' ||
+                        (prevChar === '\n' && (lookAhead[0] === ':' || lookAhead[0] === '.' || lookAhead[0] === '[' || lookAhead[0] === ' '));
+                    
+                    if (isSelector) {
+                        result += replacement;
+                        i++;
+                        continue;
+                    }
+                }
+                
+                result += char;
+                i++;
+            }
+            
+            return result;
+        };
+
         // Helper to generate a single utility with its variants
         const generateUtility = (baseClass, css, selectorInfo) => {
+            // Ensure css is a string at the start
+            if (typeof css !== 'string') {
+                css = typeof css === 'object' && css && css.css ? css.css : String(css);
+            }
+            
             // Find all variants of this base class that are actually used
             const usedVariants = usedClasses
                 .filter(cls => {
@@ -2325,9 +2578,11 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
 
                 // Check if this is an important variant
                 const isImportant = parsed.important;
+                // Ensure css is a string (handle cases where it might be an object)
+                const cssString = typeof css === 'string' ? css : (css && typeof css === 'object' && css.css ? css.css : String(css));
                 const cssContent = isImportant ? 
-                    (css.includes(';') ? css.replace(/;/g, ' !important;') : css + ' !important') : 
-                    css;
+                    (cssString.includes(';') ? cssString.replace(/;/g, ' !important;') : cssString + ' !important') : 
+                    cssString;
 
                 // Build selector by applying variants
                 let selector = `.${escapeClassName(variantClass)}`;
@@ -2377,16 +2632,22 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
 
                 // Generate the final rule
                 let rule;
+                // Ensure cssContent is a string before using it anywhere
+                let cssContentStr = typeof cssContent === 'string' ? cssContent : String(cssContent);
+                // Clean up any [object Object] that might have snuck in
+                cssContentStr = cssContentStr.replace(/\[object Object\](;?\s*)/g, '').trim();
+                
                 if (typeof selector === 'object' && selector.arbitrarySelector) {
                     // Handle arbitrary selectors with nested CSS
-                    rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContent}\n    }\n}`;
+                    rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContentStr}\n    }\n}`;
                 } else {
                     // Check if CSS is a full block (contains nested blocks like @starting-style)
-                    const isFullBlock = selectorInfo && selectorInfo.fullBlock || 
-                                       (cssContent.includes('@starting-style') || 
-                                        cssContent.includes('@media') || 
-                                        cssContent.includes('@supports') ||
-                                        cssContent.includes('{') && cssContent.includes('}'));
+                    // Use selectorInfo.fullBlock if available, otherwise check CSS content
+                    const isFullBlock = selectorInfo && selectorInfo.fullBlock !== undefined ? selectorInfo.fullBlock : 
+                                       (cssContentStr.includes('@starting-style') || 
+                                        cssContentStr.includes('@media') || 
+                                        cssContentStr.includes('@supports') ||
+                                        (cssContentStr.includes('{') && cssContentStr.includes('}')));
                     
                     // Regular selector or contextual replacement using original selector info
                     if (selectorInfo && selectorInfo.selector) {
@@ -2399,11 +2660,11 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                             // This ensures !important is only applied to the specific class
                             if (isFullBlock) {
                                 // Full block CSS includes nested content with & references
-                                // Replace & with the actual selector
-                                const resolvedCss = cssContent.replace(/&/g, selector);
+                                // Replace & in selectors with the actual selector (handles all selector contexts)
+                                const resolvedCss = replaceAmpersandInSelectors(cssContentStr, selector);
                                 rule = `${selector} {\n${resolvedCss}\n}`;
                             } else {
-                                rule = `${selector} { ${cssContent} }`;
+                                rule = `${selector} { ${cssContentStr} }`;
                             }
                         } else {
                             // For other contextual selectors, do the replacement
@@ -2414,20 +2675,20 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                                 contextual = `${selectorInfo.selector}${selector}`;
                             }
                             if (isFullBlock) {
-                                // Replace & with the contextual selector
-                                const resolvedCss = cssContent.replace(/&/g, contextual);
+                                // Replace & in selectors with the contextual selector (handles all selector contexts)
+                                const resolvedCss = replaceAmpersandInSelectors(cssContentStr, contextual);
                                 rule = `${contextual} {\n${resolvedCss}\n}`;
                             } else {
-                                rule = `${contextual} { ${cssContent} }`;
+                                rule = `${contextual} { ${cssContentStr} }`;
                             }
                         }
                     } else {
                         if (isFullBlock) {
-                            // Replace & with the actual selector
-                            const resolvedCss = cssContent.replace(/&/g, selector);
+                            // Replace & in selectors with the actual selector (handles all selector contexts)
+                            const resolvedCss = replaceAmpersandInSelectors(cssContentStr, selector);
                             rule = `${selector} {\n${resolvedCss}\n}`;
                         } else {
-                            rule = `${selector} { ${cssContent} }`;
+                            rule = `${selector} { ${cssContentStr} }`;
                         }
                     }
                 }
@@ -2475,11 +2736,18 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                 // But we need to pass the base class name to generateUtility
                 let normalizedCss = cssOrSelector;
                 if (typeof cssOrSelector === 'string') {
-                    normalizedCss = cssOrSelector;
+                    normalizedCss = cleanCssString(cssOrSelector);
                 } else if (Array.isArray(cssOrSelector)) {
                     // For arrays, we'll handle each entry separately below
                 } else if (cssOrSelector && cssOrSelector.css) {
-                    normalizedCss = cssOrSelector.css;
+                    // Ensure we extract the CSS string, not an object
+                    const extracted = typeof cssOrSelector.css === 'string' ? cssOrSelector.css : 
+                                   (cssOrSelector.css && typeof cssOrSelector.css === 'object' && cssOrSelector.css.css ? cssOrSelector.css.css : 
+                                   String(cssOrSelector.css));
+                    normalizedCss = cleanCssString(extracted);
+                } else {
+                    // Fallback: convert to string
+                    normalizedCss = cleanCssString(String(cssOrSelector));
                 }
                 
                 // Generate utility with base class name (without !)
@@ -2489,14 +2757,26 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                 } else if (Array.isArray(cssOrSelector)) {
                     for (const entry of cssOrSelector) {
                         if (entry && entry.css && entry.selector) {
-                            generateUtility(baseClassName, entry.css, { 
+                            // Ensure entry.css is a string (not an object)
+                            const extracted = typeof entry.css === 'string' ? entry.css : 
+                                           (entry.css && typeof entry.css === 'object' && entry.css.css ? entry.css.css : 
+                                           String(entry.css));
+                            const entryCss = cleanCssString(extracted);
+                            
+                            generateUtility(baseClassName, entryCss, { 
                                 selector: entry.selector,
                                 fullBlock: entry.fullBlock || false
                             });
                         }
                     }
                 } else if (cssOrSelector && cssOrSelector.css && cssOrSelector.selector) {
-                    generateUtility(baseClassName, cssOrSelector.css, { 
+                    // Ensure cssOrSelector.css is a string (not an object)
+                    const extracted = typeof cssOrSelector.css === 'string' ? cssOrSelector.css : 
+                                      (cssOrSelector.css && typeof cssOrSelector.css === 'object' && cssOrSelector.css.css ? cssOrSelector.css.css : 
+                                      String(cssOrSelector.css));
+                    const selectorCss = cleanCssString(extracted);
+                    
+                    generateUtility(baseClassName, selectorCss, { 
                         selector: cssOrSelector.selector,
                         fullBlock: cssOrSelector.fullBlock || false
                     });

@@ -56,9 +56,11 @@ TailwindCompiler.prototype.generateUtilitiesFromVars = function(cssText, usedDat
 
                 // Check if this is an important variant
                 const isImportant = parsed.important;
+                // Ensure css is a string (handle cases where it might be an object)
+                const cssString = typeof css === 'string' ? css : (css && typeof css === 'object' && css.css ? css.css : String(css));
                 const cssContent = isImportant ? 
-                    (css.includes(';') ? css.replace(/;/g, ' !important;') : css + ' !important') : 
-                    css;
+                    (cssString.includes(';') ? cssString.replace(/;/g, ' !important;') : cssString + ' !important') : 
+                    cssString;
 
                 // Build selector by applying variants
                 let selector = `.${escapeClassName(variantClass)}`;
@@ -197,6 +199,12 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
         const utilities = [];
         const generatedRules = new Set();
         const { classes: usedClasses } = usedData;
+        
+        // Helper to clean up [object Object] from CSS strings
+        const cleanCssString = (css) => {
+            if (typeof css !== 'string') return css;
+            return css.replace(/\[object Object\](;?\s*)/g, '').trim();
+        };
 
         if (this.customUtilities.size === 0) {
             return '';
@@ -207,8 +215,110 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
             return className.replace(/[^a-zA-Z0-9-]/g, '\\$&');
         };
 
+        // Helper to replace & in CSS selectors (not in property values or comments)
+        // IMPORTANT: For CSS nesting, we should NOT replace & in nested selectors
+        // The & should remain as-is so CSS nesting works correctly
+        // This function should only be used for legacy/flattened CSS, not nested CSS
+        const replaceAmpersandInSelectors = (cssText, replacement) => {
+            // For full blocks with nested rules, don't replace & at all - preserve CSS nesting
+            // Check if this looks like nested CSS:
+            // - Has & followed by :, ., [, or whitespace then { (nested selector)
+            // - Has ] & (attribute selector followed by &, like [dir=rtl] &)
+            // - Has & on its own line followed by :, ., or [ (common nested pattern)
+            const hasNestedSelectors = 
+                /&\s*[:\.\[{]/.test(cssText) ||           // &:not(), &::before, &[attr], & {
+                /&\s*\n\s*[:\.\[{]/.test(cssText) ||      // & on new line followed by selector
+                /\]\s*&/.test(cssText) ||                 // [dir=rtl] & pattern
+                /&\s*$/.test(cssText.split('\n').find(line => line.trim().startsWith('&')) || ''); // & on its own line
+            
+            if (hasNestedSelectors) {
+                // This is nested CSS - don't replace &, preserve it as-is
+                return cssText;
+            }
+            
+            // Legacy behavior: replace & for flattened CSS (shouldn't be needed for nested CSS)
+            let result = '';
+            let i = 0;
+            let inString = false;
+            let stringChar = '';
+            let inComment = false;
+            
+            while (i < cssText.length) {
+                const char = cssText[i];
+                const nextChar = i + 1 < cssText.length ? cssText[i + 1] : '';
+                const prevChar = i > 0 ? cssText[i - 1] : '';
+                
+                // Handle strings
+                if ((char === '"' || char === "'") && !inComment) {
+                    if (!inString) {
+                        inString = true;
+                        stringChar = char;
+                    } else if (char === stringChar && prevChar !== '\\') {
+                        inString = false;
+                        stringChar = '';
+                    }
+                    result += char;
+                    i++;
+                    continue;
+                }
+                
+                if (inString) {
+                    result += char;
+                    i++;
+                    continue;
+                }
+                
+                // Handle comments
+                if (char === '/' && nextChar === '*') {
+                    inComment = true;
+                    result += char;
+                    i++;
+                    continue;
+                }
+                
+                if (inComment) {
+                    if (char === '*' && nextChar === '/') {
+                        inComment = false;
+                        result += char;
+                        i++;
+                        continue;
+                    }
+                    result += char;
+                    i++;
+                    continue;
+                }
+                
+                // Replace & when it's in a selector context (only for legacy/flattened CSS)
+                if (char === '&') {
+                    const lookAhead = cssText.slice(i + 1, Math.min(i + 10, cssText.length));
+                    const isSelector = 
+                        lookAhead.match(/^[:\.\[\+\>~,)]/) ||
+                        lookAhead.match(/^\s+[:\.\[\+\>~,{]/) ||
+                        lookAhead === '' ||
+                        lookAhead[0] === '\n' ||
+                        (prevChar === '\n' && (lookAhead[0] === ':' || lookAhead[0] === '.' || lookAhead[0] === '[' || lookAhead[0] === ' '));
+                    
+                    if (isSelector) {
+                        result += replacement;
+                        i++;
+                        continue;
+                    }
+                }
+                
+                result += char;
+                i++;
+            }
+            
+            return result;
+        };
+
         // Helper to generate a single utility with its variants
         const generateUtility = (baseClass, css, selectorInfo) => {
+            // Ensure css is a string at the start
+            if (typeof css !== 'string') {
+                css = typeof css === 'object' && css && css.css ? css.css : String(css);
+            }
+            
             // Find all variants of this base class that are actually used
             const usedVariants = usedClasses
                 .filter(cls => {
@@ -264,9 +374,11 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
 
                 // Check if this is an important variant
                 const isImportant = parsed.important;
+                // Ensure css is a string (handle cases where it might be an object)
+                const cssString = typeof css === 'string' ? css : (css && typeof css === 'object' && css.css ? css.css : String(css));
                 const cssContent = isImportant ? 
-                    (css.includes(';') ? css.replace(/;/g, ' !important;') : css + ' !important') : 
-                    css;
+                    (cssString.includes(';') ? cssString.replace(/;/g, ' !important;') : cssString + ' !important') : 
+                    cssString;
 
                 // Build selector by applying variants
                 let selector = `.${escapeClassName(variantClass)}`;
@@ -316,16 +428,22 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
 
                 // Generate the final rule
                 let rule;
+                // Ensure cssContent is a string before using it anywhere
+                let cssContentStr = typeof cssContent === 'string' ? cssContent : String(cssContent);
+                // Clean up any [object Object] that might have snuck in
+                cssContentStr = cssContentStr.replace(/\[object Object\](;?\s*)/g, '').trim();
+                
                 if (typeof selector === 'object' && selector.arbitrarySelector) {
                     // Handle arbitrary selectors with nested CSS
-                    rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContent}\n    }\n}`;
+                    rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContentStr}\n    }\n}`;
                 } else {
                     // Check if CSS is a full block (contains nested blocks like @starting-style)
-                    const isFullBlock = selectorInfo && selectorInfo.fullBlock || 
-                                       (cssContent.includes('@starting-style') || 
-                                        cssContent.includes('@media') || 
-                                        cssContent.includes('@supports') ||
-                                        cssContent.includes('{') && cssContent.includes('}'));
+                    // Use selectorInfo.fullBlock if available, otherwise check CSS content
+                    const isFullBlock = selectorInfo && selectorInfo.fullBlock !== undefined ? selectorInfo.fullBlock : 
+                                       (cssContentStr.includes('@starting-style') || 
+                                        cssContentStr.includes('@media') || 
+                                        cssContentStr.includes('@supports') ||
+                                        (cssContentStr.includes('{') && cssContentStr.includes('}')));
                     
                     // Regular selector or contextual replacement using original selector info
                     if (selectorInfo && selectorInfo.selector) {
@@ -338,11 +456,11 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                             // This ensures !important is only applied to the specific class
                             if (isFullBlock) {
                                 // Full block CSS includes nested content with & references
-                                // Replace & with the actual selector
-                                const resolvedCss = cssContent.replace(/&/g, selector);
+                                // Replace & in selectors with the actual selector (handles all selector contexts)
+                                const resolvedCss = replaceAmpersandInSelectors(cssContentStr, selector);
                                 rule = `${selector} {\n${resolvedCss}\n}`;
                             } else {
-                                rule = `${selector} { ${cssContent} }`;
+                                rule = `${selector} { ${cssContentStr} }`;
                             }
                         } else {
                             // For other contextual selectors, do the replacement
@@ -353,20 +471,20 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                                 contextual = `${selectorInfo.selector}${selector}`;
                             }
                             if (isFullBlock) {
-                                // Replace & with the contextual selector
-                                const resolvedCss = cssContent.replace(/&/g, contextual);
+                                // Replace & in selectors with the contextual selector (handles all selector contexts)
+                                const resolvedCss = replaceAmpersandInSelectors(cssContentStr, contextual);
                                 rule = `${contextual} {\n${resolvedCss}\n}`;
                             } else {
-                                rule = `${contextual} { ${cssContent} }`;
+                                rule = `${contextual} { ${cssContentStr} }`;
                             }
                         }
                     } else {
                         if (isFullBlock) {
-                            // Replace & with the actual selector
-                            const resolvedCss = cssContent.replace(/&/g, selector);
+                            // Replace & in selectors with the actual selector (handles all selector contexts)
+                            const resolvedCss = replaceAmpersandInSelectors(cssContentStr, selector);
                             rule = `${selector} {\n${resolvedCss}\n}`;
                         } else {
-                            rule = `${selector} { ${cssContent} }`;
+                            rule = `${selector} { ${cssContentStr} }`;
                         }
                     }
                 }
@@ -414,11 +532,18 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                 // But we need to pass the base class name to generateUtility
                 let normalizedCss = cssOrSelector;
                 if (typeof cssOrSelector === 'string') {
-                    normalizedCss = cssOrSelector;
+                    normalizedCss = cleanCssString(cssOrSelector);
                 } else if (Array.isArray(cssOrSelector)) {
                     // For arrays, we'll handle each entry separately below
                 } else if (cssOrSelector && cssOrSelector.css) {
-                    normalizedCss = cssOrSelector.css;
+                    // Ensure we extract the CSS string, not an object
+                    const extracted = typeof cssOrSelector.css === 'string' ? cssOrSelector.css : 
+                                   (cssOrSelector.css && typeof cssOrSelector.css === 'object' && cssOrSelector.css.css ? cssOrSelector.css.css : 
+                                   String(cssOrSelector.css));
+                    normalizedCss = cleanCssString(extracted);
+                } else {
+                    // Fallback: convert to string
+                    normalizedCss = cleanCssString(String(cssOrSelector));
                 }
                 
                 // Generate utility with base class name (without !)
@@ -428,14 +553,26 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                 } else if (Array.isArray(cssOrSelector)) {
                     for (const entry of cssOrSelector) {
                         if (entry && entry.css && entry.selector) {
-                            generateUtility(baseClassName, entry.css, { 
+                            // Ensure entry.css is a string (not an object)
+                            const extracted = typeof entry.css === 'string' ? entry.css : 
+                                           (entry.css && typeof entry.css === 'object' && entry.css.css ? entry.css.css : 
+                                           String(entry.css));
+                            const entryCss = cleanCssString(extracted);
+                            
+                            generateUtility(baseClassName, entryCss, { 
                                 selector: entry.selector,
                                 fullBlock: entry.fullBlock || false
                             });
                         }
                     }
                 } else if (cssOrSelector && cssOrSelector.css && cssOrSelector.selector) {
-                    generateUtility(baseClassName, cssOrSelector.css, { 
+                    // Ensure cssOrSelector.css is a string (not an object)
+                    const extracted = typeof cssOrSelector.css === 'string' ? cssOrSelector.css : 
+                                      (cssOrSelector.css && typeof cssOrSelector.css === 'object' && cssOrSelector.css.css ? cssOrSelector.css.css : 
+                                      String(cssOrSelector.css));
+                    const selectorCss = cleanCssString(extracted);
+                    
+                    generateUtility(baseClassName, selectorCss, { 
                         selector: cssOrSelector.selector,
                         fullBlock: cssOrSelector.fullBlock || false
                     });
