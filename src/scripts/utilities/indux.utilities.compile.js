@@ -320,6 +320,13 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                     // Handle arbitrary selectors with nested CSS
                     rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContent}\n    }\n}`;
                 } else {
+                    // Check if CSS is a full block (contains nested blocks like @starting-style)
+                    const isFullBlock = selectorInfo && selectorInfo.fullBlock || 
+                                       (cssContent.includes('@starting-style') || 
+                                        cssContent.includes('@media') || 
+                                        cssContent.includes('@supports') ||
+                                        cssContent.includes('{') && cssContent.includes('}'));
+                    
                     // Regular selector or contextual replacement using original selector info
                     if (selectorInfo && selectorInfo.selector) {
                         // If the original selector contains :where(), don't try to modify it
@@ -329,7 +336,14 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                         if (selectorInfo.selector.includes(':where(')) {
                             // For :where() selectors, generate individual class selector
                             // This ensures !important is only applied to the specific class
-                            rule = `${selector} { ${cssContent} }`;
+                            if (isFullBlock) {
+                                // Full block CSS includes nested content with & references
+                                // Replace & with the actual selector
+                                const resolvedCss = cssContent.replace(/&/g, selector);
+                                rule = `${selector} {\n${resolvedCss}\n}`;
+                            } else {
+                                rule = `${selector} { ${cssContent} }`;
+                            }
                         } else {
                             // For other contextual selectors, do the replacement
                             const contextualRe = new RegExp(`\\.${baseClass}(?=[^a-zA-Z0-9_-]|$)`);
@@ -338,10 +352,22 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                                 // Fallback when base token not directly present
                                 contextual = `${selectorInfo.selector}${selector}`;
                             }
-                            rule = `${contextual} { ${cssContent} }`;
+                            if (isFullBlock) {
+                                // Replace & with the contextual selector
+                                const resolvedCss = cssContent.replace(/&/g, contextual);
+                                rule = `${contextual} {\n${resolvedCss}\n}`;
+                            } else {
+                                rule = `${contextual} { ${cssContent} }`;
+                            }
                         }
                     } else {
-                        rule = `${selector} { ${cssContent} }`;
+                        if (isFullBlock) {
+                            // Replace & with the actual selector
+                            const resolvedCss = cssContent.replace(/&/g, selector);
+                            rule = `${selector} {\n${resolvedCss}\n}`;
+                        } else {
+                            rule = `${selector} { ${cssContent} }`;
+                        }
                     }
                 }
                 
@@ -402,11 +428,17 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                 } else if (Array.isArray(cssOrSelector)) {
                     for (const entry of cssOrSelector) {
                         if (entry && entry.css && entry.selector) {
-                            generateUtility(baseClassName, entry.css, { selector: entry.selector });
+                            generateUtility(baseClassName, entry.css, { 
+                                selector: entry.selector,
+                                fullBlock: entry.fullBlock || false
+                            });
                         }
                     }
                 } else if (cssOrSelector && cssOrSelector.css && cssOrSelector.selector) {
-                    generateUtility(baseClassName, cssOrSelector.css, { selector: cssOrSelector.selector });
+                    generateUtility(baseClassName, cssOrSelector.css, { 
+                        selector: cssOrSelector.selector,
+                        fullBlock: cssOrSelector.fullBlock || false
+                    });
                 }
             }
         }

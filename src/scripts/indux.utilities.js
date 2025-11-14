@@ -1844,7 +1844,8 @@ TailwindCompiler.prototype.extractCustomUtilities = function(cssText) {
         const rules = [];
 
         // Minimal nested CSS resolver: scans and builds combined selectors
-        const resolveNested = (text, parentSelector = '') => {
+        // Only stores top-level rules with their full block content (including nested blocks)
+        const resolveNested = (text, parentSelector = '', isTopLevel = true) => {
             let i = 0;
             while (i < text.length) {
                 // Skip whitespace
@@ -1873,38 +1874,18 @@ TailwindCompiler.prototype.extractCustomUtilities = function(cssText) {
                     ? rawSelector.replace(/&/g, parentSelector).trim()
                     : rawSelector.trim();
 
-                // Extract immediate declarations (ignore nested blocks and at-rules)
-                const extractTopLevelDecls = (content) => {
-                    let decl = '';
-                    let depth = 0;
-                    let i2 = 0;
-                    while (i2 < content.length) {
-                        const ch = content[i2];
-                        if (ch === '{') { depth++; i2++; continue; }
-                        if (ch === '}') { depth--; i2++; continue; }
-                        if (depth === 0) {
-                            decl += ch;
-                        }
-                        i2++;
+                // Only store top-level rules (not nested blocks) with their full content
+                // This preserves @starting-style and other nested at-rules in the CSS
+                if (isTopLevel) {
+                    const fullBlock = block.trim();
+                    if (fullBlock) {
+                        rules.push({ selector: combinedSelector, css: fullBlock, fullBlock: true });
                     }
-                    // Remove comments and trim whitespace
-                    decl = decl.replace(/\/\*[^]*?\*\//g, '').trim();
-                    // Remove at-rules at top-level within block (e.g., @starting-style)
-                    decl = decl.split(';')
-                        .map(s => s.trim())
-                        .filter(s => s && !s.startsWith('@') && s.includes(':'))
-                        .join('; ');
-                    if (decl && !decl.endsWith(';')) decl += ';';
-                    return decl;
-                };
-
-                const declText = extractTopLevelDecls(block);
-                if (declText) {
-                    rules.push({ selector: combinedSelector, css: declText });
                 }
 
-                // Recurse into nested blocks with current selector as parent
-                resolveNested(block, combinedSelector);
+                // Recurse into nested blocks but don't store them separately
+                // They're already included in the parent block's CSS
+                resolveNested(block, combinedSelector, false);
             }
         };
 
@@ -1948,7 +1929,12 @@ TailwindCompiler.prototype.extractCustomUtilities = function(cssText) {
 
                 // Store selector-aware utility so variants preserve context and pseudos
                 // Use full className (including !) as the key
-                const value = { selector: cleanedSelector, css: finalCss };
+                // Preserve fullBlock flag if present
+                const value = { 
+                    selector: cleanedSelector, 
+                    css: finalCss,
+                    fullBlock: rule.fullBlock || false
+                };
                 if (utilities.has(className)) {
                     const existing = utilities.get(className);
                     if (typeof existing === 'string') {
@@ -2395,6 +2381,13 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                     // Handle arbitrary selectors with nested CSS
                     rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContent}\n    }\n}`;
                 } else {
+                    // Check if CSS is a full block (contains nested blocks like @starting-style)
+                    const isFullBlock = selectorInfo && selectorInfo.fullBlock || 
+                                       (cssContent.includes('@starting-style') || 
+                                        cssContent.includes('@media') || 
+                                        cssContent.includes('@supports') ||
+                                        cssContent.includes('{') && cssContent.includes('}'));
+                    
                     // Regular selector or contextual replacement using original selector info
                     if (selectorInfo && selectorInfo.selector) {
                         // If the original selector contains :where(), don't try to modify it
@@ -2404,7 +2397,14 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                         if (selectorInfo.selector.includes(':where(')) {
                             // For :where() selectors, generate individual class selector
                             // This ensures !important is only applied to the specific class
-                            rule = `${selector} { ${cssContent} }`;
+                            if (isFullBlock) {
+                                // Full block CSS includes nested content with & references
+                                // Replace & with the actual selector
+                                const resolvedCss = cssContent.replace(/&/g, selector);
+                                rule = `${selector} {\n${resolvedCss}\n}`;
+                            } else {
+                                rule = `${selector} { ${cssContent} }`;
+                            }
                         } else {
                             // For other contextual selectors, do the replacement
                             const contextualRe = new RegExp(`\\.${baseClass}(?=[^a-zA-Z0-9_-]|$)`);
@@ -2413,10 +2413,22 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                                 // Fallback when base token not directly present
                                 contextual = `${selectorInfo.selector}${selector}`;
                             }
-                            rule = `${contextual} { ${cssContent} }`;
+                            if (isFullBlock) {
+                                // Replace & with the contextual selector
+                                const resolvedCss = cssContent.replace(/&/g, contextual);
+                                rule = `${contextual} {\n${resolvedCss}\n}`;
+                            } else {
+                                rule = `${contextual} { ${cssContent} }`;
+                            }
                         }
                     } else {
-                        rule = `${selector} { ${cssContent} }`;
+                        if (isFullBlock) {
+                            // Replace & with the actual selector
+                            const resolvedCss = cssContent.replace(/&/g, selector);
+                            rule = `${selector} {\n${resolvedCss}\n}`;
+                        } else {
+                            rule = `${selector} { ${cssContent} }`;
+                        }
                     }
                 }
                 
@@ -2477,11 +2489,17 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                 } else if (Array.isArray(cssOrSelector)) {
                     for (const entry of cssOrSelector) {
                         if (entry && entry.css && entry.selector) {
-                            generateUtility(baseClassName, entry.css, { selector: entry.selector });
+                            generateUtility(baseClassName, entry.css, { 
+                                selector: entry.selector,
+                                fullBlock: entry.fullBlock || false
+                            });
                         }
                     }
                 } else if (cssOrSelector && cssOrSelector.css && cssOrSelector.selector) {
-                    generateUtility(baseClassName, cssOrSelector.css, { selector: cssOrSelector.selector });
+                    generateUtility(baseClassName, cssOrSelector.css, { 
+                        selector: cssOrSelector.selector,
+                        fullBlock: cssOrSelector.fullBlock || false
+                    });
                 }
             }
         }
