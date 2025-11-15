@@ -37,6 +37,7 @@ function createVariants() {
         'optional': ':optional',
         'user-valid': ':user-valid',
         'user-invalid': ':user-invalid',
+        'inert': ':inert',
         'open': ':is([open], :popover-open, :open) &',
         'closed': ':not(:is([open], :popover-open, :open)) &',
         'paused': '[data-state="paused"] &',

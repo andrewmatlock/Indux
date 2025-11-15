@@ -76,27 +76,10 @@ TailwindCompiler.prototype.generateUtilitiesFromVars = function(cssText, usedDat
                         arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
                         selector = { baseClass: selector, arbitrarySelector };
                     } else if (variant.selector.includes('&')) {
-                        let nestedSelector = variant.selector;
-                        if (nestedSelector.includes(',')) {
-                            nestedSelector = nestedSelector
-                                .split(',')
-                                .map(s => {
-                                    const trimmed = s.trim();
-                                    if (trimmed.includes('&')) {
-                                        return '&' + trimmed.replace(/\s*&\s*/g, '');
-                                    }
-                                    return '&' + trimmed;
-                                })
-                                .join(', ');
-                        } else {
-                            nestedSelector = nestedSelector.replace(/\s*&\s*/g, '');
-                            if (!nestedSelector.startsWith('&')) {
-                                nestedSelector = '&' + nestedSelector;
-                            } else {
-                                nestedSelector = nestedSelector.replace(/^&\s*/, '&');
-                            }
-                        }
-                        selector = { baseClass: selector, arbitrarySelector: nestedSelector };
+                        // Handle variants like .dark &, .light &, .group &, etc.
+                        // Replace & with the actual selector
+                        const replacedSelector = variant.selector.replace(/&/g, selector);
+                        selector = replacedSelector;
                     } else if (variant.selector.startsWith(':')) {
                         // For pseudo-classes, append to selector
                         selector = `${selector}${variant.selector}`;
@@ -395,27 +378,10 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                         
                         selector = { baseClass: selector, arbitrarySelector };
                     } else if (variant.selector.includes('&')) {
-                        let nestedSelector = variant.selector;
-                        if (nestedSelector.includes(',')) {
-                            nestedSelector = nestedSelector
-                                .split(',')
-                                .map(s => {
-                                    const trimmed = s.trim();
-                                    if (trimmed.includes('&')) {
-                                        return '&' + trimmed.replace(/\s*&\s*/g, '');
-                                    }
-                                    return '&' + trimmed;
-                                })
-                                .join(', ');
-                        } else {
-                            nestedSelector = nestedSelector.replace(/\s*&\s*/g, '');
-                            if (!nestedSelector.startsWith('&')) {
-                                nestedSelector = '&' + nestedSelector;
-                            } else {
-                                nestedSelector = nestedSelector.replace(/^&\s*/, '&');
-                            }
-                        }
-                        selector = { baseClass: selector, arbitrarySelector: nestedSelector };
+                        // Handle variants like .dark &, .light &, .group &, etc.
+                        // Replace & with the actual selector
+                        const replacedSelector = variant.selector.replace(/&/g, selector);
+                        selector = replacedSelector;
                     } else if (variant.selector.startsWith(':')) {
                         // For pseudo-classes, append to selector
                         selector = `${selector}${variant.selector}`;
