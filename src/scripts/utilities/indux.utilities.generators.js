@@ -15,6 +15,9 @@ function createUtilityGenerators() {
             addUtility('ring', 'box-shadow', `0 0 0 1px ${value}`);
             addUtility('fill', 'fill', value);
             addUtility('stroke', 'stroke', value);
+            addUtility('decoration', 'text-decoration-color', value);
+            addUtility('accent', 'accent-color', value);
+            addUtility('caret', 'caret-color', value);
             return utilities;
         },
         'font-': (suffix, value) => [

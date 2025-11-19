@@ -300,9 +300,17 @@ var Indux = (function (exports) {
     	            }
     	        });
     	        // After rendering, copy all attributes from the original placeholder to the first top-level element
+    	        // Note: This block ensures the first element has all attributes, including those that might have been
+    	        // skipped by the first loop due to conditions. Classes are already handled in the first loop, so we skip them here.
     	        if (topLevelElements.length > 0) {
     	            const firstRoot = topLevelElements[0];
     	            Array.from(element.attributes).forEach(attr => {
+    	                // Skip attributes that were already handled in the first loop
+    	                // Classes are always handled in the first loop, so skip them here to avoid duplication
+    	                if (attr.name === 'class') {
+    	                    return; // Skip - already handled in first loop
+    	                }
+
     	                // Preserve important attributes including data-order, x-route, and other routing/data attributes
     	                const preserveAttributes = [
     	                    'data-order', 'x-route', 'data-component', 'data-head',
@@ -312,8 +320,40 @@ var Indux = (function (exports) {
     	                    attr.name === preserveAttr || attr.name.startsWith(preserveAttr.replace('*', ''))
     	                );
 
-    	                if (!['data-original-placeholder', 'data-pre-rendered', 'data-processed'].includes(attr.name) || shouldPreserve) {
-    	                    firstRoot.setAttribute(attr.name, attr.value);
+    	                // Check if this attribute was already handled in the first loop
+    	                const alreadyHandledInFirstLoop = 
+    	                    attr.name.startsWith('x-') || attr.name.startsWith(':') || attr.name.startsWith('@') ||
+    	                    (attr.name !== name && !attr.name.startsWith('data-')) ||
+    	                    attr.name === 'data-order' || attr.name === 'x-route' || attr.name === 'data-head';
+
+    	                // Only apply if: (1) it wasn't handled in first loop, OR (2) it should be preserved, AND (3) it's not in the skip list
+    	                if ((!alreadyHandledInFirstLoop || shouldPreserve) && 
+    	                    !['data-original-placeholder', 'data-pre-rendered', 'data-processed'].includes(attr.name)) {
+    	                    if (attr.name.startsWith('x-') || attr.name.startsWith(':') || attr.name.startsWith('@')) {
+    	                        // For Alpine directives, merge if they already exist (for x-data, combine objects)
+    	                        if (attr.name === 'x-data' && firstRoot.hasAttribute('x-data')) {
+    	                            // For x-data, we need to merge the objects - this is complex, so for now we'll append
+    	                            // The user should structure their x-data to avoid conflicts
+    	                            const existing = firstRoot.getAttribute('x-data');
+    	                            // If both are objects, try to merge them
+    	                            if (existing.trim().startsWith('{') && attr.value.trim().startsWith('{')) {
+    	                                // Remove outer braces and merge
+    	                                const existingContent = existing.trim().slice(1, -1).trim();
+    	                                const newContent = attr.value.trim().slice(1, -1).trim();
+    	                                const merged = `{ ${existingContent}${existingContent && newContent ? ', ' : ''}${newContent} }`;
+    	                                firstRoot.setAttribute('x-data', merged);
+    	                            } else {
+    	                                // If not both objects, replace (user should handle this case)
+    	                                firstRoot.setAttribute(attr.name, attr.value);
+    	                            }
+    	                        } else {
+    	                            // For other Alpine directives, replace if they exist
+    	                            firstRoot.setAttribute(attr.name, attr.value);
+    	                        }
+    	                    } else {
+    	                        // For other attributes, replace if they exist
+    	                        firstRoot.setAttribute(attr.name, attr.value);
+    	                    }
     	                }
     	            });
     	        }
@@ -11534,6 +11574,9 @@ var Indux = (function (exports) {
                 addUtility('ring', 'box-shadow', `0 0 0 1px ${value}`);
                 addUtility('fill', 'fill', value);
                 addUtility('stroke', 'stroke', value);
+                addUtility('decoration', 'text-decoration-color', value);
+                addUtility('accent', 'accent-color', value);
+                addUtility('caret', 'caret-color', value);
                 return utilities;
             },
             'font-': (suffix, value) => [

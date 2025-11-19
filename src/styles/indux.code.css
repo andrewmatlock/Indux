@@ -244,6 +244,7 @@
         line-height: inherit;
         color: inherit;
         background-color: transparent;
+        border: 0 none;
 
         & span {
             vertical-align: initial
