@@ -1,6 +1,6 @@
 {
     "name": "@indux/indux",
-    "version": "0.5.13",
+    "version": "0.5.14",
     "private": false,
     "workspaces": [
         "templates/starter"
