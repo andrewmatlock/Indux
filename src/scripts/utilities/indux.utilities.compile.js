@@ -70,11 +70,18 @@ TailwindCompiler.prototype.generateUtilitiesFromVars = function(cssText, usedDat
                 for (const variant of parsed.variants) {
                     if (variant.isArbitrary) {
                         // Handle arbitrary selectors like [&_figure] or [&_fieldset:has(legend):not(.whatever)]
-                        // Convert underscores to spaces, but be careful with complex selectors
+                        // For selectors starting with &, replace & with the base class and use as regular selector
                         let arbitrarySelector = variant.selector;
                         
-                        arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
-                        selector = { baseClass: selector, arbitrarySelector };
+                        if (arbitrarySelector.startsWith('&')) {
+                            // Replace & with the base class selector and convert _ to spaces
+                            arbitrarySelector = arbitrarySelector.replace(/_/g, ' ').replace(/&/g, selector);
+                            selector = arbitrarySelector;
+                        } else {
+                            // For other arbitrary selectors (like data attributes), use nested CSS
+                            arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
+                            selector = { baseClass: selector, arbitrarySelector };
+                        }
                     } else if (variant.selector.includes('&')) {
                         // Handle variants like .dark &, .light &, .group &, etc.
                         // Replace & with the actual selector
@@ -93,7 +100,7 @@ TailwindCompiler.prototype.generateUtilitiesFromVars = function(cssText, usedDat
                 // Generate the final rule
                 let rule;
                 if (typeof selector === 'object' && selector.arbitrarySelector) {
-                    // Handle arbitrary selectors with nested CSS
+                    // Handle arbitrary selectors with nested CSS (for non-& selectors)
                     rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContent}\n    }\n}`;
                 } else {
                     // Regular selector
@@ -371,12 +378,18 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                 for (const variant of parsed.variants) {
                     if (variant.isArbitrary) {
                         // Handle arbitrary selectors like [&_figure] or [&_fieldset:has(legend):not(.whatever)]
+                        // For selectors starting with &, replace & with the base class and use as regular selector
                         let arbitrarySelector = variant.selector;
                         
-                        // Replace underscores with spaces, but preserve them inside parentheses
-                        arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
-                        
-                        selector = { baseClass: selector, arbitrarySelector };
+                        if (arbitrarySelector.startsWith('&')) {
+                            // Replace & with the base class selector and convert _ to spaces
+                            arbitrarySelector = arbitrarySelector.replace(/_/g, ' ').replace(/&/g, selector);
+                            selector = arbitrarySelector;
+                        } else {
+                            // For other arbitrary selectors (like data attributes), use nested CSS
+                            arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
+                            selector = { baseClass: selector, arbitrarySelector };
+                        }
                     } else if (variant.selector.includes('&')) {
                         // Handle variants like .dark &, .light &, .group &, etc.
                         // Replace & with the actual selector
@@ -400,7 +413,7 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                 cssContentStr = cssContentStr.replace(/\[object Object\](;?\s*)/g, '').trim();
                 
                 if (typeof selector === 'object' && selector.arbitrarySelector) {
-                    // Handle arbitrary selectors with nested CSS
+                    // Handle arbitrary selectors with nested CSS (for non-& selectors)
                     rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContentStr}\n    }\n}`;
                 } else {
                     // Check if CSS is a full block (contains nested blocks like @starting-style)

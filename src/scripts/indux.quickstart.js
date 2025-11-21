@@ -2785,7 +2785,17 @@ ${H}`)
 
       // Process variants in order (left to right)
       result.variants = parts.map(variant => {
-          // Check for arbitrary selector variants [&_selector]
+          // FIRST: Check for exact variant matches (most common case)
+          const exactSelector = this.variants[variant];
+          if (exactSelector) {
+              return {
+                  name: variant,
+                  selector: exactSelector,
+                  isArbitrary: false
+              };
+          }
+          
+          // SECOND: Check for arbitrary selector variants [&_selector]
           if (variant.startsWith('[') && variant.endsWith(']')) {
               const arbitrarySelector = variant.slice(1, -1); // Remove brackets
               if (arbitrarySelector.startsWith('&')) {
@@ -2795,18 +2805,83 @@ ${H}`)
                       isArbitrary: true
                   };
               }
+              // Handle arbitrary data variants like [data-state=active]
+              if (arbitrarySelector.startsWith('data-')) {
+                  return {
+                      name: variant,
+                      selector: `[${arbitrarySelector}] &`,
+                      isArbitrary: true
+                  };
+              }
           }
           
-          const selector = this.variants[variant];
-          if (!selector) {
-              console.warn(`Unknown variant: ${variant}`);
-              return null;
+          // THIRD: Handle parameterized variants (only if exact match not found)
+          
+          // Handle data-[...] variants like data-[state=active] (not starting with bracket)
+          // These should be regular attribute selectors, not arbitrary
+          const dataMatch = variant.match(/^data-\[(.+)\]$/);
+          if (dataMatch) {
+              const attrValue = dataMatch[1];
+              // Add quotes around the value if it contains = (e.g., state=active -> state="active")
+              const quotedValue = attrValue.includes('=') 
+                  ? attrValue.replace(/^([^=]+)=(.+)$/, '$1="$2"')
+                  : attrValue;
+              return {
+                  name: variant,
+                  selector: `[data-${quotedValue}] &`,
+                  isArbitrary: false
+              };
           }
-          return {
-              name: variant,
-              selector: selector,
-              isArbitrary: false
-          };
+          
+          // Handle parameterized nth variants: nth-3, nth-last-2, nth-of-type-2, nth-last-of-type-2
+          const nthMatch = variant.match(/^(nth|nth-last|nth-of-type|nth-last-of-type)-(\d+)$/);
+          if (nthMatch) {
+              const baseVariant = nthMatch[1];
+              const param = nthMatch[2];
+              const baseSelector = this.variants[baseVariant];
+              if (baseSelector) {
+                  return {
+                      name: variant,
+                      selector: `${baseSelector}(${param})`,
+                      isArbitrary: false
+                  };
+              }
+          }
+          
+          // Handle parameterized has/not variants: has-[>p], not-\[hidden\]
+          const hasMatch = variant.match(/^has-\[(.+)\]$/);
+          if (hasMatch) {
+              const param = hasMatch[1];
+              const baseSelector = this.variants['has'];
+              if (baseSelector) {
+                  return {
+                      name: variant,
+                      selector: `${baseSelector}(${param})`,
+                      isArbitrary: false
+                  };
+              }
+          }
+          
+          // Handle not-\[...\] variants like not-\[hidden\]
+          // The backslashes escape the brackets in the class name
+          // Match: not-\[content\] where content may have escaped brackets
+          const notMatch = variant.match(/^not-\\\[(.+?)\\\]$/);
+          if (notMatch) {
+              const param = notMatch[1];
+              // The parameter is already clean (backslashes were just for escaping brackets in class name)
+              const baseSelector = this.variants['not'];
+              if (baseSelector) {
+                  return {
+                      name: variant,
+                      selector: `${baseSelector}([${param}])`,
+                      isArbitrary: false
+                  };
+              }
+          }
+          
+          // If no match found, warn and return null
+          console.warn(`Unknown variant: ${variant}`);
+          return null;
       }).filter(Boolean);
 
       // Cache the result
@@ -2888,11 +2963,18 @@ ${H}`)
                   for (const variant of parsed.variants) {
                       if (variant.isArbitrary) {
                           // Handle arbitrary selectors like [&_figure] or [&_fieldset:has(legend):not(.whatever)]
-                          // Convert underscores to spaces, but be careful with complex selectors
+                          // For selectors starting with &, replace & with the base class and use as regular selector
                           let arbitrarySelector = variant.selector;
                           
-                          arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
-                          selector = { baseClass: selector, arbitrarySelector };
+                          if (arbitrarySelector.startsWith('&')) {
+                              // Replace & with the base class selector and convert _ to spaces
+                              arbitrarySelector = arbitrarySelector.replace(/_/g, ' ').replace(/&/g, selector);
+                              selector = arbitrarySelector;
+                          } else {
+                              // For other arbitrary selectors (like data attributes), use nested CSS
+                              arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
+                              selector = { baseClass: selector, arbitrarySelector };
+                          }
                       } else if (variant.selector.includes('&')) {
                           // Handle variants like .dark &, .light &, .group &, etc.
                           // Replace & with the actual selector
@@ -2911,7 +2993,7 @@ ${H}`)
                   // Generate the final rule
                   let rule;
                   if (typeof selector === 'object' && selector.arbitrarySelector) {
-                      // Handle arbitrary selectors with nested CSS
+                      // Handle arbitrary selectors with nested CSS (for non-& selectors)
                       rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContent}\n    }\n}`;
                   } else {
                       // Regular selector
@@ -3189,12 +3271,18 @@ ${H}`)
                   for (const variant of parsed.variants) {
                       if (variant.isArbitrary) {
                           // Handle arbitrary selectors like [&_figure] or [&_fieldset:has(legend):not(.whatever)]
+                          // For selectors starting with &, replace & with the base class and use as regular selector
                           let arbitrarySelector = variant.selector;
                           
-                          // Replace underscores with spaces, but preserve them inside parentheses
-                          arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
-                          
-                          selector = { baseClass: selector, arbitrarySelector };
+                          if (arbitrarySelector.startsWith('&')) {
+                              // Replace & with the base class selector and convert _ to spaces
+                              arbitrarySelector = arbitrarySelector.replace(/_/g, ' ').replace(/&/g, selector);
+                              selector = arbitrarySelector;
+                          } else {
+                              // For other arbitrary selectors (like data attributes), use nested CSS
+                              arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
+                              selector = { baseClass: selector, arbitrarySelector };
+                          }
                       } else if (variant.selector.includes('&')) {
                           // Handle variants like .dark &, .light &, .group &, etc.
                           // Replace & with the actual selector
@@ -3218,7 +3306,7 @@ ${H}`)
                   cssContentStr = cssContentStr.replace(/\[object Object\](;?\s*)/g, '').trim();
                   
                   if (typeof selector === 'object' && selector.arbitrarySelector) {
-                      // Handle arbitrary selectors with nested CSS
+                      // Handle arbitrary selectors with nested CSS (for non-& selectors)
                       rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContentStr}\n    }\n}`;
                   } else {
                       // Check if CSS is a full block (contains nested blocks like @starting-style)
@@ -10473,6 +10561,74 @@ ${H}`)
           }, obj);
       }
 
+      // Get default locale (first locale key) from a localized data source
+      function getDefaultLocale(dataSource) {
+          if (typeof dataSource !== 'object' || dataSource === null) {
+              return null;
+          }
+          
+          // Find first locale key (valid language code that's not a config key)
+          const configKeys = ['url', 'headers', 'params', 'transform', 'defaultValue'];
+          for (const key of Object.keys(dataSource)) {
+              if (!configKeys.includes(key) && 
+                  typeof dataSource[key] === 'string' &&
+                  /^[a-zA-Z0-9_-]+$/.test(key)) {
+                  return key;
+              }
+          }
+          return null;
+      }
+
+      // Deep merge objects with current locale taking precedence
+      function deepMergeWithFallback(currentData, fallbackData) {
+          if (fallbackData === null || fallbackData === undefined) {
+              return currentData;
+          }
+          if (currentData === null || currentData === undefined) {
+              return fallbackData;
+          }
+          
+          // If both are arrays, merge array items by index
+          if (Array.isArray(currentData) && Array.isArray(fallbackData)) {
+              const maxLength = Math.max(currentData.length, fallbackData.length);
+              const merged = [];
+              for (let i = 0; i < maxLength; i++) {
+                  const currentItem = currentData[i];
+                  const fallbackItem = fallbackData[i];
+                  if (currentItem !== undefined && fallbackItem !== undefined) {
+                      // Both exist - merge recursively
+                      merged.push(deepMergeWithFallback(currentItem, fallbackItem));
+                  } else if (currentItem !== undefined) {
+                      // Only current exists
+                      merged.push(currentItem);
+                  } else {
+                      // Only fallback exists
+                      merged.push(fallbackItem);
+                  }
+              }
+              return merged;
+          }
+          
+          // If both are objects, merge recursively
+          if (typeof currentData === 'object' && typeof fallbackData === 'object' &&
+              !Array.isArray(currentData) && !Array.isArray(fallbackData)) {
+              const merged = { ...fallbackData };
+              for (const key in currentData) {
+                  if (key.startsWith('_')) {
+                      // Preserve metadata from current locale
+                      merged[key] = currentData[key];
+                  } else if (currentData[key] !== undefined) {
+                      // Recursively merge nested objects/arrays
+                      merged[key] = deepMergeWithFallback(currentData[key], fallbackData[key]);
+                  }
+              }
+              return merged;
+          }
+          
+          // For primitives or mismatched types, prefer current
+          return currentData !== undefined ? currentData : fallbackData;
+      }
+
       // Load from API endpoint
       async function loadFromAPI(dataSource) {
           try {
@@ -10581,34 +10737,82 @@ ${H}`)
                       // Cloud API - load from HTTP endpoint
                       data = await loadFromAPI(dataSource);
                   } else if (dataSource[locale]) {
-                      // Localized dataSource
+                      // Localized dataSource - load current locale
                       const localizedDataSource = dataSource[locale];
+                      let currentLocaleData = null;
+                      
                       if (typeof localizedDataSource === 'string') {
                           // Localized local file
                           const response = await fetch(localizedDataSource);
                           const contentType = response.headers.get('content-type');
 
                           if (contentType?.includes('application/json') || localizedDataSource.endsWith('.json')) {
-                              data = await response.json();
+                              currentLocaleData = await response.json();
                           } else if (contentType?.includes('text/yaml') || localizedDataSource.endsWith('.yaml') || localizedDataSource.endsWith('.yml')) {
                               const text = await response.text();
                               const yamlLib = await loadYamlLibrary();
-                              data = yamlLib.load(text);
+                              currentLocaleData = yamlLib.load(text);
                           } else {
                               try {
                                   const text = await response.text();
-                                  data = JSON.parse(text);
+                                  currentLocaleData = JSON.parse(text);
                               } catch (e) {
                                   const yamlLib = await loadYamlLibrary();
-                                  data = yamlLib.load(text);
+                                  currentLocaleData = yamlLib.load(text);
                               }
                           }
                       } else if (localizedDataSource.url) {
                           // Localized cloud API
-                          data = await loadFromAPI(localizedDataSource);
+                          currentLocaleData = await loadFromAPI(localizedDataSource);
                       } else {
                           console.warn(`[Indux Data] No valid source found for dataSource "${dataSourceName}" in locale "${locale}"`);
                           return null;
+                      }
+                      
+                      // Load default locale for fallback (if different from current locale)
+                      const defaultLocale = getDefaultLocale(dataSource);
+                      if (defaultLocale && defaultLocale !== locale) {
+                          const defaultLocaleDataSource = dataSource[defaultLocale];
+                          let fallbackData = null;
+                          
+                          try {
+                              if (typeof defaultLocaleDataSource === 'string') {
+                                  const response = await fetch(defaultLocaleDataSource);
+                                  const contentType = response.headers.get('content-type');
+                                  
+                                  if (contentType?.includes('application/json') || defaultLocaleDataSource.endsWith('.json')) {
+                                      fallbackData = await response.json();
+                                  } else if (contentType?.includes('text/yaml') || defaultLocaleDataSource.endsWith('.yaml') || defaultLocaleDataSource.endsWith('.yml')) {
+                                      const text = await response.text();
+                                      const yamlLib = await loadYamlLibrary();
+                                      fallbackData = yamlLib.load(text);
+                                  } else {
+                                      try {
+                                          const text = await response.text();
+                                          fallbackData = JSON.parse(text);
+                                      } catch (e) {
+                                          const yamlLib = await loadYamlLibrary();
+                                          fallbackData = yamlLib.load(text);
+                                      }
+                                  }
+                              } else if (defaultLocaleDataSource?.url) {
+                                  fallbackData = await loadFromAPI(defaultLocaleDataSource);
+                              }
+                              
+                              // Merge fallback data with current locale data (current takes precedence)
+                              if (fallbackData) {
+                                  data = deepMergeWithFallback(currentLocaleData, fallbackData);
+                              } else {
+                                  data = currentLocaleData;
+                              }
+                          } catch (error) {
+                              // If fallback fails, just use current locale data
+                              console.warn(`[Indux Data] Failed to load fallback locale "${defaultLocale}" for "${dataSourceName}", using current locale only`);
+                              data = currentLocaleData;
+                          }
+                      } else {
+                          // No default locale or same as current, just use current
+                          data = currentLocaleData;
                       }
                   } else {
                       console.warn(`[Indux Data] No valid source found for dataSource "${dataSourceName}"`);

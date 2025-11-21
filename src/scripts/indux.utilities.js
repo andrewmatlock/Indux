@@ -2175,7 +2175,17 @@ TailwindCompiler.prototype.parseClassName = function(className) {
 
     // Process variants in order (left to right)
     result.variants = parts.map(variant => {
-        // Check for arbitrary selector variants [&_selector]
+        // FIRST: Check for exact variant matches (most common case)
+        const exactSelector = this.variants[variant];
+        if (exactSelector) {
+            return {
+                name: variant,
+                selector: exactSelector,
+                isArbitrary: false
+            };
+        }
+        
+        // SECOND: Check for arbitrary selector variants [&_selector]
         if (variant.startsWith('[') && variant.endsWith(']')) {
             const arbitrarySelector = variant.slice(1, -1); // Remove brackets
             if (arbitrarySelector.startsWith('&')) {
@@ -2185,18 +2195,83 @@ TailwindCompiler.prototype.parseClassName = function(className) {
                     isArbitrary: true
                 };
             }
+            // Handle arbitrary data variants like [data-state=active]
+            if (arbitrarySelector.startsWith('data-')) {
+                return {
+                    name: variant,
+                    selector: `[${arbitrarySelector}] &`,
+                    isArbitrary: true
+                };
+            }
         }
         
-        const selector = this.variants[variant];
-        if (!selector) {
-            console.warn(`Unknown variant: ${variant}`);
-            return null;
+        // THIRD: Handle parameterized variants (only if exact match not found)
+        
+        // Handle data-[...] variants like data-[state=active] (not starting with bracket)
+        // These should be regular attribute selectors, not arbitrary
+        const dataMatch = variant.match(/^data-\[(.+)\]$/);
+        if (dataMatch) {
+            const attrValue = dataMatch[1];
+            // Add quotes around the value if it contains = (e.g., state=active -> state="active")
+            const quotedValue = attrValue.includes('=') 
+                ? attrValue.replace(/^([^=]+)=(.+)$/, '$1="$2"')
+                : attrValue;
+            return {
+                name: variant,
+                selector: `[data-${quotedValue}] &`,
+                isArbitrary: false
+            };
         }
-        return {
-            name: variant,
-            selector: selector,
-            isArbitrary: false
-        };
+        
+        // Handle parameterized nth variants: nth-3, nth-last-2, nth-of-type-2, nth-last-of-type-2
+        const nthMatch = variant.match(/^(nth|nth-last|nth-of-type|nth-last-of-type)-(\d+)$/);
+        if (nthMatch) {
+            const baseVariant = nthMatch[1];
+            const param = nthMatch[2];
+            const baseSelector = this.variants[baseVariant];
+            if (baseSelector) {
+                return {
+                    name: variant,
+                    selector: `${baseSelector}(${param})`,
+                    isArbitrary: false
+                };
+            }
+        }
+        
+        // Handle parameterized has/not variants: has-[>p], not-\[hidden\]
+        const hasMatch = variant.match(/^has-\[(.+)\]$/);
+        if (hasMatch) {
+            const param = hasMatch[1];
+            const baseSelector = this.variants['has'];
+            if (baseSelector) {
+                return {
+                    name: variant,
+                    selector: `${baseSelector}(${param})`,
+                    isArbitrary: false
+                };
+            }
+        }
+        
+        // Handle not-\[...\] variants like not-\[hidden\]
+        // The backslashes escape the brackets in the class name
+        // Match: not-\[content\] where content may have escaped brackets
+        const notMatch = variant.match(/^not-\\\[(.+?)\\\]$/);
+        if (notMatch) {
+            const param = notMatch[1];
+            // The parameter is already clean (backslashes were just for escaping brackets in class name)
+            const baseSelector = this.variants['not'];
+            if (baseSelector) {
+                return {
+                    name: variant,
+                    selector: `${baseSelector}([${param}])`,
+                    isArbitrary: false
+                };
+            }
+        }
+        
+        // If no match found, warn and return null
+        console.warn(`Unknown variant: ${variant}`);
+        return null;
     }).filter(Boolean);
 
     // Cache the result
@@ -2278,11 +2353,18 @@ TailwindCompiler.prototype.generateUtilitiesFromVars = function(cssText, usedDat
                 for (const variant of parsed.variants) {
                     if (variant.isArbitrary) {
                         // Handle arbitrary selectors like [&_figure] or [&_fieldset:has(legend):not(.whatever)]
-                        // Convert underscores to spaces, but be careful with complex selectors
+                        // For selectors starting with &, replace & with the base class and use as regular selector
                         let arbitrarySelector = variant.selector;
                         
-                        arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
-                        selector = { baseClass: selector, arbitrarySelector };
+                        if (arbitrarySelector.startsWith('&')) {
+                            // Replace & with the base class selector and convert _ to spaces
+                            arbitrarySelector = arbitrarySelector.replace(/_/g, ' ').replace(/&/g, selector);
+                            selector = arbitrarySelector;
+                        } else {
+                            // For other arbitrary selectors (like data attributes), use nested CSS
+                            arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
+                            selector = { baseClass: selector, arbitrarySelector };
+                        }
                     } else if (variant.selector.includes('&')) {
                         // Handle variants like .dark &, .light &, .group &, etc.
                         // Replace & with the actual selector
@@ -2301,7 +2383,7 @@ TailwindCompiler.prototype.generateUtilitiesFromVars = function(cssText, usedDat
                 // Generate the final rule
                 let rule;
                 if (typeof selector === 'object' && selector.arbitrarySelector) {
-                    // Handle arbitrary selectors with nested CSS
+                    // Handle arbitrary selectors with nested CSS (for non-& selectors)
                     rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContent}\n    }\n}`;
                 } else {
                     // Regular selector
@@ -2579,12 +2661,18 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                 for (const variant of parsed.variants) {
                     if (variant.isArbitrary) {
                         // Handle arbitrary selectors like [&_figure] or [&_fieldset:has(legend):not(.whatever)]
+                        // For selectors starting with &, replace & with the base class and use as regular selector
                         let arbitrarySelector = variant.selector;
                         
-                        // Replace underscores with spaces, but preserve them inside parentheses
-                        arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
-                        
-                        selector = { baseClass: selector, arbitrarySelector };
+                        if (arbitrarySelector.startsWith('&')) {
+                            // Replace & with the base class selector and convert _ to spaces
+                            arbitrarySelector = arbitrarySelector.replace(/_/g, ' ').replace(/&/g, selector);
+                            selector = arbitrarySelector;
+                        } else {
+                            // For other arbitrary selectors (like data attributes), use nested CSS
+                            arbitrarySelector = arbitrarySelector.replace(/_/g, ' ');
+                            selector = { baseClass: selector, arbitrarySelector };
+                        }
                     } else if (variant.selector.includes('&')) {
                         // Handle variants like .dark &, .light &, .group &, etc.
                         // Replace & with the actual selector
@@ -2608,7 +2696,7 @@ TailwindCompiler.prototype.generateCustomUtilities = function(usedData) {
                 cssContentStr = cssContentStr.replace(/\[object Object\](;?\s*)/g, '').trim();
                 
                 if (typeof selector === 'object' && selector.arbitrarySelector) {
-                    // Handle arbitrary selectors with nested CSS
+                    // Handle arbitrary selectors with nested CSS (for non-& selectors)
                     rule = `${selector.baseClass} {\n    ${selector.arbitrarySelector} {\n        ${cssContentStr}\n    }\n}`;
                 } else {
                     // Check if CSS is a full block (contains nested blocks like @starting-style)

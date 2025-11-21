@@ -211,6 +211,74 @@ async function initializeDataSourcesPlugin() {
         }, obj);
     }
 
+    // Get default locale (first locale key) from a localized data source
+    function getDefaultLocale(dataSource) {
+        if (typeof dataSource !== 'object' || dataSource === null) {
+            return null;
+        }
+        
+        // Find first locale key (valid language code that's not a config key)
+        const configKeys = ['url', 'headers', 'params', 'transform', 'defaultValue'];
+        for (const key of Object.keys(dataSource)) {
+            if (!configKeys.includes(key) && 
+                typeof dataSource[key] === 'string' &&
+                /^[a-zA-Z0-9_-]+$/.test(key)) {
+                return key;
+            }
+        }
+        return null;
+    }
+
+    // Deep merge objects with current locale taking precedence
+    function deepMergeWithFallback(currentData, fallbackData) {
+        if (fallbackData === null || fallbackData === undefined) {
+            return currentData;
+        }
+        if (currentData === null || currentData === undefined) {
+            return fallbackData;
+        }
+        
+        // If both are arrays, merge array items by index
+        if (Array.isArray(currentData) && Array.isArray(fallbackData)) {
+            const maxLength = Math.max(currentData.length, fallbackData.length);
+            const merged = [];
+            for (let i = 0; i < maxLength; i++) {
+                const currentItem = currentData[i];
+                const fallbackItem = fallbackData[i];
+                if (currentItem !== undefined && fallbackItem !== undefined) {
+                    // Both exist - merge recursively
+                    merged.push(deepMergeWithFallback(currentItem, fallbackItem));
+                } else if (currentItem !== undefined) {
+                    // Only current exists
+                    merged.push(currentItem);
+                } else {
+                    // Only fallback exists
+                    merged.push(fallbackItem);
+                }
+            }
+            return merged;
+        }
+        
+        // If both are objects, merge recursively
+        if (typeof currentData === 'object' && typeof fallbackData === 'object' &&
+            !Array.isArray(currentData) && !Array.isArray(fallbackData)) {
+            const merged = { ...fallbackData };
+            for (const key in currentData) {
+                if (key.startsWith('_')) {
+                    // Preserve metadata from current locale
+                    merged[key] = currentData[key];
+                } else if (currentData[key] !== undefined) {
+                    // Recursively merge nested objects/arrays
+                    merged[key] = deepMergeWithFallback(currentData[key], fallbackData[key]);
+                }
+            }
+            return merged;
+        }
+        
+        // For primitives or mismatched types, prefer current
+        return currentData !== undefined ? currentData : fallbackData;
+    }
+
     // Load from API endpoint
     async function loadFromAPI(dataSource) {
         try {
@@ -319,34 +387,82 @@ async function initializeDataSourcesPlugin() {
                     // Cloud API - load from HTTP endpoint
                     data = await loadFromAPI(dataSource);
                 } else if (dataSource[locale]) {
-                    // Localized dataSource
+                    // Localized dataSource - load current locale
                     const localizedDataSource = dataSource[locale];
+                    let currentLocaleData = null;
+                    
                     if (typeof localizedDataSource === 'string') {
                         // Localized local file
                         const response = await fetch(localizedDataSource);
                         const contentType = response.headers.get('content-type');
 
                         if (contentType?.includes('application/json') || localizedDataSource.endsWith('.json')) {
-                            data = await response.json();
+                            currentLocaleData = await response.json();
                         } else if (contentType?.includes('text/yaml') || localizedDataSource.endsWith('.yaml') || localizedDataSource.endsWith('.yml')) {
                             const text = await response.text();
                             const yamlLib = await loadYamlLibrary();
-                            data = yamlLib.load(text);
+                            currentLocaleData = yamlLib.load(text);
                         } else {
                             try {
                                 const text = await response.text();
-                                data = JSON.parse(text);
+                                currentLocaleData = JSON.parse(text);
                             } catch (e) {
                                 const yamlLib = await loadYamlLibrary();
-                                data = yamlLib.load(text);
+                                currentLocaleData = yamlLib.load(text);
                             }
                         }
                     } else if (localizedDataSource.url) {
                         // Localized cloud API
-                        data = await loadFromAPI(localizedDataSource);
+                        currentLocaleData = await loadFromAPI(localizedDataSource);
                     } else {
                         console.warn(`[Indux Data] No valid source found for dataSource "${dataSourceName}" in locale "${locale}"`);
                         return null;
+                    }
+                    
+                    // Load default locale for fallback (if different from current locale)
+                    const defaultLocale = getDefaultLocale(dataSource);
+                    if (defaultLocale && defaultLocale !== locale) {
+                        const defaultLocaleDataSource = dataSource[defaultLocale];
+                        let fallbackData = null;
+                        
+                        try {
+                            if (typeof defaultLocaleDataSource === 'string') {
+                                const response = await fetch(defaultLocaleDataSource);
+                                const contentType = response.headers.get('content-type');
+                                
+                                if (contentType?.includes('application/json') || defaultLocaleDataSource.endsWith('.json')) {
+                                    fallbackData = await response.json();
+                                } else if (contentType?.includes('text/yaml') || defaultLocaleDataSource.endsWith('.yaml') || defaultLocaleDataSource.endsWith('.yml')) {
+                                    const text = await response.text();
+                                    const yamlLib = await loadYamlLibrary();
+                                    fallbackData = yamlLib.load(text);
+                                } else {
+                                    try {
+                                        const text = await response.text();
+                                        fallbackData = JSON.parse(text);
+                                    } catch (e) {
+                                        const yamlLib = await loadYamlLibrary();
+                                        fallbackData = yamlLib.load(text);
+                                    }
+                                }
+                            } else if (defaultLocaleDataSource?.url) {
+                                fallbackData = await loadFromAPI(defaultLocaleDataSource);
+                            }
+                            
+                            // Merge fallback data with current locale data (current takes precedence)
+                            if (fallbackData) {
+                                data = deepMergeWithFallback(currentLocaleData, fallbackData);
+                            } else {
+                                data = currentLocaleData;
+                            }
+                        } catch (error) {
+                            // If fallback fails, just use current locale data
+                            console.warn(`[Indux Data] Failed to load fallback locale "${defaultLocale}" for "${dataSourceName}", using current locale only`);
+                            data = currentLocaleData;
+                        }
+                    } else {
+                        // No default locale or same as current, just use current
+                        data = currentLocaleData;
                     }
                 } else {
                     console.warn(`[Indux Data] No valid source found for dataSource "${dataSourceName}"`);
